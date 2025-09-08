@@ -167,16 +167,57 @@ def login():
             # Update last login time
             user.last_login = datetime.utcnow()
             
-            # Capture login event with device/IP info
+            # Enhanced login tracking with comprehensive device/IP information
             ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'Unknown'))
             user_agent = request.headers.get('User-Agent', '')
             
-            # Create login event record
+            # Enhanced device fingerprinting and location tracking
+            device_info = {
+                'user_agent': user_agent,
+                'ip_address': ip_address,
+                'accept_language': request.headers.get('Accept-Language', ''),
+                'accept_encoding': request.headers.get('Accept-Encoding', ''),
+                'remote_addr': request.environ.get('REMOTE_ADDR'),
+                'x_forwarded_for': request.headers.get('X-Forwarded-For', ''),
+                'x_real_ip': request.headers.get('X-Real-IP', ''),
+                'host': request.headers.get('Host', ''),
+                'referer': request.headers.get('Referer', ''),
+                'connection': request.headers.get('Connection', '')
+            }
+            
+            # Check for suspicious login patterns
+            from datetime import timedelta
+            recent_logins = LoginEvent.query.filter_by(user_id=user.id).filter(
+                LoginEvent.login_time > datetime.utcnow() - timedelta(hours=1)
+            ).count()
+            
+            # Check for different IP addresses in short time (potential location jumping)
+            different_ips = db.session.query(LoginEvent.ip_address).distinct().filter(
+                LoginEvent.user_id == user.id,
+                LoginEvent.login_time > datetime.utcnow() - timedelta(hours=24)
+            ).count()
+            
+            # Check for different user agents (device switching)
+            different_devices = db.session.query(LoginEvent.user_agent).distinct().filter(
+                LoginEvent.user_id == user.id,
+                LoginEvent.login_time > datetime.utcnow() - timedelta(days=7)
+            ).count()
+            
+            is_suspicious = recent_logins > 5 or different_ips > 3 or different_devices > 5
+            
+            # Create login event record with enhanced tracking
             login_event = LoginEvent(
                 user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                device_info=user_agent  # Will be parsed in email service
+                device_info=json.dumps(device_info),
+                device_fingerprint=json.dumps(device_info),  # Enhanced fingerprinting
+                is_suspicious=is_suspicious,
+                location_info=None,  # Can be enhanced with GeoIP lookup
+                security_score=95 if not is_suspicious else 50,
+                browser_language=request.headers.get('Accept-Language', '').split(',')[0] if request.headers.get('Accept-Language') else None,
+                timezone=None,  # Can be captured via JavaScript
+                screen_resolution=None  # Can be captured via JavaScript
             )
             
             db.session.add(login_event)
