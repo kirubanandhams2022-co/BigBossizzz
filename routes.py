@@ -859,50 +859,6 @@ def get_quiz_questions(quiz_id):
     return jsonify({'questions': questions})
 
 
-@app.route('/question/edit/<int:question_id>', methods=['GET', 'POST'])
-@login_required
-def edit_question(question_id):
-    """Edit a question"""
-    question = Question.query.get_or_404(question_id)
-    quiz = question.quiz
-    
-    # Check permissions
-    if quiz.creator_id != current_user.id and not current_user.is_admin():
-        flash('Access denied.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    if request.method == 'POST':
-        question.question_text = request.form.get('question_text')
-        question.points = int(request.form.get('points', 1))
-        
-        # Update options for multiple choice
-        if question.question_type == 'multiple_choice':
-            # Delete existing options
-            QuestionOption.query.filter_by(question_id=question.id).delete()
-            
-            # Add new options
-            correct_answer = request.form.get('correct_answer')
-            for i in range(4):
-                option_text = request.form.get(f'option_{i}')
-                if option_text:
-                    option = QuestionOption(
-                        question_id=question.id,
-                        option_text=option_text,
-                        is_correct=(str(i) == correct_answer)
-                    )
-                    db.session.add(option)
-        
-        db.session.commit()
-        flash('Question updated successfully.', 'success')
-        return redirect(url_for('edit_quiz', quiz_id=quiz.id))
-    
-    return jsonify({'question': {
-        'id': question.id,
-        'text': question.question_text,
-        'type': question.question_type,
-        'points': question.points,
-        'options': [{'text': opt.option_text, 'is_correct': opt.is_correct} for opt in question.options]
-    }})
 
 @app.route('/admin/violations')
 @login_required
