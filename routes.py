@@ -8,6 +8,7 @@ from email_service import send_verification_email, send_credentials_email, send_
 from datetime import datetime
 import json
 import logging
+from sqlalchemy import func
 
 @app.route('/')
 def index():
@@ -229,7 +230,7 @@ def dashboard():
 @app.route('/host/dashboard')
 @login_required
 def host_dashboard():
-    """Host dashboard"""
+    """Enhanced Host dashboard with participant management"""
     if not current_user.is_host() and not current_user.is_admin():
         flash('Access denied. Host privileges required.', 'error')
         return redirect(url_for('dashboard'))
@@ -245,7 +246,26 @@ def host_dashboard():
     recent_attempts.sort(key=lambda x: x.started_at, reverse=True)
     recent_attempts = recent_attempts[:10]  # Show only 10 most recent
     
-    return render_template('host_dashboard.html', quizzes=quizzes, recent_attempts=recent_attempts)
+    # Get participant statistics
+    participants = User.query.filter_by(role='participant').all()
+    recent_logins = LoginEvent.query.join(User).filter(User.role == 'participant').order_by(LoginEvent.login_time.desc()).limit(10).all()
+    
+    # Get violation statistics
+    quiz_ids = [quiz.id for quiz in quizzes]
+    if quiz_ids:
+        high_violations = db.session.query(QuizAttempt, func.count(ProctoringEvent.id).label('violation_count')).join(ProctoringEvent).filter(
+            QuizAttempt.quiz_id.in_(quiz_ids),
+            ProctoringEvent.severity == 'high'
+        ).group_by(QuizAttempt.id).having(func.count(ProctoringEvent.id) > 2).all()
+    else:
+        high_violations = []
+    
+    return render_template('host_dashboard.html', 
+                         quizzes=quizzes, 
+                         recent_attempts=recent_attempts,
+                         participants=participants,
+                         recent_logins=recent_logins,
+                         high_violations=high_violations)
 
 @app.route('/participant/dashboard')
 @login_required
@@ -473,10 +493,13 @@ def admin_create_user():
 @app.route('/host/participants')
 @login_required
 def host_participants():
-    """Host view of participants who took their quizzes"""
+    """Enhanced Host view of participants with management features"""
     if not current_user.is_host() and not current_user.is_admin():
         flash('Access denied. Host privileges required.', 'error')
         return redirect(url_for('dashboard'))
+    
+    # Get all participants and their data
+    participants = User.query.filter_by(role='participant').all()
     
     # Get all attempts for quizzes created by this host
     host_quizzes = Quiz.query.filter_by(creator_id=current_user.id).all()
@@ -484,7 +507,153 @@ def host_participants():
     
     attempts = QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(quiz_ids)).order_by(QuizAttempt.started_at.desc()).all()
     
-    return render_template('host_participants.html', attempts=attempts, host_quizzes=host_quizzes)
+    # Get participant statistics
+    participant_stats = {}
+    for participant in participants:
+        participant_attempts = [attempt for attempt in attempts if attempt.participant_id == participant.id]
+        completed_attempts = [attempt for attempt in participant_attempts if attempt.status == 'completed']
+        avg_score = sum([attempt.score for attempt in completed_attempts if attempt.score]) / len(completed_attempts) if completed_attempts else 0
+        
+        # Get violation count
+        violation_count = 0
+        for attempt in participant_attempts:
+            violation_count += ProctoringEvent.query.filter_by(attempt_id=attempt.id).count()
+        
+        # Get recent login
+        recent_login = LoginEvent.query.filter_by(user_id=participant.id).order_by(LoginEvent.login_time.desc()).first()
+        
+        participant_stats[participant.id] = {
+            'total_attempts': len(participant_attempts),
+            'completed_attempts': len(completed_attempts),
+            'avg_score': avg_score,
+            'violation_count': violation_count,
+            'recent_login': recent_login,
+            'is_flagged': any(attempt.is_flagged for attempt in participant_attempts)
+        }
+    
+    return render_template('host_participants.html', 
+                         participants=participants,
+                         attempts=attempts, 
+                         host_quizzes=host_quizzes,
+                         participant_stats=participant_stats)
+
+@app.route('/host/participant/<int:participant_id>/manage', methods=['GET', 'POST'])
+@login_required
+def manage_participant(participant_id):
+    """Manage individual participant - credentials, performance, flags"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    participant = User.query.get_or_404(participant_id)
+    if participant.role != 'participant':
+        flash('Invalid participant.', 'error')
+        return redirect(url_for('host_participants'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'update_credentials':
+            # Update participant credentials
+            new_username = request.form.get('username')
+            new_email = request.form.get('email')
+            new_password = request.form.get('password')
+            
+            if new_username:
+                participant.username = new_username
+            if new_email:
+                participant.email = new_email
+            if new_password:
+                participant.set_password(new_password)
+            
+            db.session.commit()
+            flash('Participant credentials updated successfully.', 'success')
+            
+        elif action == 'flag_user':
+            # Flag user for violations
+            violation_record = UserViolation.query.filter_by(user_id=participant_id).first()
+            if not violation_record:
+                violation_record = UserViolation(user_id=participant_id)
+                db.session.add(violation_record)
+            
+            violation_record.is_flagged = True
+            violation_record.flagged_at = datetime.utcnow()
+            violation_record.flagged_by = current_user.id
+            violation_record.notes = request.form.get('notes', '')
+            
+            db.session.commit()
+            flash('Participant flagged for violations.', 'warning')
+            
+        elif action == 'unflag_user':
+            # Remove flag
+            violation_record = UserViolation.query.filter_by(user_id=participant_id).first()
+            if violation_record:
+                violation_record.is_flagged = False
+                violation_record.notes = request.form.get('notes', '')
+                db.session.commit()
+            flash('Participant flag removed.', 'success')
+            
+        return redirect(url_for('manage_participant', participant_id=participant_id))
+    
+    # Get participant data for display
+    attempts = QuizAttempt.query.filter_by(participant_id=participant_id).order_by(QuizAttempt.started_at.desc()).all()
+    login_events = LoginEvent.query.filter_by(user_id=participant_id).order_by(LoginEvent.login_time.desc()).limit(10).all()
+    
+    # Get violation data
+    violation_record = UserViolation.query.filter_by(user_id=participant_id).first()
+    total_violations = 0
+    for attempt in attempts:
+        total_violations += ProctoringEvent.query.filter_by(attempt_id=attempt.id).count()
+    
+    return render_template('manage_participant.html', 
+                         participant=participant,
+                         attempts=attempts,
+                         login_events=login_events,
+                         violation_record=violation_record,
+                         total_violations=total_violations)
+
+@app.route('/host/participant/<int:participant_id>/violations')
+@login_required
+def view_participant_violations(participant_id):
+    """View detailed violation history for a participant"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    participant = User.query.get_or_404(participant_id)
+    attempts = QuizAttempt.query.filter_by(participant_id=participant_id).all()
+    
+    # Get all violations for this participant
+    violations = []
+    for attempt in attempts:
+        attempt_violations = ProctoringEvent.query.filter_by(attempt_id=attempt.id).order_by(ProctoringEvent.timestamp.desc()).all()
+        for violation in attempt_violations:
+            violations.append({
+                'violation': violation,
+                'attempt': attempt,
+                'quiz': attempt.quiz
+            })
+    
+    violations.sort(key=lambda x: x['violation'].timestamp, reverse=True)
+    
+    return render_template('participant_violations.html', 
+                         participant=participant,
+                         violations=violations)
+
+@app.route('/host/login-activity')
+@login_required
+def host_login_activity():
+    """View login activity of all participants"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get recent login events for participants
+    login_events = db.session.query(LoginEvent, User).join(User).filter(
+        User.role == 'participant'
+    ).order_by(LoginEvent.login_time.desc()).limit(50).all()
+    
+    return render_template('host_login_activity.html', login_events=login_events)
 
 @app.route('/api/violations/<int:attempt_id>')
 @login_required
