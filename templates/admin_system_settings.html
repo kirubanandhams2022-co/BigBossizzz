@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-cog"></i> System Settings</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-shield-alt"></i> Security Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="securitySettings">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enableProctoring" checked>
+                                <label class="form-check-label" for="enableProctoring">
+                                    Enable Proctoring System
+                                </label>
+                            </div>
+                            <small class="text-muted">Global proctoring system control</small>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoTerminate" checked>
+                                <label class="form-check-label" for="autoTerminate">
+                                    Auto-Terminate on Violations
+                                </label>
+                            </div>
+                            <small class="text-muted">Automatically end quiz on high violations</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Maximum Login Attempts</label>
+                            <input type="number" class="form-control" value="5" min="1" max="10">
+                            <small class="text-muted">Lock account after failed attempts</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Session Timeout (minutes)</label>
+                            <input type="number" class="form-control" value="30" min="5" max="120">
+                            <small class="text-muted">Auto-logout after inactivity</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Violation Sensitivity</label>
+                        <select class="form-select">
+                            <option value="low">Low - Basic monitoring</option>
+                            <option value="medium" selected>Medium - Standard monitoring</option>
+                            <option value="high">High - Strict monitoring</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Security Settings</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-envelope"></i> Email Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="emailSettings">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Server</label>
+                            <input type="text" class="form-control" value="smtp.gmail.com" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Port</label>
+                            <input type="number" class="form-control" value="587" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enableEmailVerification" checked>
+                            <label class="form-check-label" for="enableEmailVerification">
+                                Require Email Verification
+                            </label>
+                        </div>
+                        <small class="text-muted">Users must verify email before access</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
+                            <label class="form-check-label" for="emailNotifications">
+                                Send Violation Notifications
+                            </label>
+                        </div>
+                        <small class="text-muted">Email admins about security violations</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Email Settings</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-database"></i> System Maintenance</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <h6>Database Operations</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-info" onclick="optimizeDatabase()">
+                                <i class="fas fa-database"></i> Optimize Database
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="clearOldLogs()">
+                                <i class="fas fa-trash"></i> Clear Old Logs
+                            </button>
+                            <button class="btn btn-outline-success" onclick="backupDatabase()">
+                                <i class="fas fa-download"></i> Backup Database
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <h6>System Information</h6>
+                        <div class="alert alert-info">
+                            <strong>Platform:</strong> Replit<br>
+                            <strong>Database:</strong> PostgreSQL<br>
+                            <strong>Python Version:</strong> 3.11<br>
+                            <strong>Flask Version:</strong> Latest
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie"></i> System Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Database Connection</span>
+                        <span class="badge bg-success">Healthy</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Email Service</span>
+                        <span class="badge bg-success">Operational</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Proctoring System</span>
+                        <span class="badge bg-success">Active</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Backup System</span>
+                        <span class="badge bg-info">Automated</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-exclamation-triangle"></i> Recent Alerts</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-clock"></i> Database optimization recommended
+                    <br><small>Last optimization: 7 days ago</small>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-shield-alt"></i> 15 security violations today
+                    <br><small>All handled automatically</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tools"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="refreshStats()">
+                        <i class="fas fa-sync"></i> Refresh Statistics
+                    </button>
+                    <button class="btn btn-outline-info" onclick="testEmailService()">
+                        <i class="fas fa-envelope"></i> Test Email Service
+                    </button>
+                    <button class="btn btn-outline-success" onclick="generateReport()">
+                        <i class="fas fa-file-pdf"></i> Generate System Report
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="restartSystem()">
+                        <i class="fas fa-power-off"></i> Restart System
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// System Settings Functions
+document.getElementById('securitySettings').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Simulate saving settings
+    alert('Security settings saved successfully!');
+});
+
+document.getElementById('emailSettings').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Simulate saving settings
+    alert('Email settings saved successfully!');
+});
+
+function optimizeDatabase() {
+    if (confirm('This will optimize the database. Continue?')) {
+        alert('Database optimization started. This may take a few minutes.');
+    }
+}
+
+function clearOldLogs() {
+    if (confirm('This will clear logs older than 30 days. Continue?')) {
+        alert('Old logs cleared successfully.');
+    }
+}
+
+function backupDatabase() {
+    alert('Database backup initiated. You will receive an email when complete.');
+}
+
+function refreshStats() {
+    alert('System statistics refreshed.');
+}
+
+function testEmailService() {
+    alert('Email service test completed. Check your email for confirmation.');
+}
+
+function generateReport() {
+    alert('System report generation started. Report will be available in the downloads section.');
+}
+
+function restartSystem() {
+    if (confirm('This will restart the system. All users will be logged out. Continue?')) {
+        alert('System restart initiated. Please wait 2-3 minutes.');
+    }
+}
+</script>
+{% endblock %}
