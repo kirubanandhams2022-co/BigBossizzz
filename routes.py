@@ -495,7 +495,7 @@ def log_proctoring_event():
         attempt = QuizAttempt.query.get_or_404(attempt_id)
         
         # Verify user owns this attempt
-        if attempt.user_id != current_user.id:
+        if attempt.participant_id != current_user.id:
             return jsonify({'error': 'Access denied'}), 403
         
         # Create proctoring event

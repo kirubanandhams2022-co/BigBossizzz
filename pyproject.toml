@@ -15,4 +15,5 @@ dependencies = [
     "sqlalchemy>=2.0.43",
     "flask-login>=0.6.3",
     "flask-wtf>=1.2.2",
+    "sendgrid>=6.12.4",
 ]
