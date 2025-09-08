@@ -313,6 +313,62 @@ def admin_change_user_role(user_id):
     flash(f'User {user.username} role changed from {old_role} to {new_role}.', 'success')
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_user(user_id):
+    """Delete a user (admin only)"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Don't allow deleting yourself
+    if user.id == current_user.id:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    try:
+        # Delete related data in proper order
+        # 1. Delete answers and proctoring events for this user's attempts
+        user_attempts = QuizAttempt.query.filter_by(participant_id=user.id).all()
+        for attempt in user_attempts:
+            Answer.query.filter_by(attempt_id=attempt.id).delete()
+            ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
+        
+        # 2. Delete quiz attempts
+        QuizAttempt.query.filter_by(participant_id=user.id).delete()
+        
+        # 3. Handle quizzes created by this user
+        user_quizzes = Quiz.query.filter_by(creator_id=user.id).all()
+        for quiz in user_quizzes:
+            # Delete all attempts for these quizzes first
+            quiz_attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).all()
+            for attempt in quiz_attempts:
+                Answer.query.filter_by(attempt_id=attempt.id).delete()
+                ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
+            QuizAttempt.query.filter_by(quiz_id=quiz.id).delete()
+            
+            # Delete questions and options
+            for question in quiz.questions:
+                QuestionOption.query.filter_by(question_id=question.id).delete()
+            Question.query.filter_by(quiz_id=quiz.id).delete()
+            
+            # Delete the quiz
+            db.session.delete(quiz)
+        
+        # 4. Finally delete the user
+        username = user.username
+        db.session.delete(user)
+        db.session.commit()
+        
+        flash(f'User {username} has been permanently deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting user: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users'))
+
 @app.route('/admin/user/<int:user_id>/reset-password', methods=['POST'])
 @login_required
 def admin_reset_password(user_id):
@@ -808,6 +864,25 @@ def profile():
                 flash('Email already registered.', 'error')
                 return render_template('profile.html', form=form)
         
+        # Handle profile picture upload
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and file.filename:
+                import os
+                from werkzeug.utils import secure_filename
+                
+                # Create uploads directory if it doesn't exist
+                upload_dir = os.path.join('static', 'uploads', 'profiles')
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                # Save file with user id prefix
+                filename = f"user_{current_user.id}_{secure_filename(file.filename)}"
+                filepath = os.path.join(upload_dir, filename)
+                file.save(filepath)
+                
+                # Update user profile picture path
+                current_user.profile_picture = f"uploads/profiles/{filename}"
+
         # Update profile
         current_user.username = form.username.data
         current_user.email = form.email.data
@@ -976,12 +1051,22 @@ def admin_delete_quiz(quiz_id):
     
     quiz = Quiz.query.get_or_404(quiz_id)
     
-    # Delete all related data
+    # Delete all related data in correct order (respecting foreign keys)
+    # 1. Delete answers first (they reference quiz_attempt)
+    attempts = QuizAttempt.query.filter_by(quiz_id=quiz_id).all()
+    for attempt in attempts:
+        Answer.query.filter_by(attempt_id=attempt.id).delete()
+        ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
+    
+    # 2. Delete quiz attempts
     QuizAttempt.query.filter_by(quiz_id=quiz_id).delete()
+    
+    # 3. Delete question options and questions
     for question in quiz.questions:
         QuestionOption.query.filter_by(question_id=question.id).delete()
     Question.query.filter_by(quiz_id=quiz_id).delete()
     
+    # 4. Finally delete the quiz
     db.session.delete(quiz)
     db.session.commit()
     
@@ -1023,6 +1108,43 @@ def get_violations_count():
     
     count = ProctoringEvent.query.count()
     return jsonify({'count': count})
+
+
+@app.route('/api/export-logs')
+@login_required  
+def export_logs():
+    """Export audit logs to CSV"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    import csv
+    import io
+    from flask import make_response
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow(['Date', 'User', 'Quiz', 'Action', 'Status', 'Score', 'Violations'])
+    
+    # Write data
+    attempts = QuizAttempt.query.order_by(QuizAttempt.started_at.desc()).all()
+    for attempt in attempts:
+        writer.writerow([
+            attempt.started_at.strftime('%Y-%m-%d %H:%M:%S') if attempt.started_at else 'N/A',
+            attempt.participant.username,
+            attempt.quiz.title,
+            'Quiz Attempt',
+            attempt.status,
+            f"{attempt.score:.1f}%" if attempt.score else 'N/A',
+            len(attempt.answers) if hasattr(attempt, 'answers') else 0
+        ])
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = 'attachment; filename=audit_logs.csv'
+    
+    return response
 
 # Error handlers
 @app.errorhandler(404)
