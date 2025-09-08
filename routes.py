@@ -253,6 +253,169 @@ def admin_dashboard():
     
     return render_template('admin_dashboard.html', stats=stats, recent_users=recent_users)
 
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    """Manage all users"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/user/<int:user_id>/toggle-status', methods=['POST'])
+@login_required
+def admin_toggle_user_status(user_id):
+    """Toggle user active/inactive status"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Don't allow disabling yourself
+    if user.id == current_user.id:
+        flash('You cannot disable your own account.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    user.is_active = not user.is_active
+    db.session.commit()
+    
+    status = 'activated' if user.is_active else 'deactivated'
+    flash(f'User {user.username} has been {status}.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/user/<int:user_id>/change-role', methods=['POST'])
+@login_required
+def admin_change_user_role(user_id):
+    """Change user role"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    new_role = request.form.get('role')
+    
+    if new_role not in ['admin', 'host', 'participant']:
+        flash('Invalid role specified.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Don't allow changing your own role
+    if user.id == current_user.id:
+        flash('You cannot change your own role.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    old_role = user.role
+    user.role = new_role
+    db.session.commit()
+    
+    flash(f'User {user.username} role changed from {old_role} to {new_role}.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/user/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+def admin_reset_password(user_id):
+    """Reset user password"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    new_password = request.form.get('new_password')
+    
+    if not new_password or len(new_password) < 6:
+        flash('Password must be at least 6 characters long.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    user.set_password(new_password)
+    db.session.commit()
+    
+    flash(f'Password reset for user {user.username}.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/create-user', methods=['POST'])
+@login_required
+def admin_create_user():
+    """Create new user account"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    username = request.form.get('username')
+    email = request.form.get('email')
+    password = request.form.get('password')
+    role = request.form.get('role')
+    
+    # Validation
+    if not all([username, email, password, role]):
+        flash('All fields are required.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    if User.query.filter_by(email=email).first():
+        flash('Email already exists.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    if User.query.filter_by(username=username).first():
+        flash('Username already exists.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    if role not in ['admin', 'host', 'participant']:
+        flash('Invalid role.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Create user
+    user = User(
+        username=username,
+        email=email,
+        role=role
+    )
+    user.set_password(password)
+    user.is_verified = True  # Admin-created users are pre-verified
+    user.is_active = True
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    flash(f'User {username} created successfully with role {role}.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/host/participants')
+@login_required
+def host_participants():
+    """Host view of participants who took their quizzes"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all attempts for quizzes created by this host
+    host_quizzes = Quiz.query.filter_by(creator_id=current_user.id).all()
+    quiz_ids = [quiz.id for quiz in host_quizzes]
+    
+    attempts = QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(quiz_ids)).order_by(QuizAttempt.started_at.desc()).all()
+    
+    return render_template('host_participants.html', attempts=attempts, host_quizzes=host_quizzes)
+
+@app.route('/api/violations/<int:attempt_id>')
+@login_required
+def get_violations(attempt_id):
+    """Get violations for a quiz attempt"""
+    attempt = QuizAttempt.query.get_or_404(attempt_id)
+    
+    # Check permissions
+    if not (current_user.is_admin() or 
+            (current_user.is_host() and attempt.quiz.creator_id == current_user.id)):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    violations = [{
+        'event_type': event.event_type,
+        'description': event.description,
+        'severity': event.severity,
+        'timestamp': event.timestamp.isoformat() if event.timestamp else None
+    } for event in attempt.proctoring_events]
+    
+    return jsonify({'violations': violations})
+
 @app.route('/quiz/create', methods=['GET', 'POST'])
 @login_required
 def create_quiz():

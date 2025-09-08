@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Participants - Host Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-users"></i> Quiz Participants</h1>
+    <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Quiz Attempts by Participants</h5>
+    </div>
+    <div class="card-body">
+        {% if attempts %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Participant</th>
+                        <th>Email</th>
+                        <th>Quiz</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Completed</th>
+                        <th>Violations</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in attempts %}
+                    <tr>
+                        <td><strong>{{ attempt.user.username }}</strong></td>
+                        <td>{{ attempt.user.email }}</td>
+                        <td>{{ attempt.quiz.title }}</td>
+                        <td>
+                            {% if attempt.score is not none %}
+                                <span class="badge 
+                                    {% if attempt.score >= 80 %}bg-success
+                                    {% elif attempt.score >= 60 %}bg-warning
+                                    {% else %}bg-danger{% endif %}">
+                                    {{ attempt.score|round(1) }}%
+                                </span>
+                            {% else %}
+                                <span class="text-muted">Not graded</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if attempt.status == 'completed' %}bg-success
+                                {% elif attempt.status == 'in_progress' %}bg-primary
+                                {% else %}bg-secondary{% endif %}">
+                                {{ attempt.status.replace('_', ' ').title() }}
+                            </span>
+                        </td>
+                        <td>{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'N/A' }}</td>
+                        <td>{{ attempt.completed_at.strftime('%Y-%m-%d %H:%M') if attempt.completed_at else 'N/A' }}</td>
+                        <td>
+                            {% set violations = attempt.proctoring_events|length %}
+                            {% if violations > 0 %}
+                                <span class="badge bg-warning">{{ violations }}</span>
+                            {% else %}
+                                <span class="badge bg-success">0</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                                {% if violations > 0 %}
+                                <button type="button" class="btn btn-outline-warning" 
+                                        onclick="showViolations({{ attempt.id }}, '{{ attempt.user.username }}')">
+                                    <i class="fas fa-exclamation-triangle"></i> Violations
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+            <h5>No participants yet</h5>
+            <p class="text-muted">Participants who take your quizzes will appear here.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Violations Modal -->
+<div class="modal fade" id="violationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Proctoring Violations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="violationsContent">
+                <!-- Violations will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showViolations(attemptId, username) {
+    // Load violations for the attempt
+    fetch(`/api/violations/${attemptId}`)
+        .then(response => response.json())
+        .then(data => {
+            let html = `<h6>Violations for ${username}:</h6><div class="list-group">`;
+            
+            if (data.violations && data.violations.length > 0) {
+                data.violations.forEach(violation => {
+                    const severityClass = violation.severity === 'high' ? 'danger' : 
+                                        violation.severity === 'medium' ? 'warning' : 'info';
+                    html += `
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${violation.event_type}</h6>
+                                <span class="badge bg-${severityClass}">${violation.severity}</span>
+                            </div>
+                            <p class="mb-1">${violation.description}</p>
+                            <small class="text-muted">${new Date(violation.timestamp).toLocaleString()}</small>
+                        </div>
+                    `;
+                });
+            } else {
+                html += '<div class="alert alert-info">No violations recorded.</div>';
+            }
+            
+            html += '</div>';
+            document.getElementById('violationsContent').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('violationsModal')).show();
+        })
+        .catch(error => {
+            console.error('Error loading violations:', error);
+            document.getElementById('violationsContent').innerHTML = 
+                '<div class="alert alert-danger">Error loading violations.</div>';
+            new bootstrap.Modal(document.getElementById('violationsModal')).show();
+        });
+}
+</script>
+{% endblock %}
