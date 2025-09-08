@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Default Login Accounts - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="card">
+            <div class="card-header text-center">
+                <h3><i class="fas fa-users"></i> Default Login Accounts</h3>
+                <p class="mb-0 text-muted">Use these pre-configured accounts to access the platform</p>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Admin Account -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white text-center">
+                                <h5><i class="fas fa-user-shield"></i> Administrator</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Email:</strong> admin@platform.com</p>
+                                <p><strong>Password:</strong> admin123</p>
+                                <p class="text-muted small">
+                                    <i class="fas fa-info-circle"></i>
+                                    Full system access, user management, and platform statistics
+                                </p>
+                                <a href="{{ url_for('login') }}" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-sign-in-alt"></i> Login as Admin
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Host Account -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white text-center">
+                                <h5><i class="fas fa-user-tie"></i> Host</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Email:</strong> host@platform.com</p>
+                                <p><strong>Password:</strong> host123</p>
+                                <p class="text-muted small">
+                                    <i class="fas fa-info-circle"></i>
+                                    Create and manage quizzes, view participant results
+                                </p>
+                                <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-sign-in-alt"></i> Login as Host
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Participant Account -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white text-center">
+                                <h5><i class="fas fa-user-graduate"></i> Participant</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Email:</strong> participant@platform.com</p>
+                                <p><strong>Password:</strong> participant123</p>
+                                <p class="text-muted small">
+                                    <i class="fas fa-info-circle"></i>
+                                    Take quizzes with proctoring features enabled
+                                </p>
+                                <a href="{{ url_for('login') }}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-sign-in-alt"></i> Login as Participant
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <h6><i class="fas fa-lightbulb"></i> How to Use:</h6>
+                    <ol class="mb-0">
+                        <li>Click on any "Login" button above</li>
+                        <li>Use the provided email and password to log in</li>
+                        <li>Explore the features available for that role</li>
+                        <li>You can switch between roles by logging out and logging in with different accounts</li>
+                    </ol>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Note:</strong> These are demo accounts. In production, you should change these passwords and create your own accounts.
+                </div>
+            </div>
+            <div class="card-footer text-center">
+                <a href="{{ url_for('register') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-user-plus"></i> Create New Account
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

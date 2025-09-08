@@ -56,6 +56,44 @@ with app.app_context():
     # Import models to ensure tables are created
     import models
     db.create_all()
+    
+    # Create default accounts if they don't exist
+    from models import User
+    
+    # Default Admin Account
+    if not User.query.filter_by(email='admin@platform.com').first():
+        admin = User(
+            username='admin',
+            email='admin@platform.com',
+            role='admin'
+        )
+        admin.set_password('admin123')
+        admin.is_verified = True
+        db.session.add(admin)
+    
+    # Default Host Account
+    if not User.query.filter_by(email='host@platform.com').first():
+        host = User(
+            username='host',
+            email='host@platform.com',
+            role='host'
+        )
+        host.set_password('host123')
+        host.is_verified = True
+        db.session.add(host)
+    
+    # Default Participant Account
+    if not User.query.filter_by(email='participant@platform.com').first():
+        participant = User(
+            username='participant',
+            email='participant@platform.com',
+            role='participant'
+        )
+        participant.set_password('participant123')
+        participant.is_verified = True
+        db.session.add(participant)
+    
+    db.session.commit()
 
 # Import routes
 from routes import *
