@@ -48,7 +48,25 @@
             <i class="fas fa-envelope"></i>
             <strong>First time logging in?</strong><br>
             Please verify your email address first. Check your inbox for the verification link and follow the instructions to receive your login credentials.
+            <br><br>
+            <strong>Didn't receive the email?</strong>
+            <a href="{{ url_for('request_verification') }}" class="btn btn-sm btn-outline-primary mt-2">
+                <i class="fas fa-redo"></i> Resend Verification Email
+            </a>
         </div>
+        
+        <!-- Show resend verification option if user tried to login but not verified -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                {% if category == 'info' and 'resend' in message %}
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Email Not Verified?</strong><br>
+                        {{ message|safe }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endwith %}
     </div>
 </div>
 {% endblock %}

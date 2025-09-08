@@ -8,9 +8,19 @@
         <div class="card">
             <div class="card-body text-center py-5">
                 <i class="fas fa-envelope-open-text fa-4x text-success mb-4"></i>
-                <h2 class="card-title">Check Your Email</h2>
+                <h2 class="card-title">
+                    {% if resent %}
+                        Verification Email Resent!
+                    {% else %}
+                        Check Your Email
+                    {% endif %}
+                </h2>
                 <p class="card-text mb-4">
-                    We've sent a verification link to your email address. Please click the link in the email to verify your account.
+                    {% if resent %}
+                        We've sent a new verification link to your email address. Please click the link in the email to verify your account.
+                    {% else %}
+                        We've sent a verification link to your email address. Please click the link in the email to verify your account.
+                    {% endif %}
                 </p>
                 
                 <div class="alert alert-info">
@@ -24,9 +34,14 @@
                     </ol>
                 </div>
                 
-                <a href="{{ url_for('login') }}" class="btn btn-primary">
-                    <i class="fas fa-sign-in-alt"></i> Go to Login
-                </a>
+                <div class="d-flex justify-content-center gap-2">
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Go to Login
+                    </a>
+                    <a href="{{ url_for('request_verification') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo"></i> Resend Email
+                    </a>
+                </div>
             </div>
         </div>
     </div>
