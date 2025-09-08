@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Manage User Flags - BigBossizzz Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-shield-alt"></i> User Flags & Security Management</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h4>{{ flagged_users|length }}</h4>
+                <small>Flagged Users</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h4>{{ recent_violations|length }}</h4>
+                <small>Recent High Violations</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ flagged_users|selectattr('0.is_flagged')|list|length }}</h4>
+                <small>Active Flags</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ (recent_violations|selectattr('0.severity', 'equalto', 'critical')|list|length) }}</h4>
+                <small>Critical Violations</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flagged Users Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-flag"></i> Flagged Users Requiring Admin Review</h5>
+            </div>
+            <div class="card-body">
+                {% if flagged_users %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Flag Details</th>
+                                    <th>Violation Count</th>
+                                    <th>Flagged Date</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for violation_record, user in flagged_users %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                <img src="{{ url_for('static', filename='uploads/profiles/' + (user.profile_picture or 'default.png')) }}" 
+                                                     alt="Profile" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold">{{ user.username }}</div>
+                                                <small class="text-muted">{{ user.email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-flag"></i> Flagged
+                                        </span>
+                                        <br>
+                                        {% if violation_record.flagged_by %}
+                                            <small class="text-muted">By: Admin</small>
+                                        {% else %}
+                                            <small class="text-muted">Auto-flagged</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning">
+                                            {{ violation_record.violation_count or 0 }} violations
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ violation_record.flagged_at.strftime('%Y-%m-%d %H:%M') if violation_record.flagged_at else 'Unknown' }}</small>
+                                    </td>
+                                    <td>
+                                        <div style="max-width: 300px;">
+                                            <small>{{ violation_record.notes[:100] + '...' if violation_record.notes and violation_record.notes|length > 100 else violation_record.notes or 'No notes' }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-success" onclick="unflagUser({{ user.id }}, '{{ user.username }}')">
+                                                <i class="fas fa-check"></i> Unflag
+                                            </button>
+                                            <a href="{{ url_for('manage_participant', participant_id=user.id) }}" class="btn btn-outline-primary">
+                                                <i class="fas fa-user-cog"></i> Manage
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                        <h5>No Flagged Users</h5>
+                        <p class="text-muted">All users are in good standing with no security violations.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent High-Severity Violations -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-exclamation-triangle"></i> Recent High-Severity Violations</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_violations %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Quiz</th>
+                                    <th>Violation Type</th>
+                                    <th>Severity</th>
+                                    <th>Description</th>
+                                    <th>Timestamp</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event, attempt, user, quiz in recent_violations %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ user.username }}</div>
+                                        <small class="text-muted">{{ user.email }}</small>
+                                    </td>
+                                    <td>{{ quiz.title }}</td>
+                                    <td>
+                                        <code>{{ event.event_type }}</code>
+                                    </td>
+                                    <td>
+                                        {% if event.severity == 'critical' %}
+                                            <span class="badge bg-danger">Critical</span>
+                                        {% elif event.severity == 'high' %}
+                                            <span class="badge bg-warning">High</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ event.severity.title() }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div style="max-width: 250px;">
+                                            <small>{{ event.description[:80] + '...' if event.description|length > 80 else event.description }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small>{{ event.timestamp.strftime('%m/%d %H:%M') if event.timestamp else 'Unknown' }}</small>
+                                    </td>
+                                    <td>
+                                        {% if attempt.status == 'terminated' %}
+                                            <span class="badge bg-dark">Terminated</span>
+                                        {% else %}
+                                            <button class="btn btn-outline-danger btn-sm" onclick="flagUser({{ user.id }}, '{{ user.username }}')">
+                                                <i class="fas fa-flag"></i> Flag
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-shield-alt fa-2x text-success mb-2"></i>
+                        <p class="text-muted mb-0">No recent high-severity violations detected.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unflag User Modal -->
+<div class="modal fade" id="unflagModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-check"></i> Unflag User & Grant Retake Permissions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="unflagForm">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>Administrator Action:</strong> You are about to unflag <span id="unflagUsername"></span> and grant them permission to retake quizzes.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Admin Notes</label>
+                        <textarea name="notes" class="form-control" rows="3" 
+                                  placeholder="Add notes about why this user is being unflagged..." required></textarea>
+                        <small class="text-muted">Required: Explain the reason for removing the flag</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check"></i> Unflag & Grant Access
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Flag User Modal -->
+<div class="modal fade" id="flagModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-flag"></i> Flag User for Violations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="flagForm">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>Administrator Action:</strong> You are about to flag <span id="flagUsername"></span> for security violations.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Flagging</label>
+                        <textarea name="notes" class="form-control" rows="3" 
+                                  placeholder="Describe the violations or reasons for flagging this user..." required></textarea>
+                        <small class="text-muted">Required: Provide detailed justification for the flag</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-flag"></i> Flag User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function unflagUser(userId, username) {
+    document.getElementById('unflagUsername').textContent = username;
+    document.getElementById('unflagForm').action = `/admin/unflag-user/${userId}`;
+    new bootstrap.Modal(document.getElementById('unflagModal')).show();
+}
+
+function flagUser(userId, username) {
+    document.getElementById('flagUsername').textContent = username;
+    document.getElementById('flagForm').action = `/admin/flag-user/${userId}`;
+    new bootstrap.Modal(document.getElementById('flagModal')).show();
+}
+</script>
+{% endblock %}
