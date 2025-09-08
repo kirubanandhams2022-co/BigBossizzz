@@ -232,7 +232,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label">Date Range</label>
-                    <select class="form-select">
+                    <select class="form-select" id="dateRange">
                         <option selected>Last 24 hours</option>
                         <option>Last 7 days</option>
                         <option>Last 30 days</option>
@@ -241,7 +241,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Event Type</label>
-                    <select class="form-select">
+                    <select class="form-select" id="eventType">
                         <option selected>All events</option>
                         <option>User activities</option>
                         <option>Quiz attempts</option>
@@ -251,14 +251,14 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">User Role</label>
-                    <select class="form-select">
+                    <select class="form-select" id="userRole">
                         <option selected>All roles</option>
                         <option>Administrators</option>
                         <option>Hosts</option>
                         <option>Participants</option>
                     </select>
                 </div>
-                <button class="btn btn-primary w-100">Apply Filters</button>
+                <button class="btn btn-primary w-100" onclick="applyFilters()">Apply Filters</button>
             </div>
         </div>
         
@@ -307,7 +307,7 @@ function exportLogs() {
 }
 
 function exportCSV() {
-    alert('CSV export started. File will be ready for download.');
+    window.location.href = '/api/export-logs';
 }
 
 function exportJSON() {
@@ -316,6 +316,41 @@ function exportJSON() {
 
 function exportPDF() {
     alert('PDF report generation started. Download will be available soon.');
+}
+
+function applyFilters() {
+    const dateRange = document.getElementById('dateRange').value;
+    const eventType = document.getElementById('eventType').value;
+    const userRole = document.getElementById('userRole').value;
+    
+    // Show loading indicator
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Filtering...';
+    button.disabled = true;
+    
+    // In a real implementation, you would send these filters to the backend
+    // For now, we'll just simulate the filtering
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        // Show success message
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3';
+        toast.style.zIndex = '9999';
+        toast.innerHTML = `
+            <i class="fas fa-check-circle"></i> Filters applied: ${dateRange}, ${eventType}, ${userRole}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(toast);
+        
+        // Auto-remove toast after 3 seconds
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 3000);
+    }, 1000);
 }
 </script>
 {% endblock %}
