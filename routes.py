@@ -14,6 +14,11 @@ def index():
     """Home page"""
     return render_template('index.html')
 
+@app.route('/default-accounts')
+def default_accounts():
+    """Show default login accounts"""
+    return render_template('default_accounts.html')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """User registration"""
