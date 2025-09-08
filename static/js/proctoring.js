@@ -11,6 +11,14 @@ class ProctoringManager {
         this.context = null;
         this.detectionInterval = null;
         
+        // Enhanced violation tracking
+        this.violationCount = 0;
+        this.highSeverityCount = 0;
+        this.isTerminated = false;
+        this.maxViolations = 3;
+        this.lastViolationTime = null;
+        this.violationBuffer = [];
+        
         // Configuration
         this.config = {
             faceDetection: true,
@@ -500,6 +508,10 @@ class ProctoringManager {
     }
 
     logViolation(type, description, severity = 'medium') {
+        if (this.isTerminated) {
+            return; // No more violations after termination
+        }
+        
         const violation = {
             type: type,
             description: description,
@@ -512,13 +524,39 @@ class ProctoringManager {
         
         this.violations.push(violation);
         
+        // Enhanced violation tracking
+        this.violationCount++;
+        if (severity === 'high') {
+            this.highSeverityCount++;
+        }
+        
+        // Store in violation buffer for pattern analysis
+        this.violationBuffer.push({
+            ...violation,
+            timestamp: Date.now()
+        });
+        
+        // Clean old violations (last 5 minutes)
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        this.violationBuffer = this.violationBuffer.filter(v => v.timestamp > fiveMinutesAgo);
+        
+        console.warn('Proctoring violation:', violation);
+        console.warn(`Total violations: ${this.violationCount}, High severity: ${this.highSeverityCount}`);
+        
+        // Check for immediate termination conditions
+        if (this.shouldTerminateQuiz(violation)) {
+            this.terminateQuiz(violation);
+            return;
+        }
+        
         // Send to server
         this.sendViolationToServer(violation);
         
         // Show warning to user
         this.showViolationWarning(violation);
         
-        console.warn('Proctoring violation:', violation);
+        // Update security status display
+        this.updateSecurityStatus();
     }
 
     async sendViolationToServer(violation) {
@@ -538,10 +576,14 @@ class ProctoringManager {
             
             const result = await response.json();
             
-            // If quiz is terminated due to violation, redirect immediately
+            // If quiz is terminated due to violation, trigger local termination
             if (result.status === 'terminated') {
-                alert('QUIZ TERMINATED: ' + result.message);
-                window.location.href = '/dashboard';
+                this.isTerminated = true;
+                this.showTerminationMessage({
+                    type: 'server_terminated',
+                    description: result.message || 'Quiz terminated by security system',
+                    severity: 'critical'
+                });
                 return;
             }
         } catch (error) {
@@ -590,6 +632,239 @@ class ProctoringManager {
         
         // Play warning sound
         this.playWarningSound();
+    }
+    
+    shouldTerminateQuiz(violation) {
+        if (this.isTerminated) {
+            return false;
+        }
+        
+        // Immediate termination violations (zero tolerance)
+        const immediateTerminationTypes = [
+            'console_access',
+            'multiple_instances',
+            'devtools_opened'
+        ];
+        
+        if (immediateTerminationTypes.includes(violation.type)) {
+            return true;
+        }
+        
+        // Terminate after maximum violations reached
+        if (this.violationCount >= this.maxViolations) {
+            return true;
+        }
+        
+        // Terminate after 2 high severity violations
+        if (this.highSeverityCount >= 2) {
+            return true;
+        }
+        
+        // Terminate if too many violations in short time (4 violations in 2 minutes)
+        const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+        const recentViolations = this.violationBuffer.filter(v => v.timestamp > twoMinutesAgo);
+        if (recentViolations.length >= 4) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    terminateQuiz(triggerViolation) {
+        this.isTerminated = true;
+        this.isActive = false;
+        
+        // Stop all monitoring
+        this.stopMonitoring();
+        
+        // Log the termination
+        const terminationViolation = {
+            type: 'quiz_terminated',
+            description: `Quiz terminated due to: ${triggerViolation.description}`,
+            severity: 'critical',
+            timestamp: new Date().toISOString(),
+            attemptId: this.attemptId,
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            triggerViolation: triggerViolation
+        };
+        
+        // Send termination event to server
+        fetch('/api/proctoring/event', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(terminationViolation)
+        }).catch(error => {
+            console.error('Failed to send termination event:', error);
+        });
+        
+        // Show termination message
+        this.showTerminationMessage(triggerViolation);
+        
+        // Disable all form inputs
+        this.disableQuizInterface();
+        
+        // Auto-redirect after 10 seconds
+        setTimeout(() => {
+            window.location.href = '/dashboard';
+        }, 10000);
+    }
+    
+    showTerminationMessage(violation) {
+        // Remove all existing alerts
+        document.querySelectorAll('.alert').forEach(alert => alert.remove());
+        
+        // Create termination overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(220, 53, 69, 0.95);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        `;
+        
+        overlay.innerHTML = `
+            <div style="text-align: center; max-width: 600px; padding: 40px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 80px; margin-bottom: 20px; color: #fff;"></i>
+                <h1 style="font-size: 2.5rem; margin-bottom: 20px; color: #fff;">QUIZ TERMINATED</h1>
+                <h3 style="margin-bottom: 30px; color: #fff;">🚨 SECURITY VIOLATION DETECTED 🚨</h3>
+                <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+                    <p style="font-size: 1.2rem; margin-bottom: 10px; color: #fff;"><strong>Violation Type:</strong> ${violation.type.replace('_', ' ').toUpperCase()}</p>
+                    <p style="font-size: 1.1rem; margin-bottom: 10px; color: #fff;"><strong>Description:</strong> ${violation.description}</p>
+                    <p style="font-size: 1rem; color: #fff;"><strong>Total Violations:</strong> ${this.violationCount}</p>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0; font-size: 1rem; color: #fff;">⚠️ Your exam session has been flagged for review</p>
+                    <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #fff;">Contact your administrator for retake permissions</p>
+                </div>
+                <p style="font-size: 1rem; margin-bottom: 0; color: #fff;">Redirecting to dashboard in <span id="countdown">10</span> seconds...</p>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Countdown timer
+        let countdown = 10;
+        const countdownElement = document.getElementById('countdown');
+        const timer = setInterval(() => {
+            countdown--;
+            if (countdownElement) {
+                countdownElement.textContent = countdown;
+            }
+            if (countdown <= 0) {
+                clearInterval(timer);
+            }
+        }, 1000);
+        
+        // Play termination sound
+        this.playTerminationSound();
+    }
+    
+    updateSecurityStatus() {
+        let status = 'secure';
+        let message = `🟢 Secure - ${this.violationCount} violations detected`;
+        
+        if (this.violationCount >= 1) {
+            status = 'warning';
+            message = `🟡 Warning - ${this.violationCount} violations (${this.maxViolations - this.violationCount} remaining)`;
+        }
+        
+        if (this.violationCount >= this.maxViolations - 1) {
+            status = 'danger';
+            message = `🔴 Critical - ${this.violationCount} violations (1 more will terminate quiz)`;
+        }
+        
+        if (this.highSeverityCount >= 1) {
+            status = 'danger';
+            message = `🔴 High Risk - ${this.highSeverityCount} high-severity violations detected`;
+        }
+        
+        this.showProctoringStatus(status, message);
+    }
+    
+    disableQuizInterface() {
+        // Disable all form inputs
+        const form = document.getElementById('quiz-form');
+        if (form) {
+            const inputs = form.querySelectorAll('input, textarea, button, select');
+            inputs.forEach(input => {
+                input.disabled = true;
+                input.style.opacity = '0.5';
+            });
+        }
+        
+        // Add overlay to prevent interaction
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.3);
+            z-index: 999;
+            pointer-events: none;
+        `;
+        document.body.appendChild(overlay);
+    }
+    
+    playTerminationSound() {
+        try {
+            // Create termination sound sequence
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Create dramatic sound sequence
+            const frequencies = [880, 659, 523, 440];  // A5, E5, C5, A4
+            
+            frequencies.forEach((freq, index) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + index * 0.3);
+                oscillator.type = 'square';
+                
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime + index * 0.3);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + index * 0.3 + 0.2);
+                
+                oscillator.start(audioContext.currentTime + index * 0.3);
+                oscillator.stop(audioContext.currentTime + index * 0.3 + 0.2);
+            });
+        } catch (error) {
+            console.error('Failed to play termination sound:', error);
+        }
+    }
+    
+    stopMonitoring() {
+        // Stop all monitoring activities
+        if (this.mediaStream) {
+            const tracks = this.mediaStream.getTracks();
+            tracks.forEach(track => track.stop());
+        }
+        
+        // Clear intervals
+        if (this.detectionInterval) {
+            clearInterval(this.detectionInterval);
+        }
+        
+        // Hide camera view
+        if (this.videoElement) {
+            this.videoElement.style.display = 'none';
+        }
+        
+        this.isActive = false;
     }
 
     showProctoringStatus(status, message = '') {
