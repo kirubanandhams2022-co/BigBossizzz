@@ -45,10 +45,10 @@ def register():
         # Send verification email
         if send_verification_email(user):
             flash('Registration successful! Please check your email to verify your account.', 'success')
+            return render_template('verify_email.html', user=user, resent=False)
         else:
-            flash('Registration successful, but we could not send the verification email. Please contact support.', 'warning')
-        
-        return redirect(url_for('login'))
+            flash('Registration successful, but we could not send the verification email. You can request a new one from the login page.', 'warning')
+            return redirect(url_for('login'))
     
     return render_template('register.html', form=form)
 
@@ -78,6 +78,63 @@ def verify_email(token):
     
     return redirect(url_for('login'))
 
+@app.route('/resend-verification/<email>')
+def resend_verification(email):
+    """Resend email verification"""
+    user = User.query.filter_by(email=email).first()
+    
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('login'))
+    
+    if user.is_verified:
+        flash('Your email is already verified. You can log in now.', 'info')
+        return redirect(url_for('login'))
+    
+    # Generate new verification token
+    user.generate_verification_token()
+    db.session.commit()
+    
+    # Send verification email
+    if send_verification_email(user):
+        flash('Verification email sent successfully! Please check your inbox and spam folder.', 'success')
+        return render_template('verify_email.html', user=user, resent=True)
+    else:
+        flash('Failed to send verification email. Please try again later.', 'error')
+    
+    return redirect(url_for('login'))
+
+@app.route('/request-verification', methods=['GET', 'POST'])
+def request_verification():
+    """Request email verification page"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        if not email:
+            flash('Please enter your email address.', 'error')
+            return render_template('request_verification.html')
+        
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            flash('No account found with that email address.', 'error')
+            return render_template('request_verification.html')
+        
+        if user.is_verified:
+            flash('Your email is already verified. You can log in now.', 'info')
+            return redirect(url_for('login'))
+        
+        # Generate new verification token
+        user.generate_verification_token()
+        db.session.commit()
+        
+        # Send verification email
+        if send_verification_email(user):
+            flash('Verification email sent successfully! Please check your inbox and spam folder.', 'success')
+            return render_template('verify_email.html', user=user, resent=True)
+        else:
+            flash('Failed to send verification email. Please try again later.', 'error')
+    
+    return render_template('request_verification.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login"""
@@ -91,6 +148,9 @@ def login():
         if user and user.check_password(form.password.data):
             if not user.is_verified:
                 flash('Please verify your email address before logging in.', 'warning')
+                # Add resend verification option
+                resend_link = url_for('resend_verification', email=user.email)
+                flash(f'Need a new verification email? <a href="{resend_link}">Click here to resend</a>', 'info')
                 return render_template('login.html', form=form)
             
             user.last_login = datetime.utcnow()
