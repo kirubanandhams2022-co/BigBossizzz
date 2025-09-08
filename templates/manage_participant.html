@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Participant - {{ participant.username }} - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-user-cog"></i> Manage Participant: {{ participant.username }}</h1>
+    <a href="{{ url_for('host_participants') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Participants
+    </a>
+</div>
+
+<!-- Participant Info Card -->
+<div class="row mb-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user"></i> Participant Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <img src="{{ url_for('static', filename='uploads/profiles/' + participant.profile_picture) }}" 
+                         alt="Profile" class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;">
+                </div>
+                <table class="table table-borderless">
+                    <tr>
+                        <td><strong>Username:</strong></td>
+                        <td>{{ participant.username }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Email:</strong></td>
+                        <td>{{ participant.email }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Role:</strong></td>
+                        <td><span class="badge bg-info">{{ participant.role.title() }}</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Joined:</strong></td>
+                        <td>{{ participant.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Last Login:</strong></td>
+                        <td>
+                            {% if participant.last_login %}
+                                {{ participant.last_login.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+                
+                <!-- Flag Status -->
+                {% if violation_record and violation_record.is_flagged %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-flag"></i> <strong>FLAGGED FOR VIOLATIONS</strong>
+                        <br><small>Flagged on: {{ violation_record.flagged_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        {% if violation_record.notes %}
+                            <br><small>Notes: {{ violation_record.notes }}</small>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <!-- Stats Cards -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h4>{{ attempts|length }}</h4>
+                        <small>Total Attempts</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h4>{{ attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                        <small>Completed</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h4>{{ total_violations }}</h4>
+                        <small>Total Violations</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        {% set completed_attempts = attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
+                        <h4>{{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(1) if completed_attempts else 0 }}%</h4>
+                        <small>Avg Score</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="btn-group w-100">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#credentialsModal">
+                        <i class="fas fa-key"></i> Edit Credentials
+                    </button>
+                    {% if violation_record and violation_record.is_flagged %}
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#unflagModal">
+                            <i class="fas fa-flag"></i> Remove Flag
+                        </button>
+                    {% else %}
+                        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#flagModal">
+                            <i class="fas fa-flag"></i> Flag User
+                        </button>
+                    {% endif %}
+                    <a href="{{ url_for('view_participant_violations', participant_id=participant.id) }}" class="btn btn-outline-danger">
+                        <i class="fas fa-exclamation-triangle"></i> View Violations
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Login Activity -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-sign-in-alt"></i> Recent Login Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if login_events %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>IP Address</th>
+                                    <th>Device</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in login_events %}
+                                <tr>
+                                    <td>{{ event.login_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ event.ip_address }}</td>
+                                    <td>
+                                        <small>{{ event.user_agent[:50] + '...' if event.user_agent and event.user_agent|length > 50 else event.user_agent or 'Unknown' }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No login activity recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clipboard-list"></i> Quiz Attempts</h5>
+            </div>
+            <div class="card-body">
+                {% if attempts %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Quiz</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for attempt in attempts[:10] %}
+                                <tr>
+                                    <td>{{ attempt.quiz.title }}</td>
+                                    <td>
+                                        {% if attempt.score %}
+                                            {{ attempt.score|round(1) }}%
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if attempt.status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% elif attempt.status == 'terminated' %}
+                                            <span class="badge bg-danger">Terminated</span>
+                                        {% elif attempt.status == 'in_progress' %}
+                                            <span class="badge bg-warning">In Progress</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ attempt.status.title() }}</span>
+                                        {% endif %}
+                                        {% if attempt.is_flagged %}
+                                            <span class="badge bg-danger ms-1">Flagged</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ attempt.started_at.strftime('%m/%d %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No quiz attempts recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Credentials Modal -->
+<div class="modal fade" id="credentialsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-key"></i> Edit Participant Credentials</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="update_credentials">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control" value="{{ participant.username }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ participant.email }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Password (optional)</label>
+                        <div class="input-group">
+                            <input type="password" name="password" class="form-control" id="new-password-input" 
+                                   placeholder="Leave empty to keep current password">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('new-password-input', this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Only enter if you want to change the password</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Credentials</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Flag User Modal -->
+<div class="modal fade" id="flagModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-flag"></i> Flag User for Violations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="flag_user">
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> Flagging this user will prevent them from taking future quizzes until an admin approves their access.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason for flagging</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Describe the violations or reasons for flagging this user..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Flag User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Unflag User Modal -->
+<div class="modal fade" id="unflagModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success">
+                <h5 class="modal-title"><i class="fas fa-flag"></i> Remove Flag</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="unflag_user">
+                    <div class="alert alert-info">
+                        <strong>Note:</strong> Removing the flag will allow this user to take quizzes again.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (optional)</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Add any notes about removing the flag..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Remove Flag</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function togglePassword(inputId, button) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+</script>
+{% endblock %}
