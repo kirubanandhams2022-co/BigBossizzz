@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Security Violations - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-exclamation-triangle text-warning"></i> Security Violations</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-shield-alt"></i> Recent Proctoring Violations</h5>
+    </div>
+    <div class="card-body">
+        {% if violations %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>User</th>
+                        <th>Quiz</th>
+                        <th>Violation Type</th>
+                        <th>Description</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for violation in violations %}
+                    <tr class="{% if violation.severity == 'high' %}table-danger{% elif violation.severity == 'medium' %}table-warning{% endif %}">
+                        <td>{{ violation.timestamp.strftime('%Y-%m-%d %H:%M:%S') if violation.timestamp else 'N/A' }}</td>
+                        <td>
+                            <strong>{{ violation.attempt.user.username }}</strong>
+                            <br><small class="text-muted">{{ violation.attempt.user.email }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ violation.attempt.quiz.title }}</strong>
+                            <br><small class="text-muted">by {{ violation.attempt.quiz.creator.username }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ violation.event_type.replace('_', ' ').title() }}</span>
+                        </td>
+                        <td>{{ violation.description }}</td>
+                        <td>
+                            {% if violation.severity == 'high' %}
+                                <span class="badge bg-danger">High Risk</span>
+                            {% elif violation.severity == 'medium' %}
+                                <span class="badge bg-warning text-dark">Medium Risk</span>
+                            {% else %}
+                                <span class="badge bg-info">Low Risk</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if violation.attempt.status == 'terminated' %}
+                                <span class="badge bg-danger">Quiz Terminated</span>
+                            {% elif violation.attempt.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% else %}
+                                <span class="badge bg-primary">{{ violation.attempt.status.title() }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="mt-4">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ violations|selectattr('severity', 'equalto', 'high')|list|length }}</h4>
+                            <small>High Risk Violations</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h4>{{ violations|selectattr('severity', 'equalto', 'medium')|list|length }}</h4>
+                            <small>Medium Risk Violations</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ violations|selectattr('severity', 'equalto', 'low')|list|length }}</h4>
+                            <small>Low Risk Violations</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ violations|selectattr('attempt.status', 'equalto', 'terminated')|list|length }}</h4>
+                            <small>Terminated Quizzes</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-shield-check fa-3x text-success mb-3"></i>
+            <h5>No Security Violations</h5>
+            <p class="text-muted">All quizzes have been completed without security incidents.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if violations %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Violation Analytics</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Most Common Violations</h6>
+                <div class="list-group">
+                    {% set violation_types = violations|groupby('event_type') %}
+                    {% for type, group in violation_types %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ type.replace('_', ' ').title() }}
+                        <span class="badge bg-primary rounded-pill">{{ group|list|length }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Users with Most Violations</h6>
+                <div class="list-group">
+                    {% set user_violations = violations|groupby('attempt.user.username') %}
+                    {% for username, group in user_violations %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ username }}
+                        <span class="badge bg-warning rounded-pill">{{ group|list|length }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -210,7 +210,7 @@
                         {% for i in range(4) %}
                         <div class="input-group mb-2">
                             <div class="input-group-text">
-                                <input type="radio" name="correct_{{ i }}" value="on" {% if i == 0 %}checked{% endif %}>
+                                <input type="radio" name="correct_answer" value="{{ i }}">
                             </div>
                             <input type="text" name="option_{{ i }}" class="form-control" placeholder="Option {{ i + 1 }}" required>
                         </div>
