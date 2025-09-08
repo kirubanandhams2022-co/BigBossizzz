@@ -1146,6 +1146,42 @@ def export_logs():
     
     return response
 
+@app.route('/api/export-users')
+@login_required  
+def export_users():
+    """Export user data to CSV"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    import csv
+    import io
+    from flask import make_response
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow(['Username', 'Email', 'Role', 'Status', 'Verified', 'Registered', 'Last Login'])
+    
+    # Write data
+    users = User.query.order_by(User.created_at.desc()).all()
+    for user in users:
+        writer.writerow([
+            user.username,
+            user.email,
+            user.role,
+            'Active' if user.is_verified else 'Inactive',
+            'Yes' if user.is_verified else 'No',
+            user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A',
+            user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'Never'
+        ])
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = 'attachment; filename=users_export.csv'
+    
+    return response
+
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
