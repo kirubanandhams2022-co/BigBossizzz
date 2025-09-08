@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Host Dashboard - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-tachometer-alt"></i> Host Dashboard</h1>
+    <a href="{{ url_for('create_quiz') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Create New Quiz
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ quizzes|length }}</h4>
+                        <p class="mb-0">Total Quizzes</p>
+                    </div>
+                    <i class="fas fa-clipboard-list fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ quizzes|selectattr('is_active')|list|length }}</h4>
+                        <p class="mb-0">Active Quizzes</p>
+                    </div>
+                    <i class="fas fa-play-circle fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ recent_attempts|length }}</h4>
+                        <p class="mb-0">Recent Attempts</p>
+                    </div>
+                    <i class="fas fa-user-clock fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ recent_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                        <p class="mb-0">Completed</p>
+                    </div>
+                    <i class="fas fa-check-circle fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clipboard-list"></i> My Quizzes</h5>
+            </div>
+            <div class="card-body">
+                {% if quizzes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Questions</th>
+                                    <th>Time Limit</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for quiz in quizzes %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ quiz.title }}</strong>
+                                        {% if quiz.description %}
+                                            <br><small class="text-muted">{{ quiz.description[:50] }}...</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ quiz.questions|length }}</td>
+                                    <td>{{ quiz.time_limit }} min</td>
+                                    <td>
+                                        {% if quiz.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                        {% if quiz.proctoring_enabled %}
+                                            <span class="badge bg-info">Proctored</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ quiz.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{{ url_for('view_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-info">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                        <h5>No Quizzes Yet</h5>
+                        <p class="text-muted">Create your first quiz to get started.</p>
+                        <a href="{{ url_for('create_quiz') }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create Quiz
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clock"></i> Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_attempts %}
+                    {% for attempt in recent_attempts[:10] %}
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                            <div>
+                                <div class="fw-bold">{{ attempt.participant.username }}</div>
+                                <small class="text-muted">{{ attempt.quiz.title }}</small>
+                            </div>
+                            <div class="text-end">
+                                {% if attempt.status == 'completed' %}
+                                    <span class="badge bg-success">{{ attempt.score|round(1) if attempt.score else 'N/A' }}%</span>
+                                {% elif attempt.status == 'in_progress' %}
+                                    <span class="badge bg-warning">In Progress</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ attempt.status.title() }}</span>
+                                {% endif %}
+                                <br><small class="text-muted">{{ attempt.started_at.strftime('%m/%d %H:%M') }}</small>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-clock fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No recent activity</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <h4 class="text-primary">{{ recent_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                        <small class="text-muted">Completed</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h4 class="text-warning">{{ recent_attempts|selectattr('status', 'equalto', 'in_progress')|list|length }}</h4>
+                        <small class="text-muted">In Progress</small>
+                    </div>
+                </div>
+                {% set avg_score = recent_attempts|selectattr('score')|map(attribute='score')|list %}
+                {% if avg_score %}
+                    <div class="text-center">
+                        <h4 class="text-success">{{ (avg_score|sum / avg_score|length)|round(1) }}%</h4>
+                        <small class="text-muted">Average Score</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

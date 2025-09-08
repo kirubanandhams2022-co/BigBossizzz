@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Quiz - {{ quiz.title }} - Proctoring Platform{% endblock %}
+
+{% block extra_head %}
+<style>
+.question-card {
+    transition: all 0.3s ease;
+}
+.question-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-edit"></i> Edit Quiz: {{ quiz.title }}</h1>
+    <div class="btn-group">
+        <a href="{{ url_for('view_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-info">
+            <i class="fas fa-eye"></i> Preview
+        </a>
+        <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-cog"></i> Quiz Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" name="update_quiz" value="1">
+                    
+                    <div class="mb-3">
+                        {{ form.title.label(class="form-label") }}
+                        {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else "")) }}
+                        {% for error in form.title.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else ""), rows="3") }}
+                        {% for error in form.description.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.time_limit.label(class="form-label") }}
+                        <div class="input-group">
+                            {{ form.time_limit(class="form-control" + (" is-invalid" if form.time_limit.errors else "")) }}
+                            <span class="input-group-text">min</span>
+                        </div>
+                        {% for error in form.time_limit.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.proctoring_enabled(class="form-check-input") }}
+                            {{ form.proctoring_enabled.label(class="form-check-label") }}
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save"></i> Update Quiz
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar"></i> Quiz Statistics</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-2">
+                        <h5 class="text-primary">{{ quiz.questions|length }}</h5>
+                        <small class="text-muted">Questions</small>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <h5 class="text-success">{{ quiz.attempts|length }}</h5>
+                        <small class="text-muted">Attempts</small>
+                    </div>
+                </div>
+                {% if quiz.questions %}
+                    {% set total_points = quiz.questions|map(attribute='points')|sum %}
+                    <div class="text-center">
+                        <h5 class="text-info">{{ total_points }}</h5>
+                        <small class="text-muted">Total Points</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-question-circle"></i> Questions ({{ quiz.questions|length }})</h5>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addQuestionModal">
+                    <i class="fas fa-plus"></i> Add Question
+                </button>
+            </div>
+            <div class="card-body">
+                {% if quiz.questions %}
+                    <div class="accordion" id="questionsAccordion">
+                        {% for question in quiz.questions %}
+                        <div class="accordion-item mb-3">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#question{{ question.id }}">
+                                    <div class="d-flex justify-content-between w-100 me-3">
+                                        <span>
+                                            <strong>Q{{ loop.index }}:</strong> 
+                                            {{ question.question_text[:50] }}{% if question.question_text|length > 50 %}...{% endif %}
+                                        </span>
+                                        <div>
+                                            <span class="badge bg-primary">{{ question.points }} pts</span>
+                                            <span class="badge bg-secondary">{{ question.question_type|title }}</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="question{{ question.id }}" class="accordion-collapse collapse" data-bs-parent="#questionsAccordion">
+                                <div class="accordion-body">
+                                    <p><strong>Question:</strong> {{ question.question_text }}</p>
+                                    
+                                    {% if question.question_type in ['multiple_choice', 'true_false'] %}
+                                        <p><strong>Options:</strong></p>
+                                        <ul class="list-group list-group-flush">
+                                            {% for option in question.options|sort(attribute='order') %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                {{ option.option_text }}
+                                                {% if option.is_correct %}
+                                                    <span class="badge bg-success">Correct</span>
+                                                {% endif %}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                    
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            Type: {{ question.question_type|title }} | Points: {{ question.points }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+                        <h5>No Questions Yet</h5>
+                        <p class="text-muted">Add questions to make your quiz interactive.</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addQuestionModal">
+                            <i class="fas fa-plus"></i> Add First Question
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Question Modal -->
+<div class="modal fade" id="addQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Add New Question</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_question', quiz_id=quiz.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Question Text</label>
+                        <textarea name="question_text" class="form-control" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Question Type</label>
+                            <select name="question_type" class="form-select" id="questionType" onchange="toggleOptions()">
+                                <option value="multiple_choice">Multiple Choice</option>
+                                <option value="true_false">True/False</option>
+                                <option value="text">Text Answer</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Points</label>
+                            <input type="number" name="points" class="form-control" value="1" min="1" max="10" required>
+                        </div>
+                    </div>
+                    
+                    <div id="multipleChoiceOptions">
+                        <label class="form-label">Answer Options</label>
+                        {% for i in range(4) %}
+                        <div class="input-group mb-2">
+                            <div class="input-group-text">
+                                <input type="radio" name="correct_{{ i }}" value="on" {% if i == 0 %}checked{% endif %}>
+                            </div>
+                            <input type="text" name="option_{{ i }}" class="form-control" placeholder="Option {{ i + 1 }}" required>
+                        </div>
+                        {% endfor %}
+                        <small class="text-muted">Select the radio button next to the correct answer.</small>
+                    </div>
+                    
+                    <div id="trueFalseOptions" style="display: none;">
+                        <label class="form-label">Correct Answer</label>
+                        <div class="form-check">
+                            <input type="radio" name="correct_answer" value="true" class="form-check-input" id="answerTrue" checked>
+                            <label class="form-check-label" for="answerTrue">True</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="radio" name="correct_answer" value="false" class="form-check-input" id="answerFalse">
+                            <label class="form-check-label" for="answerFalse">False</label>
+                        </div>
+                    </div>
+                    
+                    <div id="textAnswerNote" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            Text answers require manual grading. The system will record the participant's response for review.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Add Question
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleOptions() {
+    const questionType = document.getElementById('questionType').value;
+    const multipleChoice = document.getElementById('multipleChoiceOptions');
+    const trueFalse = document.getElementById('trueFalseOptions');
+    const textNote = document.getElementById('textAnswerNote');
+    
+    // Hide all option sections
+    multipleChoice.style.display = 'none';
+    trueFalse.style.display = 'none';
+    textNote.style.display = 'none';
+    
+    // Remove required attribute from all inputs
+    multipleChoice.querySelectorAll('input[type="text"]').forEach(input => {
+        input.removeAttribute('required');
+    });
+    
+    // Show appropriate section and set required attributes
+    if (questionType === 'multiple_choice') {
+        multipleChoice.style.display = 'block';
+        multipleChoice.querySelectorAll('input[type="text"]').forEach(input => {
+            input.setAttribute('required', 'required');
+        });
+    } else if (questionType === 'true_false') {
+        trueFalse.style.display = 'block';
+    } else if (questionType === 'text') {
+        textNote.style.display = 'block';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleOptions();
+});
+</script>
+{% endblock %}

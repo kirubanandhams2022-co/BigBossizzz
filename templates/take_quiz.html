@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Taking Quiz - {{ quiz.title }} - Proctoring Platform{% endblock %}
+
+{% block extra_head %}
+<style>
+.quiz-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+.question-card {
+    margin-bottom: 2rem;
+}
+.time-warning {
+    animation: pulse 1s infinite;
+}
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+.proctoring-status {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% if quiz.proctoring_enabled %}
+<div class="proctoring-status">
+    <div class="alert alert-info alert-dismissible">
+        <i class="fas fa-eye"></i> Proctoring Active
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+</div>
+{% endif %}
+
+<div class="quiz-container">
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3><i class="fas fa-clipboard-list"></i> {{ quiz.title }}</h3>
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-clock"></i>
+                        <span id="timer" class="fw-bold">{{ quiz.time_limit }}:00</span>
+                    </div>
+                    <div>
+                        <span class="badge bg-primary">{{ questions|length }} Questions</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <form id="quizForm" method="POST" action="{{ url_for('submit_quiz', attempt_id=attempt.id) }}">
+            <div class="card-body">
+                {% if quiz.description %}
+                    <div class="alert alert-light">
+                        <i class="fas fa-info-circle"></i>
+                        {{ quiz.description }}
+                    </div>
+                {% endif %}
+                
+                {% if quiz.proctoring_enabled %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Proctoring Notice:</strong> This quiz is being monitored. Avoid switching tabs, opening other applications, or leaving the quiz window.
+                    </div>
+                {% endif %}
+                
+                <div class="progress mb-4">
+                    <div class="progress-bar" role="progressbar" style="width: 0%" id="progressBar">
+                        <span id="progressText">0 of {{ questions|length }} answered</span>
+                    </div>
+                </div>
+                
+                {% for question in questions %}
+                <div class="question-card card mb-4">
+                    <div class="card-header">
+                        <h5>
+                            <span class="badge bg-secondary me-2">Q{{ loop.index }}</span>
+                            {{ question.question_text }}
+                            <span class="badge bg-primary ms-2">{{ question.points }} pts</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if question.question_type == 'multiple_choice' %}
+                            {% for option in question.options|sort(attribute='order') %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input question-input" type="radio" 
+                                       name="question_{{ question.id }}" 
+                                       value="{{ option.id }}" 
+                                       id="q{{ question.id }}_{{ option.id }}"
+                                       {% if existing_answers.get(question.id) and existing_answers[question.id].selected_option_id == option.id %}checked{% endif %}
+                                       onchange="updateProgress()">
+                                <label class="form-check-label" for="q{{ question.id }}_{{ option.id }}">
+                                    {{ option.option_text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            
+                        {% elif question.question_type == 'true_false' %}
+                            {% for option in question.options|sort(attribute='order') %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input question-input" type="radio" 
+                                       name="question_{{ question.id }}" 
+                                       value="{{ option.id }}" 
+                                       id="q{{ question.id }}_{{ option.id }}"
+                                       {% if existing_answers.get(question.id) and existing_answers[question.id].selected_option_id == option.id %}checked{% endif %}
+                                       onchange="updateProgress()">
+                                <label class="form-check-label" for="q{{ question.id }}_{{ option.id }}">
+                                    {{ option.option_text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            
+                        {% elif question.question_type == 'text' %}
+                            <textarea class="form-control question-input" 
+                                      name="question_{{ question.id }}" 
+                                      rows="4" 
+                                      placeholder="Enter your answer here..."
+                                      onchange="updateProgress()">{% if existing_answers.get(question.id) %}{{ existing_answers[question.id].text_answer or '' }}{% endif %}</textarea>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="saveDraft()">
+                        <i class="fas fa-save"></i> Save Draft
+                    </button>
+                    <button type="submit" class="btn btn-success" onclick="return confirmSubmit()">
+                        <i class="fas fa-paper-plane"></i> Submit Quiz
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="submitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Submission</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to submit your quiz? Once submitted, you cannot make any changes.</p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="submissionSummary"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitQuiz()">
+                    <i class="fas fa-paper-plane"></i> Submit Quiz
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
+{% if quiz.proctoring_enabled %}
+<script src="{{ url_for('static', filename='js/proctoring.js') }}"></script>
+<script>
+// Initialize proctoring for this attempt
+initializeProctoring({{ attempt.id }});
+</script>
+{% endif %}
+
+<script>
+// Initialize quiz timer
+let timeRemaining = {{ quiz.time_limit }} * 60; // Convert to seconds
+let timer;
+
+function startTimer() {
+    timer = setInterval(function() {
+        timeRemaining--;
+        
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        const display = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+        
+        document.getElementById('timer').textContent = display;
+        
+        // Warning when 5 minutes remaining
+        if (timeRemaining === 300) {
+            document.getElementById('timer').classList.add('time-warning', 'text-warning');
+            alert('Warning: 5 minutes remaining!');
+        }
+        
+        // Critical warning when 1 minute remaining
+        if (timeRemaining === 60) {
+            document.getElementById('timer').classList.add('text-danger');
+            alert('Critical: 1 minute remaining!');
+        }
+        
+        // Auto-submit when time runs out
+        if (timeRemaining <= 0) {
+            clearInterval(timer);
+            alert('Time\'s up! Submitting quiz automatically.');
+            document.getElementById('quizForm').submit();
+        }
+    }, 1000);
+}
+
+function updateProgress() {
+    const totalQuestions = {{ questions|length }};
+    let answeredQuestions = 0;
+    
+    // Count answered questions
+    const questionInputs = document.querySelectorAll('.question-input');
+    const answeredInputs = new Set();
+    
+    questionInputs.forEach(input => {
+        if (input.type === 'radio' && input.checked) {
+            answeredInputs.add(input.name);
+        } else if (input.type === 'textarea' && input.value.trim()) {
+            answeredInputs.add(input.name);
+        }
+    });
+    
+    answeredQuestions = answeredInputs.size;
+    const percentage = (answeredQuestions / totalQuestions) * 100;
+    
+    document.getElementById('progressBar').style.width = percentage + '%';
+    document.getElementById('progressText').textContent = answeredQuestions + ' of ' + totalQuestions + ' answered';
+    
+    if (percentage === 100) {
+        document.getElementById('progressBar').classList.add('bg-success');
+    } else {
+        document.getElementById('progressBar').classList.remove('bg-success');
+    }
+}
+
+function confirmSubmit() {
+    const totalQuestions = {{ questions|length }};
+    let answeredQuestions = 0;
+    
+    // Count answered questions
+    const questionInputs = document.querySelectorAll('.question-input');
+    const answeredInputs = new Set();
+    
+    questionInputs.forEach(input => {
+        if (input.type === 'radio' && input.checked) {
+            answeredInputs.add(input.name);
+        } else if (input.type === 'textarea' && input.value.trim()) {
+            answeredInputs.add(input.name);
+        }
+    });
+    
+    answeredQuestions = answeredInputs.size;
+    const unanswered = totalQuestions - answeredQuestions;
+    
+    document.getElementById('submissionSummary').textContent = 
+        `You have answered ${answeredQuestions} out of ${totalQuestions} questions.` +
+        (unanswered > 0 ? ` ${unanswered} questions remain unanswered.` : '');
+    
+    // Show confirmation modal
+    const submitModal = new bootstrap.Modal(document.getElementById('submitModal'));
+    submitModal.show();
+    
+    return false; // Prevent form submission
+}
+
+function submitQuiz() {
+    // Hide modal and submit form
+    const submitModal = bootstrap.Modal.getInstance(document.getElementById('submitModal'));
+    submitModal.hide();
+    clearInterval(timer);
+    document.getElementById('quizForm').submit();
+}
+
+function saveDraft() {
+    // This would save the current answers as a draft
+    alert('Draft saved! You can continue later.');
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    startTimer();
+    updateProgress();
+    
+    // Auto-save every 30 seconds
+    setInterval(saveDraft, 30000);
+});
+
+// Warn before leaving page
+window.addEventListener('beforeunload', function(e) {
+    e.preventDefault();
+    e.returnValue = 'Are you sure you want to leave? Your progress may be lost.';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Details - {{ quiz.title }} - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-clipboard-list"></i> {{ quiz.title }}</h3>
+                    <div class="btn-group">
+                        {% if current_user.is_host() or current_user.is_admin() %}
+                            <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                        {% endif %}
+                        {% if current_user.role == 'participant' %}
+                            <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Take Quiz
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if quiz.description %}
+                    <p class="card-text">{{ quiz.description }}</p>
+                {% endif %}
+                
+                <div class="row mb-4">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center">
+                            <i class="fas fa-question-circle fa-2x text-primary mb-2"></i>
+                            <h5>{{ quiz.questions|length }}</h5>
+                            <small class="text-muted">Questions</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center">
+                            <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                            <h5>{{ quiz.time_limit }}</h5>
+                            <small class="text-muted">Minutes</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center">
+                            {% if quiz.proctoring_enabled %}
+                                <i class="fas fa-eye fa-2x text-warning mb-2"></i>
+                                <h5>Enabled</h5>
+                            {% else %}
+                                <i class="fas fa-eye-slash fa-2x text-muted mb-2"></i>
+                                <h5>Disabled</h5>
+                            {% endif %}
+                            <small class="text-muted">Proctoring</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center">
+                            {% if quiz.questions %}
+                                {% set total_points = quiz.questions|map(attribute='points')|sum %}
+                                <i class="fas fa-trophy fa-2x text-success mb-2"></i>
+                                <h5>{{ total_points }}</h5>
+                            {% else %}
+                                <i class="fas fa-trophy fa-2x text-muted mb-2"></i>
+                                <h5>0</h5>
+                            {% endif %}
+                            <small class="text-muted">Total Points</small>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if quiz.proctoring_enabled %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Proctoring Notice:</strong> This quiz is monitored. Please ensure you are in a quiet environment and avoid switching tabs or windows during the quiz.
+                    </div>
+                {% endif %}
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list"></i> Quiz Questions</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if quiz.questions %}
+                            {% for question in quiz.questions %}
+                            <div class="mb-4 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                                <h6><strong>Question {{ loop.index }}:</strong> <span class="badge bg-primary">{{ question.points }} pts</span></h6>
+                                <p>{{ question.question_text }}</p>
+                                
+                                {% if question.question_type in ['multiple_choice', 'true_false'] %}
+                                    <div class="ms-3">
+                                        {% for option in question.options|sort(attribute='order') %}
+                                        <div class="mb-2">
+                                            <span class="me-2">{{ loop.index }}.</span>
+                                            {{ option.option_text }}
+                                            {% if current_user.is_host() or current_user.is_admin() %}
+                                                {% if option.is_correct %}
+                                                    <span class="badge bg-success ms-2">Correct</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif question.question_type == 'text' %}
+                                    <div class="ms-3">
+                                        <em class="text-muted">Text answer required</em>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+                                <h5>No Questions Available</h5>
+                                <p class="text-muted">This quiz doesn't have any questions yet.</p>
+                                {% if current_user.is_host() or current_user.is_admin() %}
+                                    <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-primary">
+                                        <i class="fas fa-plus"></i> Add Questions
+                                    </a>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">
+                            Created by {{ quiz.creator.username }} on {{ quiz.created_at.strftime('%Y-%m-%d') }}
+                        </small>
+                    </div>
+                    <div>
+                        {% if current_user.role == 'participant' and quiz.questions %}
+                            <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Start Quiz
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

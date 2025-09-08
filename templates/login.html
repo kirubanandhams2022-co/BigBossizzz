@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-header text-center">
+                <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                        {% for error in form.email.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-4">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
+                        {% for error in form.password.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-center">
+                <p class="mb-0">
+                    Don't have an account? 
+                    <a href="{{ url_for('register') }}">Register here</a>
+                </p>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-3">
+            <i class="fas fa-envelope"></i>
+            <strong>First time logging in?</strong><br>
+            Please verify your email address first. Check your inbox for the verification link and follow the instructions to receive your login credentials.
+        </div>
+    </div>
+</div>
+{% endblock %}

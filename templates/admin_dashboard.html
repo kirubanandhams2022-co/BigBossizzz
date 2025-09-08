@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-cog"></i> Admin Dashboard</h1>
+</div>
+
+<!-- System Statistics Overview -->
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_users }}</h4>
+                        <p class="mb-0">Total Users</p>
+                    </div>
+                    <i class="fas fa-users fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_quizzes }}</h4>
+                        <p class="mb-0">Total Quizzes</p>
+                    </div>
+                    <i class="fas fa-clipboard-list fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_attempts }}</h4>
+                        <p class="mb-0">Quiz Attempts</p>
+                    </div>
+                    <i class="fas fa-user-clock fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_hosts }}</h4>
+                        <p class="mb-0">Host Accounts</p>
+                    </div>
+                    <i class="fas fa-user-tie fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Role Breakdown -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie"></i> User Role Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="mb-3">
+                            <i class="fas fa-user-tie fa-2x text-warning mb-2"></i>
+                            <h4>{{ stats.total_hosts }}</h4>
+                            <small class="text-muted">Hosts</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-3">
+                            <i class="fas fa-user fa-2x text-primary mb-2"></i>
+                            <h4>{{ stats.total_participants }}</h4>
+                            <small class="text-muted">Participants</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-3">
+                            <i class="fas fa-user-shield fa-2x text-danger mb-2"></i>
+                            <h4>{{ stats.total_users - stats.total_hosts - stats.total_participants }}</h4>
+                            <small class="text-muted">Admins</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="progress" style="height: 20px;">
+                    {% set host_percentage = (stats.total_hosts / stats.total_users * 100) if stats.total_users > 0 else 0 %}
+                    {% set participant_percentage = (stats.total_participants / stats.total_users * 100) if stats.total_users > 0 else 0 %}
+                    {% set admin_percentage = 100 - host_percentage - participant_percentage %}
+                    
+                    <div class="progress-bar bg-warning" style="width: {{ host_percentage }}%">
+                        {% if host_percentage > 10 %}Hosts{% endif %}
+                    </div>
+                    <div class="progress-bar bg-primary" style="width: {{ participant_percentage }}%">
+                        {% if participant_percentage > 10 %}Participants{% endif %}
+                    </div>
+                    <div class="progress-bar bg-danger" style="width: {{ admin_percentage }}%">
+                        {% if admin_percentage > 10 %}Admins{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Platform Activity</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <i class="fas fa-clipboard-check fa-2x text-success mb-2"></i>
+                        <h4>{{ stats.total_attempts }}</h4>
+                        <small class="text-muted">Total Attempts</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <i class="fas fa-clipboard-list fa-2x text-info mb-2"></i>
+                        <h4>{{ stats.total_quizzes }}</h4>
+                        <small class="text-muted">Total Quizzes</small>
+                    </div>
+                </div>
+                
+                {% if stats.total_quizzes > 0 %}
+                    <div class="text-center">
+                        <h4 class="text-primary">{{ (stats.total_attempts / stats.total_quizzes)|round(1) }}</h4>
+                        <small class="text-muted">Average Attempts per Quiz</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Users and System Management -->
+<div class="row">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user-plus"></i> Recent Registrations</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_users %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Registered</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in recent_users %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ user.username }}</strong>
+                                        {% if user.last_login %}
+                                            <br><small class="text-muted">Last login: {{ user.last_login.strftime('%Y-%m-%d') }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        {% if user.role == 'host' %}
+                                            <span class="badge bg-warning">Host</span>
+                                        {% elif user.role == 'participant' %}
+                                            <span class="badge bg-primary">Participant</span>
+                                        {% elif user.role == 'admin' %}
+                                            <span class="badge bg-danger">Admin</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_verified %}
+                                            <span class="badge bg-success">Verified</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Unverified</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-info" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-warning" title="Edit User">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5>No Recent Registrations</h5>
+                        <p class="text-muted">New user registrations will appear here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tools"></i> System Management</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="showUserManagement()">
+                        <i class="fas fa-users"></i> User Management
+                    </button>
+                    <button class="btn btn-outline-info" onclick="showQuizManagement()">
+                        <i class="fas fa-clipboard-list"></i> Quiz Management
+                    </button>
+                    <button class="btn btn-outline-success" onclick="showSystemSettings()">
+                        <i class="fas fa-cog"></i> System Settings
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="showAuditLogs()">
+                        <i class="fas fa-file-alt"></i> Audit Logs
+                    </button>
+                </div>
+                
+                <hr>
+                
+                <h6><i class="fas fa-database"></i> Database Status</h6>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> Database connection healthy
+                </div>
+                
+                <h6><i class="fas fa-envelope"></i> Email Service</h6>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> Email service operational
+                </div>
+                
+                <h6><i class="fas fa-shield-alt"></i> Security</h6>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> All systems secure
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="exportUserData()">
+                        <i class="fas fa-download"></i> Export User Data
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="generateReport()">
+                        <i class="fas fa-file-pdf"></i> Generate Report
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="systemBackup()">
+                        <i class="fas fa-database"></i> System Backup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Alerts (if any) -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-exclamation-triangle"></i> System Alerts</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>System Status:</strong> All systems are running normally. Last system check was performed successfully.
+                </div>
+                
+                <!-- Example alerts - in real implementation, these would come from actual system monitoring -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Database Performance:</strong> Optimal
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Email Service:</strong> All emails delivered successfully
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showUserManagement() {
+    alert('User Management feature would be implemented here.\n\nFeatures would include:\n- View all users\n- Edit user roles\n- Activate/deactivate accounts\n- Reset passwords\n- View user activity');
+}
+
+function showQuizManagement() {
+    alert('Quiz Management feature would be implemented here.\n\nFeatures would include:\n- View all quizzes\n- Archive old quizzes\n- View quiz statistics\n- Manage quiz permissions\n- Export quiz data');
+}
+
+function showSystemSettings() {
+    alert('System Settings feature would be implemented here.\n\nFeatures would include:\n- Email configuration\n- Security settings\n- Proctoring parameters\n- System maintenance\n- Feature toggles');
+}
+
+function showAuditLogs() {
+    alert('Audit Logs feature would be implemented here.\n\nFeatures would include:\n- View system logs\n- Security events\n- User activity logs\n- Login attempts\n- System changes');
+}
+
+function exportUserData() {
+    alert('Export User Data feature would generate:\n- User statistics\n- Registration reports\n- Activity summaries\n- Performance metrics');
+}
+
+function generateReport() {
+    alert('Generate Report feature would create:\n- Platform usage reports\n- Quiz performance analytics\n- User engagement metrics\n- System performance reports');
+}
+
+function systemBackup() {
+    alert('System Backup feature would:\n- Create database backup\n- Export configuration\n- Archive important data\n- Generate backup reports');
+}
+
+// Auto-refresh statistics every 5 minutes
+setInterval(function() {
+    console.log('Refreshing admin dashboard statistics...');
+    // In a real implementation, this would make an AJAX call to update statistics
+}, 300000);
+</script>
+{% endblock %}

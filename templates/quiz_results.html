@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Results - {{ quiz.title }} - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-chart-line"></i> Quiz Results: {{ quiz.title }}</h3>
+                    <div class="btn-group">
+                        <a href="{{ url_for('participant_dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                        {% if current_user.is_host() or current_user.is_admin() %}
+                            <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-tachometer-alt"></i> Host Dashboard
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Score Overview -->
+                <div class="row mb-4">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card bg-primary text-white text-center">
+                            <div class="card-body">
+                                <i class="fas fa-percentage fa-2x mb-2"></i>
+                                <h4>{{ attempt.score|round(1) if attempt.score else 'N/A' }}%</h4>
+                                <p class="mb-0">Final Score</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card bg-success text-white text-center">
+                            <div class="card-body">
+                                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                <h4>{{ answers.values()|selectattr('is_correct', 'equalto', True)|list|length }}</h4>
+                                <p class="mb-0">Correct</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card bg-danger text-white text-center">
+                            <div class="card-body">
+                                <i class="fas fa-times-circle fa-2x mb-2"></i>
+                                <h4>{{ answers.values()|selectattr('is_correct', 'equalto', False)|list|length }}</h4>
+                                <p class="mb-0">Incorrect</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card bg-info text-white text-center">
+                            <div class="card-body">
+                                <i class="fas fa-trophy fa-2x mb-2"></i>
+                                <h4>{{ attempt.total_points or 0 }}</h4>
+                                <p class="mb-0">Total Points</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quiz Information -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle"></i> Quiz Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Participant:</strong> {{ attempt.participant.username }}</p>
+                                <p><strong>Started:</strong> {{ attempt.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                <p><strong>Completed:</strong> {{ attempt.completed_at.strftime('%Y-%m-%d %H:%M:%S') if attempt.completed_at else 'Not completed' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Time Limit:</strong> {{ quiz.time_limit }} minutes</p>
+                                <p><strong>Total Questions:</strong> {{ questions|length }}</p>
+                                <p><strong>Status:</strong> 
+                                    {% if attempt.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif attempt.status == 'in_progress' %}
+                                        <span class="badge bg-warning">In Progress</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ attempt.status.title() }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {% if attempt.completed_at and attempt.started_at %}
+                            {% set duration = attempt.completed_at - attempt.started_at %}
+                            <div class="alert alert-light">
+                                <i class="fas fa-clock"></i>
+                                <strong>Duration:</strong> {{ duration.total_seconds() // 60 }} minutes and {{ duration.total_seconds() % 60 }} seconds
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Question Results -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list"></i> Question by Question Results</h5>
+                    </div>
+                    <div class="card-body">
+                        {% for question in questions %}
+                            {% set answer = answers.get(question.id) %}
+                            <div class="card mb-3 {% if answer and answer.is_correct %}border-success{% elif answer and answer.is_correct == False %}border-danger{% else %}border-warning{% endif %}">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <span class="badge bg-secondary me-2">Q{{ loop.index }}</span>
+                                        {{ question.question_text }}
+                                    </h6>
+                                    <div>
+                                        <span class="badge bg-primary">{{ question.points }} pts</span>
+                                        {% if answer %}
+                                            {% if answer.is_correct %}
+                                                <span class="badge bg-success">Correct</span>
+                                            {% elif answer.is_correct == False %}
+                                                <span class="badge bg-danger">Incorrect</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Needs Review</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">Not Answered</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    {% if question.question_type in ['multiple_choice', 'true_false'] %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Answer Options:</h6>
+                                                {% for option in question.options|sort(attribute='order') %}
+                                                    <div class="mb-2 p-2 rounded {% if answer and answer.selected_option_id == option.id %}bg-light{% endif %}">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span>
+                                                                {% if answer and answer.selected_option_id == option.id %}
+                                                                    <i class="fas fa-check-circle text-primary"></i>
+                                                                {% else %}
+                                                                    <i class="far fa-circle text-muted"></i>
+                                                                {% endif %}
+                                                                {{ option.option_text }}
+                                                            </span>
+                                                            {% if option.is_correct %}
+                                                                <span class="badge bg-success">Correct Answer</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {% if answer %}
+                                                    <h6>Your Answer:</h6>
+                                                    {% if answer.selected_option_id %}
+                                                        {% set selected_option = question.options|selectattr('id', 'equalto', answer.selected_option_id)|first %}
+                                                        <div class="alert {% if answer.is_correct %}alert-success{% else %}alert-danger{% endif %}">
+                                                            <strong>{{ selected_option.option_text if selected_option else 'Unknown option' }}</strong>
+                                                            {% if answer.is_correct %}
+                                                                <br><small><i class="fas fa-check"></i> This is correct!</small>
+                                                            {% elif answer.is_correct == False %}
+                                                                <br><small><i class="fas fa-times"></i> This is incorrect.</small>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="alert alert-warning">
+                                                            <i class="fas fa-exclamation-triangle"></i> No answer selected
+                                                        </div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <div class="alert alert-secondary">
+                                                        <i class="fas fa-minus-circle"></i> Question not answered
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% elif question.question_type == 'text' %}
+                                        <div class="row">
+                                            <div class="col-12">
+                                                <h6>Your Answer:</h6>
+                                                {% if answer and answer.text_answer %}
+                                                    <div class="alert alert-light">
+                                                        <pre class="mb-0">{{ answer.text_answer }}</pre>
+                                                    </div>
+                                                    {% if answer.is_correct == None %}
+                                                        <div class="alert alert-info">
+                                                            <i class="fas fa-info-circle"></i> This answer requires manual grading by the instructor.
+                                                        </div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <div class="alert alert-warning">
+                                                        <i class="fas fa-exclamation-triangle"></i> No answer provided
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Proctoring Information (if enabled and user has permission) -->
+                {% if quiz.proctoring_enabled and (current_user.is_host() or current_user.is_admin() or current_user.id == attempt.participant_id) %}
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-shield-alt"></i> Proctoring Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if attempt.proctoring_flags %}
+                                {% set flags = attempt.proctoring_flags|from_json if attempt.proctoring_flags else [] %}
+                                {% if flags %}
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <strong>{{ flags|length }} proctoring event(s) detected during this attempt.</strong>
+                                    </div>
+                                    {% for flag in flags %}
+                                        <div class="mb-2">
+                                            <span class="badge bg-warning me-2">{{ flag.type|title }}</span>
+                                            <small class="text-muted">{{ flag.timestamp }}</small>
+                                            {% if flag.details %}
+                                                <br><small>{{ flag.details }}</small>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-success">
+                                        <i class="fas fa-check-circle"></i>
+                                        No proctoring violations detected.
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle"></i>
+                                    No proctoring violations detected.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

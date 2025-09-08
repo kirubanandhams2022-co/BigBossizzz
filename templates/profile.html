@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-user-edit"></i> User Profile</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-circle fa-4x text-primary mb-3"></i>
+                                    <h5>{{ current_user.username }}</h5>
+                                    <p class="text-muted">
+                                        <i class="fas fa-tag"></i> {{ current_user.role.title() }}
+                                    </p>
+                                    {% if current_user.is_verified %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle"></i> Verified
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-exclamation-triangle"></i> Unverified
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-info-circle"></i> Account Information</h6>
+                                    <p><strong>Email:</strong> {{ current_user.email }}</p>
+                                    <p><strong>Role:</strong> {{ current_user.role.title() }}</p>
+                                    <p><strong>Member Since:</strong> {{ current_user.created_at.strftime('%Y-%m-%d') }}</p>
+                                    {% if current_user.last_login %}
+                                        <p><strong>Last Login:</strong> {{ current_user.last_login.strftime('%Y-%m-%d %H:%M') }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-user"></i> Basic Information</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.username.label(class="form-label") }}
+                                {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                                {% for error in form.username.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                                {% for error in form.email.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                                {% if not current_user.is_verified %}
+                                    <div class="form-text text-warning">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        Your email address is not verified. Please check your inbox.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-lock"></i> Change Password</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.current_password.label(class="form-label") }}
+                                {{ form.current_password(class="form-control" + (" is-invalid" if form.current_password.errors else "")) }}
+                                {% for error in form.current_password.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                                <div class="form-text">Leave blank to keep current password</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                {{ form.new_password.label(class="form-label") }}
+                                {{ form.new_password(class="form-control" + (" is-invalid" if form.new_password.errors else "")) }}
+                                {% for error in form.new_password.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                {{ form.confirm_password.label(class="form-label") }}
+                                {{ form.confirm_password(class="form-control" + (" is-invalid" if form.confirm_password.errors else "")) }}
+                                {% for error in form.confirm_password.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Security Note:</strong> If you change your email address, you will need to verify the new email before you can log in again.
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Update Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Role-specific Statistics -->
+        {% if current_user.is_host() %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Host Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <i class="fas fa-clipboard-list fa-2x text-primary mb-2"></i>
+                            <h4>{{ current_user.created_quizzes|length }}</h4>
+                            <small class="text-muted">Quizzes Created</small>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <i class="fas fa-play-circle fa-2x text-success mb-2"></i>
+                            <h4>{{ current_user.created_quizzes|selectattr('is_active')|list|length }}</h4>
+                            <small class="text-muted">Active Quizzes</small>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <i class="fas fa-users fa-2x text-info mb-2"></i>
+                            <h4>
+                                {% set total_attempts = 0 %}
+                                {% for quiz in current_user.created_quizzes %}
+                                    {% set total_attempts = total_attempts + quiz.attempts|length %}
+                                {% endfor %}
+                                {{ total_attempts }}
+                            </h4>
+                            <small class="text-muted">Total Attempts</small>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <i class="fas fa-question-circle fa-2x text-warning mb-2"></i>
+                            <h4>
+                                {% set total_questions = 0 %}
+                                {% for quiz in current_user.created_quizzes %}
+                                    {% set total_questions = total_questions + quiz.questions|length %}
+                                {% endfor %}
+                                {{ total_questions }}
+                            </h4>
+                            <small class="text-muted">Questions Created</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% elif current_user.role == 'participant' %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-line"></i> Participant Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4 col-sm-6 mb-3">
+                            <i class="fas fa-clipboard-check fa-2x text-primary mb-2"></i>
+                            <h4>{{ current_user.quiz_attempts|length }}</h4>
+                            <small class="text-muted">Quiz Attempts</small>
+                        </div>
+                        <div class="col-md-4 col-sm-6 mb-3">
+                            <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                            <h4>{{ current_user.quiz_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                            <small class="text-muted">Completed</small>
+                        </div>
+                        <div class="col-md-4 col-sm-6 mb-3">
+                            <i class="fas fa-percentage fa-2x text-info mb-2"></i>
+                            {% set completed_attempts = current_user.quiz_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
+                            <h4>
+                                {% if completed_attempts %}
+                                    {{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(1) }}%
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </h4>
+                            <small class="text-muted">Average Score</small>
+                        </div>
+                    </div>
+                    
+                    {% if completed_attempts %}
+                        <div class="mt-3">
+                            <h6>Recent Performance:</h6>
+                            <div class="list-group">
+                                {% for attempt in current_user.quiz_attempts|selectattr('status', 'equalto', 'completed')|sort(attribute='completed_at', reverse=true)[:5] %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">{{ attempt.quiz.title }}</h6>
+                                            <small class="text-muted">{{ attempt.completed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        </div>
+                                        <span class="badge bg-primary">{{ attempt.score|round(1) if attempt.score else 'N/A' }}%</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

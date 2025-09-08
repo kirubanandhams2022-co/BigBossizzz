@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Participant Dashboard - Proctoring Platform{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-tachometer-alt"></i> Participant Dashboard</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ available_quizzes|length }}</h4>
+                        <p class="mb-0">Available Quizzes</p>
+                    </div>
+                    <i class="fas fa-clipboard-list fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ my_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                        <p class="mb-0">Completed</p>
+                    </div>
+                    <i class="fas fa-check-circle fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ my_attempts|selectattr('status', 'equalto', 'in_progress')|list|length }}</h4>
+                        <p class="mb-0">In Progress</p>
+                    </div>
+                    <i class="fas fa-clock fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        {% set completed_attempts = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
+                        {% if completed_attempts %}
+                            <h4>{{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(1) }}%</h4>
+                        {% else %}
+                            <h4>-</h4>
+                        {% endif %}
+                        <p class="mb-0">Avg Score</p>
+                    </div>
+                    <i class="fas fa-chart-line fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-play-circle"></i> Available Quizzes</h5>
+            </div>
+            <div class="card-body">
+                {% if available_quizzes %}
+                    <div class="row">
+                        {% for quiz in available_quizzes %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ quiz.title }}</h6>
+                                    <p class="card-text">
+                                        {% if quiz.description %}
+                                            {{ quiz.description[:100] }}...
+                                        {% else %}
+                                            No description available.
+                                        {% endif %}
+                                    </p>
+                                    
+                                    <div class="row text-center mb-3">
+                                        <div class="col-4">
+                                            <small class="text-muted">Questions</small>
+                                            <div class="fw-bold">{{ quiz.questions|length }}</div>
+                                        </div>
+                                        <div class="col-4">
+                                            <small class="text-muted">Time Limit</small>
+                                            <div class="fw-bold">{{ quiz.time_limit }} min</div>
+                                        </div>
+                                        <div class="col-4">
+                                            <small class="text-muted">Proctoring</small>
+                                            <div class="fw-bold">
+                                                {% if quiz.proctoring_enabled %}
+                                                    <i class="fas fa-eye text-info"></i>
+                                                {% else %}
+                                                    <i class="fas fa-eye-slash text-muted"></i>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {% set user_attempt = my_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('status', 'equalto', 'in_progress')|first %}
+                                    {% if user_attempt %}
+                                        <a href="{{ url_for('continue_quiz', attempt_id=user_attempt.id) }}" class="btn btn-warning btn-sm w-100">
+                                            <i class="fas fa-play"></i> Continue Quiz
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn btn-primary btn-sm w-100">
+                                            <i class="fas fa-play"></i> Start Quiz
+                                        </a>
+                                    {% endif %}
+                                </div>
+                                <div class="card-footer text-muted">
+                                    <small>Created by {{ quiz.creator.username }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                        <h5>No Quizzes Available</h5>
+                        <p class="text-muted">Check back later for new quizzes.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> My Quiz History</h5>
+            </div>
+            <div class="card-body">
+                {% if my_attempts %}
+                    {% for attempt in my_attempts[:10] %}
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                            <div>
+                                <div class="fw-bold">{{ attempt.quiz.title }}</div>
+                                <small class="text-muted">{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            <div class="text-end">
+                                {% if attempt.status == 'completed' %}
+                                    <span class="badge bg-success">{{ attempt.score|round(1) if attempt.score else 'N/A' }}%</span>
+                                    <br><a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-outline-primary btn-sm mt-1">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                {% elif attempt.status == 'in_progress' %}
+                                    <span class="badge bg-warning">In Progress</span>
+                                    <br><a href="{{ url_for('continue_quiz', attempt_id=attempt.id) }}" class="btn btn-outline-warning btn-sm mt-1">
+                                        <i class="fas fa-play"></i> Continue
+                                    </a>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ attempt.status.title() }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No quiz history yet</p>
+                        <small class="text-muted">Start taking quizzes to see your history here.</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if my_attempts|selectattr('status', 'equalto', 'completed')|list %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-trophy"></i> Performance</h5>
+            </div>
+            <div class="card-body">
+                {% set completed = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
+                {% if completed %}
+                    <div class="text-center">
+                        <h4 class="text-success">{{ (completed|map(attribute='score')|sum / completed|length)|round(1) }}%</h4>
+                        <p class="text-muted mb-3">Average Score</p>
+                        
+                        <div class="row">
+                            <div class="col-6">
+                                <h6 class="text-primary">{{ completed|map(attribute='score')|max|round(1) }}%</h6>
+                                <small class="text-muted">Best Score</small>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-info">{{ completed|length }}</h6>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
