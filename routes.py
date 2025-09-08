@@ -19,6 +19,11 @@ def default_accounts():
     """Show default login accounts"""
     return render_template('default_accounts.html')
 
+@app.route('/loading')
+def loading():
+    """Loading page with eye animation"""
+    return render_template('loading.html')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """User registration"""
