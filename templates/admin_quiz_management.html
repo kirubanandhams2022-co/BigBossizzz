@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Management - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-clipboard-list"></i> Quiz Management</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ quizzes|length }}</h4>
+                <small>Total Quizzes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ quizzes|selectattr('is_active')|list|length }}</h4>
+                <small>Active Quizzes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h4>{{ quizzes|rejectattr('is_active')|list|length }}</h4>
+                <small>Inactive Quizzes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ (quizzes|sum(attribute='questions')|list)|length or 0 }}</h4>
+                <small>Total Questions</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list"></i> All Quizzes</h5>
+    </div>
+    <div class="card-body">
+        {% if quizzes %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Quiz Title</th>
+                        <th>Creator</th>
+                        <th>Questions</th>
+                        <th>Time Limit</th>
+                        <th>Attempts</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for quiz in quizzes %}
+                    <tr class="{% if not quiz.is_active %}table-secondary{% endif %}">
+                        <td>
+                            <strong>{{ quiz.title }}</strong>
+                            {% if quiz.description %}
+                                <br><small class="text-muted">{{ quiz.description[:100] }}{% if quiz.description|length > 100 %}...{% endif %}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ quiz.creator.username }}</strong>
+                            <br><small class="text-muted">{{ quiz.creator.email }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-primary">{{ quiz.questions|length }}</span>
+                        </td>
+                        <td>{{ quiz.time_limit }} minutes</td>
+                        <td class="text-center">
+                            {% set attempt_count = quiz.attempts|length %}
+                            <span class="badge bg-info">{{ attempt_count }}</span>
+                        </td>
+                        <td>
+                            {% if quiz.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ quiz.created_at.strftime('%Y-%m-%d') if quiz.created_at else 'N/A' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <!-- View Quiz -->
+                                <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-primary" title="Edit Quiz">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                <!-- Toggle Active Status -->
+                                <form method="POST" action="{{ url_for('admin_toggle_quiz_active', quiz_id=quiz.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-outline-{% if quiz.is_active %}warning{% else %}success{% endif %}" 
+                                            onclick="return confirm('Are you sure?')" title="{% if quiz.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                        <i class="fas fa-{% if quiz.is_active %}pause{% else %}play{% endif %}"></i>
+                                    </button>
+                                </form>
+                                
+                                <!-- View Results -->
+                                <button class="btn btn-outline-info" onclick="showQuizStats({{ quiz.id }}, '{{ quiz.title|e }}')" title="View Statistics">
+                                    <i class="fas fa-chart-bar"></i>
+                                </button>
+                                
+                                <!-- Delete Quiz -->
+                                <form method="POST" action="{{ url_for('admin_delete_quiz', quiz_id=quiz.id) }}" style="display: inline;" 
+                                      onsubmit="return confirm('Are you sure you want to permanently delete this quiz and all its data?');">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete Quiz">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+            <h5>No Quizzes Found</h5>
+            <p class="text-muted">No quizzes have been created yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quiz Statistics Modal -->
+<div class="modal fade" id="quizStatsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chart-bar"></i> Quiz Statistics</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="statsContent">
+                <!-- Statistics will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showQuizStats(quizId, quizTitle) {
+    document.querySelector('#quizStatsModal .modal-title').innerHTML = 
+        `<i class="fas fa-chart-bar"></i> Statistics for "${quizTitle}"`;
+    
+    // Load quiz statistics
+    fetch(`/api/quiz/${quizId}/stats`)
+        .then(response => response.json())
+        .then(data => {
+            let html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6>Attempt Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Total Attempts:</strong> ${data.total_attempts || 0}</p>
+                                <p><strong>Completed:</strong> ${data.completed_attempts || 0}</p>
+                                <p><strong>Average Score:</strong> ${data.average_score || 0}%</p>
+                                <p><strong>Best Score:</strong> ${data.highest_score || 0}%</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6>Security Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Violations:</strong> ${data.total_violations || 0}</p>
+                                <p><strong>Terminated Attempts:</strong> ${data.terminated_attempts || 0}</p>
+                                <p><strong>Most Common Violation:</strong> ${data.common_violation || 'None'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('statsContent').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('quizStatsModal')).show();
+        })
+        .catch(error => {
+            document.getElementById('statsContent').innerHTML = 
+                '<div class="alert alert-danger">Error loading quiz statistics.</div>';
+            new bootstrap.Modal(document.getElementById('quizStatsModal')).show();
+        });
+}
+</script>
+{% endblock %}

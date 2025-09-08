@@ -871,6 +871,159 @@ def admin_violations():
     violations = ProctoringEvent.query.join(QuizAttempt).join(User).order_by(ProctoringEvent.timestamp.desc()).limit(100).all()
     return render_template('admin_violations.html', violations=violations)
 
+@app.route('/admin/user/<int:user_id>/edit-credentials', methods=['POST'])
+@login_required
+def admin_edit_credentials(user_id):
+    """Edit user credentials"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Don't allow editing your own account
+    if user.id == current_user.id:
+        flash('You cannot edit your own credentials.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    username = request.form.get('username')
+    email = request.form.get('email')
+    password = request.form.get('password')
+    
+    # Validation
+    if not username or not email:
+        flash('Username and email are required.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Check for duplicates
+    if username != user.username and User.query.filter_by(username=username).first():
+        flash('Username already exists.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    if email != user.email and User.query.filter_by(email=email).first():
+        flash('Email already exists.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Update credentials
+    user.username = username
+    user.email = email
+    
+    if password and len(password) >= 6:
+        user.set_password(password)
+    
+    db.session.commit()
+    flash(f'Credentials updated for user {username}.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/quiz-management')
+@login_required
+def admin_quiz_management():
+    """Admin quiz management system"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    quizzes = Quiz.query.order_by(Quiz.created_at.desc()).all()
+    return render_template('admin_quiz_management.html', quizzes=quizzes)
+
+@app.route('/admin/system-settings')
+@login_required
+def admin_system_settings():
+    """Admin system settings"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('admin_system_settings.html')
+
+@app.route('/admin/audit-logs')
+@login_required
+def admin_audit_logs():
+    """Admin audit logs"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get recent activities (for now, we'll show quiz attempts and user registrations)
+    recent_attempts = QuizAttempt.query.order_by(QuizAttempt.started_at.desc()).limit(50).all()
+    recent_users = User.query.order_by(User.created_at.desc()).limit(20).all()
+    
+    return render_template('admin_audit_logs.html', recent_attempts=recent_attempts, recent_users=recent_users)
+
+@app.route('/admin/quiz/<int:quiz_id>/toggle-active', methods=['POST'])
+@login_required
+def admin_toggle_quiz_active(quiz_id):
+    """Toggle quiz active status"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    quiz = Quiz.query.get_or_404(quiz_id)
+    quiz.is_active = not quiz.is_active
+    db.session.commit()
+    
+    status = 'activated' if quiz.is_active else 'deactivated'
+    flash(f'Quiz "{quiz.title}" has been {status}.', 'success')
+    return redirect(url_for('admin_quiz_management'))
+
+@app.route('/admin/quiz/<int:quiz_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_quiz(quiz_id):
+    """Delete a quiz (admin only)"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    quiz = Quiz.query.get_or_404(quiz_id)
+    
+    # Delete all related data
+    QuizAttempt.query.filter_by(quiz_id=quiz_id).delete()
+    for question in quiz.questions:
+        QuestionOption.query.filter_by(question_id=question.id).delete()
+    Question.query.filter_by(quiz_id=quiz_id).delete()
+    
+    db.session.delete(quiz)
+    db.session.commit()
+    
+    flash(f'Quiz "{quiz.title}" has been permanently deleted.', 'success')
+    return redirect(url_for('admin_quiz_management'))
+
+@app.route('/api/quiz/<int:quiz_id>/stats')
+@login_required
+def get_quiz_stats(quiz_id):
+    """Get quiz statistics for admin"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    quiz = Quiz.query.get_or_404(quiz_id)
+    attempts = QuizAttempt.query.filter_by(quiz_id=quiz_id).all()
+    violations = ProctoringEvent.query.join(QuizAttempt).filter(QuizAttempt.quiz_id == quiz_id).all()
+    
+    completed_attempts = [a for a in attempts if a.status == 'completed']
+    terminated_attempts = [a for a in attempts if a.status == 'terminated']
+    
+    stats = {
+        'total_attempts': len(attempts),
+        'completed_attempts': len(completed_attempts),
+        'terminated_attempts': len(terminated_attempts),
+        'total_violations': len(violations),
+        'average_score': sum([a.score for a in completed_attempts if a.score]) / len(completed_attempts) if completed_attempts else 0,
+        'highest_score': max([a.score for a in completed_attempts if a.score]) if completed_attempts else 0,
+        'common_violation': violations[0].event_type.replace('_', ' ').title() if violations else 'None'
+    }
+    
+    return jsonify(stats)
+
+@app.route('/api/violations/count')
+@login_required
+def get_violations_count():
+    """Get total violation count for admin dashboard"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    count = ProctoringEvent.query.count()
+    return jsonify({'count': count})
+
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):

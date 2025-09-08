@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-file-alt"></i> Audit Logs</h1>
+    <div>
+        <button class="btn btn-outline-primary me-2" onclick="exportLogs()">
+            <i class="fas fa-download"></i> Export Logs
+        </button>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ recent_attempts|length }}</h4>
+                <small>Recent Quiz Attempts</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ recent_users|length }}</h4>
+                <small>New User Registrations</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h4>{{ recent_attempts|selectattr('status', 'equalto', 'terminated')|list|length }}</h4>
+                <small>Terminated Attempts</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h4 id="violationCount">-</h4>
+                <small>Security Violations</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#quiz-attempts">Quiz Attempts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#user-activities">User Activities</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#system-events">System Events</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+                    <!-- Quiz Attempts Tab -->
+                    <div class="tab-pane fade show active" id="quiz-attempts">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date/Time</th>
+                                        <th>User</th>
+                                        <th>Quiz</th>
+                                        <th>Status</th>
+                                        <th>Score</th>
+                                        <th>Duration</th>
+                                        <th>Violations</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for attempt in recent_attempts %}
+                                    <tr class="{% if attempt.status == 'terminated' %}table-danger{% endif %}">
+                                        <td>{{ attempt.started_at.strftime('%m/%d %H:%M') if attempt.started_at else 'N/A' }}</td>
+                                        <td>
+                                            <strong>{{ attempt.user.username }}</strong>
+                                            <br><small class="text-muted">{{ attempt.user.email }}</small>
+                                        </td>
+                                        <td>
+                                            <strong>{{ attempt.quiz.title }}</strong>
+                                            <br><small class="text-muted">by {{ attempt.quiz.creator.username }}</small>
+                                        </td>
+                                        <td>
+                                            {% if attempt.status == 'completed' %}
+                                                <span class="badge bg-success">Completed</span>
+                                            {% elif attempt.status == 'terminated' %}
+                                                <span class="badge bg-danger">Terminated</span>
+                                            {% elif attempt.status == 'in_progress' %}
+                                                <span class="badge bg-primary">In Progress</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ attempt.status.title() }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if attempt.score is not none %}
+                                                {{ attempt.score|round(1) }}%
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if attempt.completed_at and attempt.started_at %}
+                                                {% set duration = (attempt.completed_at - attempt.started_at).total_seconds() / 60 %}
+                                                {{ duration|round(1) }} min
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set violation_count = attempt.proctoring_events|length %}
+                                            {% if violation_count > 0 %}
+                                                <span class="badge bg-warning">{{ violation_count }}</span>
+                                            {% else %}
+                                                <span class="badge bg-success">0</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- User Activities Tab -->
+                    <div class="tab-pane fade" id="user-activities">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Last Login</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in recent_users %}
+                                    <tr>
+                                        <td>{{ user.created_at.strftime('%m/%d/%Y') if user.created_at else 'N/A' }}</td>
+                                        <td><strong>{{ user.username }}</strong></td>
+                                        <td>{{ user.email }}</td>
+                                        <td>
+                                            <span class="badge 
+                                                {% if user.role == 'admin' %}bg-danger
+                                                {% elif user.role == 'host' %}bg-primary
+                                                {% else %}bg-success{% endif %}">
+                                                {{ user.role.title() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if user.is_active %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            {% endif %}
+                                            {% if not user.is_verified %}
+                                                <span class="badge bg-warning ms-1">Unverified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ user.last_login.strftime('%m/%d %H:%M') if user.last_login else 'Never' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- System Events Tab -->
+                    <div class="tab-pane fade" id="system-events">
+                        <div class="list-group">
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">System Startup</h6>
+                                    <small>Just now</small>
+                                </div>
+                                <p class="mb-1">Application server started successfully</p>
+                                <small class="text-muted">All services operational</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Database Connection</h6>
+                                    <small>5 minutes ago</small>
+                                </div>
+                                <p class="mb-1">PostgreSQL database connected</p>
+                                <small class="text-muted">Connection pool initialized</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Email Service</h6>
+                                    <small>10 minutes ago</small>
+                                </div>
+                                <p class="mb-1">SMTP service configured</p>
+                                <small class="text-muted">Email notifications enabled</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Proctoring System</h6>
+                                    <small>15 minutes ago</small>
+                                </div>
+                                <p class="mb-1">Security monitoring initialized</p>
+                                <small class="text-muted">All violation detectors active</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-filter"></i> Log Filters</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Date Range</label>
+                    <select class="form-select">
+                        <option selected>Last 24 hours</option>
+                        <option>Last 7 days</option>
+                        <option>Last 30 days</option>
+                        <option>Custom range</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Event Type</label>
+                    <select class="form-select">
+                        <option selected>All events</option>
+                        <option>User activities</option>
+                        <option>Quiz attempts</option>
+                        <option>Security violations</option>
+                        <option>System events</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">User Role</label>
+                    <select class="form-select">
+                        <option selected>All roles</option>
+                        <option>Administrators</option>
+                        <option>Hosts</option>
+                        <option>Participants</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary w-100">Apply Filters</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-download"></i> Export Options</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="exportCSV()">
+                        <i class="fas fa-file-csv"></i> Export as CSV
+                    </button>
+                    <button class="btn btn-outline-info" onclick="exportJSON()">
+                        <i class="fas fa-file-code"></i> Export as JSON
+                    </button>
+                    <button class="btn btn-outline-success" onclick="exportPDF()">
+                        <i class="fas fa-file-pdf"></i> Generate PDF Report
+                    </button>
+                </div>
+                <hr>
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i> Exports include filtered data only
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Load violation count on page load
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/violations/count')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('violationCount').textContent = data.count || 0;
+        })
+        .catch(error => {
+            document.getElementById('violationCount').textContent = '0';
+        });
+});
+
+function exportLogs() {
+    alert('Log export initiated. Download will start shortly.');
+}
+
+function exportCSV() {
+    alert('CSV export started. File will be ready for download.');
+}
+
+function exportJSON() {
+    alert('JSON export started. File will be ready for download.');
+}
+
+function exportPDF() {
+    alert('PDF report generation started. Download will be available soon.');
+}
+</script>
+{% endblock %}

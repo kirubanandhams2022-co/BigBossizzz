@@ -228,18 +228,21 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <button class="btn btn-outline-primary" onclick="showUserManagement()">
+                    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-primary">
                         <i class="fas fa-users"></i> User Management
-                    </button>
-                    <button class="btn btn-outline-info" onclick="showQuizManagement()">
+                    </a>
+                    <a href="{{ url_for('admin_quiz_management') }}" class="btn btn-outline-info">
                         <i class="fas fa-clipboard-list"></i> Quiz Management
-                    </button>
-                    <button class="btn btn-outline-success" onclick="showSystemSettings()">
+                    </a>
+                    <a href="{{ url_for('admin_violations') }}" class="btn btn-outline-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Security Violations
+                    </a>
+                    <a href="{{ url_for('admin_system_settings') }}" class="btn btn-outline-success">
                         <i class="fas fa-cog"></i> System Settings
-                    </button>
-                    <button class="btn btn-outline-warning" onclick="showAuditLogs()">
+                    </a>
+                    <a href="{{ url_for('admin_audit_logs') }}" class="btn btn-outline-secondary">
                         <i class="fas fa-file-alt"></i> Audit Logs
-                    </button>
+                    </a>
                 </div>
                 
                 <hr>
