@@ -15,16 +15,18 @@ class ProctoringManager {
         this.config = {
             faceDetection: true,
             tabSwitchDetection: true,
-            fullscreenEnforcement: false,
+            fullscreenEnforcement: true,
             screenshotDetection: true,
-            audioMonitoring: false,
+            audioMonitoring: true,
             mouseMoveTracking: true,
             keyboardMonitoring: true,
             windowBlurDetection: true,
             multipleTabDetection: true,
             rightClickDisabled: true,
             copyPasteDisabled: true,
-            devToolsDetection: true
+            devToolsDetection: true,
+            printScreenBlocked: true,
+            selectTextDisabled: true
         };
         
         this.init();
@@ -127,21 +129,87 @@ class ProctoringManager {
             });
         }
 
-        // Copy/paste prevention
+        // Enhanced copy/paste and security prevention
         if (this.config.copyPasteDisabled) {
+            // Block text selection
+            document.body.style.userSelect = 'none';
+            document.body.style.webkitUserSelect = 'none';
+            document.body.style.mozUserSelect = 'none';
+            document.body.style.msUserSelect = 'none';
+            
+            // Disable drag and drop
+            document.addEventListener('dragstart', (e) => {
+                e.preventDefault();
+                return false;
+            });
+            
+            document.addEventListener('selectstart', (e) => {
+                e.preventDefault();
+                this.logViolation('text_selection', 'Text selection attempted', 'low');
+                return false;
+            });
+
+            // Block copy/paste events directly
+            document.addEventListener('copy', (e) => {
+                e.preventDefault();
+                this.logViolation('copy_attempt', 'Copy operation blocked', 'medium');
+                return false;
+            });
+
+            document.addEventListener('paste', (e) => {
+                e.preventDefault();
+                this.logViolation('paste_attempt', 'Paste operation blocked', 'medium');
+                return false;
+            });
+
+            document.addEventListener('cut', (e) => {
+                e.preventDefault();
+                this.logViolation('cut_attempt', 'Cut operation blocked', 'medium');
+                return false;
+            });
+
             document.addEventListener('keydown', (e) => {
-                // Prevent Ctrl+C, Ctrl+V, Ctrl+A, Ctrl+X
-                if (e.ctrlKey && ['c', 'v', 'a', 'x'].includes(e.key.toLowerCase())) {
-                    e.preventDefault();
-                    this.logViolation('copy_paste_attempt', `Attempted ${e.key.toUpperCase()} operation`, 'medium');
-                    return false;
-                }
-                
-                // Prevent F12, Ctrl+Shift+I (DevTools)
-                if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
-                    e.preventDefault();
-                    this.logViolation('devtools_attempt', 'Attempted to open developer tools', 'high');
-                    return false;
+                // Block comprehensive list of shortcuts
+                const blockedCombos = [
+                    // Copy/Paste operations
+                    { ctrl: true, key: 'c' },
+                    { ctrl: true, key: 'v' },
+                    { ctrl: true, key: 'a' },
+                    { ctrl: true, key: 'x' },
+                    { ctrl: true, key: 'z' },
+                    { ctrl: true, key: 's' },
+                    // Developer tools
+                    { key: 'F12' },
+                    { ctrl: true, shift: true, key: 'i' },
+                    { ctrl: true, shift: true, key: 'c' },
+                    { ctrl: true, shift: true, key: 'j' },
+                    { ctrl: true, shift: true, key: 'k' },
+                    { ctrl: true, key: 'u' },
+                    // Navigation
+                    { ctrl: true, key: 'r' },
+                    { key: 'F5' },
+                    { ctrl: true, key: 'h' },
+                    { ctrl: true, key: 'l' },
+                    { ctrl: true, key: 't' },
+                    { ctrl: true, key: 'n' },
+                    { ctrl: true, key: 'w' },
+                    { alt: true, key: 'F4' },
+                    // Print
+                    { ctrl: true, key: 'p' },
+                    { key: 'PrintScreen' }
+                ];
+
+                for (let combo of blockedCombos) {
+                    if ((!combo.ctrl || e.ctrlKey) && 
+                        (!combo.shift || e.shiftKey) && 
+                        (!combo.alt || e.altKey) && 
+                        e.key.toLowerCase() === combo.key.toLowerCase()) {
+                        
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.logViolation('blocked_shortcut', `Blocked shortcut: ${combo.key}`, 'medium');
+                        return false;
+                    }
                 }
             });
         }
