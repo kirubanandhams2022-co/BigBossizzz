@@ -655,6 +655,86 @@ def host_login_activity():
     
     return render_template('host_login_activity.html', login_events=login_events)
 
+@app.route('/admin/manage-flags')
+@login_required
+def admin_manage_flags():
+    """Admin interface to manage user flags and retake permissions"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all flagged users
+    flagged_users = db.session.query(UserViolation, User).join(User).filter(
+        UserViolation.is_flagged == True
+    ).order_by(UserViolation.flagged_at.desc()).all()
+    
+    # Get recent violations
+    recent_violations = db.session.query(ProctoringEvent, QuizAttempt, User, Quiz).join(
+        QuizAttempt, ProctoringEvent.attempt_id == QuizAttempt.id
+    ).join(
+        User, QuizAttempt.participant_id == User.id
+    ).join(
+        Quiz, QuizAttempt.quiz_id == Quiz.id
+    ).filter(
+        ProctoringEvent.severity.in_(['high', 'critical'])
+    ).order_by(ProctoringEvent.timestamp.desc()).limit(20).all()
+    
+    return render_template('admin_manage_flags.html', 
+                         flagged_users=flagged_users,
+                         recent_violations=recent_violations)
+
+@app.route('/admin/unflag-user/<int:user_id>', methods=['POST'])
+@login_required
+def admin_unflag_user(user_id):
+    """Admin action to unflag a user and grant retake permissions"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    violation_record = UserViolation.query.filter_by(user_id=user_id).first()
+    if not violation_record:
+        flash('User violation record not found.', 'error')
+        return redirect(url_for('admin_manage_flags'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Remove flag
+    violation_record.is_flagged = False
+    violation_record.unflagged_at = datetime.utcnow()
+    violation_record.unflagged_by = current_user.id
+    violation_record.notes = request.form.get('notes', '')
+    
+    db.session.commit()
+    
+    flash(f'User {user.username} has been unflagged and granted retake permissions.', 'success')
+    return redirect(url_for('admin_manage_flags'))
+
+@app.route('/admin/flag-user/<int:user_id>', methods=['POST'])
+@login_required
+def admin_flag_user(user_id):
+    """Admin action to manually flag a user"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    violation_record = UserViolation.query.filter_by(user_id=user_id).first()
+    if not violation_record:
+        violation_record = UserViolation(user_id=user_id)
+        db.session.add(violation_record)
+    
+    violation_record.is_flagged = True
+    violation_record.flagged_at = datetime.utcnow()
+    violation_record.flagged_by = current_user.id
+    violation_record.notes = request.form.get('notes', 'Manually flagged by administrator')
+    violation_record.violation_count = (violation_record.violation_count or 0) + 1
+    
+    db.session.commit()
+    
+    flash(f'User {user.username} has been flagged for violations.', 'warning')
+    return redirect(url_for('admin_manage_flags'))
+
 @app.route('/api/violations/<int:attempt_id>')
 @login_required
 def get_violations(attempt_id):
@@ -707,21 +787,59 @@ def log_proctoring_event():
         
         db.session.add(event)
         
-        # Check for high-severity violations - TERMINATE QUIZ
+        # Enhanced violation tracking and termination logic
+        violation_count = ProctoringEvent.query.filter_by(attempt_id=attempt_id).count() + 1
+        high_severity_count = ProctoringEvent.query.filter_by(
+            attempt_id=attempt_id, 
+            severity='high'
+        ).count()
+        
         if data.get('severity') == 'high':
+            high_severity_count += 1
+        
+        # Immediate termination conditions
+        immediate_termination_types = ['quiz_terminated', 'console_access', 'multiple_instances', 'devtools_opened']
+        should_terminate = (
+            data.get('type') in immediate_termination_types or
+            violation_count >= 3 or
+            high_severity_count >= 2
+        )
+        
+        if should_terminate:
+            # Terminate the quiz attempt
             attempt.status = 'terminated'
             attempt.completed_at = datetime.utcnow()
+            attempt.is_flagged = True
+            
+            # Auto-flag the user for violations
+            violation_record = UserViolation.query.filter_by(user_id=current_user.id).first()
+            if not violation_record:
+                violation_record = UserViolation(user_id=current_user.id)
+                db.session.add(violation_record)
+            
+            violation_record.is_flagged = True
+            violation_record.flagged_at = datetime.utcnow()
+            violation_record.flagged_by = None  # System flagged
+            violation_record.notes = f"Auto-flagged due to quiz termination: {data.get('type')} - {data.get('description')}"
+            violation_record.violation_count = (violation_record.violation_count or 0) + 1
             
             # Save current answers before termination
             db.session.commit()
             
             return jsonify({
                 'status': 'terminated',
-                'message': 'Quiz terminated due to security violation'
+                'message': f'Quiz terminated due to security violation: {data.get("description")}'
             })
         
         db.session.commit()
-        return jsonify({'status': 'logged'})
+        
+        response_data = {'status': 'logged'}
+        
+        # Add warning if approaching limits
+        if violation_count >= 2:
+            response_data['warning'] = f'{3 - violation_count} violations remaining before termination'
+        
+        return jsonify(response_data)
         
     except Exception as e:
         print(f"Error logging proctoring event: {e}")
@@ -910,7 +1028,17 @@ def view_quiz(quiz_id):
 @app.route('/quiz/<int:quiz_id>/take')
 @login_required
 def take_quiz(quiz_id):
-    """Take a quiz"""
+    """Take a quiz with enhanced security checks"""
+    if not current_user.is_participant():
+        flash('Access denied. Participant privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Check if user is flagged for violations - ADMIN ONLY RETAKE PERMISSIONS
+    violation_record = UserViolation.query.filter_by(user_id=current_user.id).first()
+    if violation_record and violation_record.is_flagged:
+        flash('❌ Access denied. Your account has been flagged for security violations. Contact an administrator for retake permissions.', 'error')
+        return redirect(url_for('dashboard'))
+    
     quiz = Quiz.query.get_or_404(quiz_id)
     
     if not quiz.is_active:
