@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     verification_token = db.Column(db.String(100), unique=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    profile_picture = db.Column(db.String(200), default='default.png')
     
     # Relationships
     created_quizzes = db.relationship('Quiz', backref='creator', lazy=True, cascade='all, delete-orphan')

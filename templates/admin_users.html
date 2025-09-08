@@ -91,6 +91,14 @@
                                         onclick="showPasswordModal({{ user.id }}, '{{ user.username }}')">
                                     <i class="fas fa-key"></i>
                                 </button>
+                                
+                                <!-- Delete User -->
+                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}" style="display: inline;" 
+                                      onsubmit="return confirm('Are you sure you want to permanently delete this user and all their data?');">
+                                    <button type="submit" class="btn btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
                             </div>
                             {% else %}
                             <span class="text-muted">Self</span>
