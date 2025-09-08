@@ -88,8 +88,8 @@
                                     <tr class="{% if attempt.status == 'terminated' %}table-danger{% endif %}">
                                         <td>{{ attempt.started_at.strftime('%m/%d %H:%M') if attempt.started_at else 'N/A' }}</td>
                                         <td>
-                                            <strong>{{ attempt.user.username }}</strong>
-                                            <br><small class="text-muted">{{ attempt.user.email }}</small>
+                                            <strong>{{ attempt.participant.username }}</strong>
+                                            <br><small class="text-muted">{{ attempt.participant.email }}</small>
                                         </td>
                                         <td>
                                             <strong>{{ attempt.quiz.title }}</strong>

@@ -38,7 +38,11 @@
     <div class="col-md-3">
         <div class="card bg-info text-white">
             <div class="card-body text-center">
-                <h4>{{ (quizzes|sum(attribute='questions')|list)|length or 0 }}</h4>
+                {% set total_questions = 0 %}
+                {% for quiz in quizzes %}
+                  {% set total_questions = total_questions + quiz.questions|length %}
+                {% endfor %}
+                <h4>{{ total_questions }}</h4>
                 <small>Total Questions</small>
             </div>
         </div>
