@@ -214,11 +214,62 @@ class ProctoringManager {
             });
         }
 
-        // Screenshot detection (print screen)
+        // Enhanced screenshot detection and prevention
         if (this.config.screenshotDetection) {
+            // Print Screen key detection
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'PrintScreen') {
+                    e.preventDefault();
+                    this.logViolation('screenshot_attempt', 'Screenshot attempt blocked', 'high');
+                    return false;
+                }
+            });
+            
             document.addEventListener('keyup', (e) => {
                 if (e.key === 'PrintScreen') {
-                    this.logViolation('screenshot_attempt', 'Print Screen key pressed', 'high');
+                    e.preventDefault();
+                    this.logViolation('screenshot_attempt', 'Screenshot key detected', 'high');
+                    return false;
+                }
+            });
+            
+            // Detect screenshot via clipboard API
+            document.addEventListener('paste', (e) => {
+                if (e.clipboardData && e.clipboardData.files.length > 0) {
+                    this.logViolation('screenshot_detected', 'Screenshot pasted from clipboard', 'high');
+                }
+            });
+            
+            // Block Windows snipping tool shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Windows + Shift + S (Snipping Tool)
+                if (e.metaKey && e.shiftKey && e.key === 'S') {
+                    e.preventDefault();
+                    this.logViolation('snipping_tool_blocked', 'Snipping tool shortcut blocked', 'high');
+                    return false;
+                }
+            });
+            
+            // Detect screen recording software shortcuts
+            const screenRecordShortcuts = [
+                { alt: true, key: 'r' }, // Common screen record
+                { ctrl: true, shift: true, key: 'r' }, // Various screen recorders
+                { meta: true, shift: true, key: 'r' }, // Mac screen record
+            ];
+            
+            document.addEventListener('keydown', (e) => {
+                for (let combo of screenRecordShortcuts) {
+                    if ((!combo.ctrl || e.ctrlKey) && 
+                        (!combo.shift || e.shiftKey) && 
+                        (!combo.alt || e.altKey) && 
+                        (!combo.meta || e.metaKey) && 
+                        e.key.toLowerCase() === combo.key.toLowerCase()) {
+                        
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.logViolation('screen_record_blocked', 'Screen recording shortcut blocked', 'high');
+                        return false;
+                    }
                 }
             });
         }
@@ -482,6 +533,16 @@ class ProctoringManager {
             
             if (!response.ok) {
                 console.error('Failed to send violation to server');
+                return;
+            }
+            
+            const result = await response.json();
+            
+            // If quiz is terminated due to violation, redirect immediately
+            if (result.status === 'terminated') {
+                alert('QUIZ TERMINATED: ' + result.message);
+                window.location.href = '/dashboard';
+                return;
             }
         } catch (error) {
             console.error('Error sending violation to server:', error);

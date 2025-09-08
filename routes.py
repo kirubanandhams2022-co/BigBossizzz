@@ -416,6 +416,58 @@ def get_violations(attempt_id):
     
     return jsonify({'violations': violations})
 
+@app.route('/api/proctoring/event', methods=['POST'])
+@login_required
+def log_proctoring_event():
+    """Log proctoring violation events"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Get current quiz attempt
+        attempt_id = data.get('attemptId')
+        if not attempt_id:
+            return jsonify({'error': 'Attempt ID required'}), 400
+        
+        attempt = QuizAttempt.query.get_or_404(attempt_id)
+        
+        # Verify user owns this attempt
+        if attempt.user_id != current_user.id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Create proctoring event
+        event = ProctoringEvent(
+            attempt_id=attempt_id,
+            event_type=data.get('type', 'unknown'),
+            description=data.get('description', 'Unknown violation'),
+            severity=data.get('severity', 'medium'),
+            timestamp=datetime.utcnow()
+        )
+        
+        db.session.add(event)
+        
+        # Check for high-severity violations - TERMINATE QUIZ
+        if data.get('severity') == 'high':
+            attempt.status = 'terminated'
+            attempt.completed_at = datetime.utcnow()
+            
+            # Save current answers before termination
+            db.session.commit()
+            
+            return jsonify({
+                'status': 'terminated',
+                'message': 'Quiz terminated due to security violation'
+            })
+        
+        db.session.commit()
+        return jsonify({'status': 'logged'})
+        
+    except Exception as e:
+        print(f"Error logging proctoring event: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/quiz/create', methods=['GET', 'POST'])
 @login_required
 def create_quiz():
@@ -775,31 +827,6 @@ def profile():
     
     return render_template('profile.html', form=form)
 
-# API endpoints for proctoring
-@app.route('/api/proctoring/event', methods=['POST'])
-@login_required
-def log_proctoring_event():
-    """Log a proctoring event"""
-    data = request.get_json()
-    
-    if not data or 'attempt_id' not in data or 'event_type' not in data:
-        return jsonify({'error': 'Invalid data'}), 400
-    
-    attempt = QuizAttempt.query.get(data['attempt_id'])
-    if not attempt or attempt.participant_id != current_user.id:
-        return jsonify({'error': 'Access denied'}), 403
-    
-    event = ProctoringEvent(
-        attempt_id=data['attempt_id'],
-        event_type=data['event_type'],
-        details=data.get('details', ''),
-        severity=data.get('severity', 'low')
-    )
-    
-    db.session.add(event)
-    db.session.commit()
-    
-    return jsonify({'success': True})
 
 @app.route('/api/quiz/<int:quiz_id>/questions')
 @login_required
