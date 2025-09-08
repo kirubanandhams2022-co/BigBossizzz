@@ -305,6 +305,62 @@ def edit_quiz(quiz_id):
     
     return render_template('edit_quiz.html', quiz=quiz, form=form, question_form=question_form)
 
+@app.route('/question/<int:question_id>/edit', methods=['POST'])
+@login_required
+def edit_question(question_id):
+    """Edit a specific question"""
+    question = Question.query.get_or_404(question_id)
+    quiz = question.quiz
+    
+    if quiz.creator_id != current_user.id and not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('host_dashboard'))
+    
+    question.question_text = request.form.get('question_text')
+    question.question_type = request.form.get('question_type')
+    question.points = int(request.form.get('points', 1))
+    
+    # Update options for multiple choice questions
+    if question.question_type == 'multiple_choice':
+        # Remove old options
+        QuestionOption.query.filter_by(question_id=question.id).delete()
+        
+        # Add new options
+        for i in range(1, 5):  # Support up to 4 options
+            option_text = request.form.get(f'option_{i}')
+            if option_text:
+                is_correct = request.form.get('correct_option') == str(i)
+                option = QuestionOption(
+                    question_id=question.id,
+                    option_text=option_text,
+                    is_correct=is_correct
+                )
+                db.session.add(option)
+    
+    db.session.commit()
+    flash('Question updated successfully!', 'success')
+    return redirect(url_for('edit_quiz', quiz_id=quiz.id))
+
+@app.route('/question/<int:question_id>/delete', methods=['POST'])
+@login_required
+def delete_question(question_id):
+    """Delete a question"""
+    question = Question.query.get_or_404(question_id)
+    quiz = question.quiz
+    
+    if quiz.creator_id != current_user.id and not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('host_dashboard'))
+    
+    # Delete associated options first
+    QuestionOption.query.filter_by(question_id=question.id).delete()
+    # Delete the question
+    db.session.delete(question)
+    db.session.commit()
+    
+    flash('Question deleted successfully!', 'success')
+    return redirect(url_for('edit_quiz', quiz_id=quiz.id))
+
 @app.route('/quiz/<int:quiz_id>/add_question', methods=['POST'])
 @login_required
 def add_question(quiz_id):
