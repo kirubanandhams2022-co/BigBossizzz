@@ -2,9 +2,9 @@ from flask import render_template, request, redirect, url_for, flash, jsonify, s
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
 from app import app, db
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
-from email_service import send_verification_email, send_credentials_email
+from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from datetime import datetime
 import json
 import logging
@@ -163,8 +163,37 @@ def login():
                 flash(f'Need a new verification email? <a href="{resend_link}">Click here to resend</a>', 'info')
                 return render_template('login.html', form=form)
             
+            # Update last login time
             user.last_login = datetime.utcnow()
+            
+            # Capture login event with device/IP info
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'Unknown'))
+            user_agent = request.headers.get('User-Agent', '')
+            
+            # Create login event record
+            login_event = LoginEvent(
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                device_info=user_agent  # Will be parsed in email service
+            )
+            
+            db.session.add(login_event)
             db.session.commit()
+            
+            # Send email notifications
+            try:
+                # Send notification to user
+                send_login_notification(user, login_event)
+                
+                # If participant, notify all hosts
+                if user.role == 'participant':
+                    hosts = User.query.filter_by(role='host').all()
+                    for host in hosts:
+                        send_host_login_notification(host, user, login_event)
+                        
+            except Exception as e:
+                logging.error(f"Failed to send login notifications: {e}")
             
             login_user(user)
             flash(f'Welcome back, {user.username}!', 'success')

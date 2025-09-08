@@ -97,8 +97,10 @@ class QuizAttempt(db.Model):
     completed_at = db.Column(db.DateTime)
     score = db.Column(db.Float)
     total_points = db.Column(db.Integer)
-    status = db.Column(db.String(20), default='in_progress')  # 'in_progress', 'completed', 'abandoned'
+    status = db.Column(db.String(20), default='in_progress')  # 'in_progress', 'completed', 'abandoned', 'terminated'
     proctoring_flags = db.Column(db.Text)  # JSON string for proctoring violations
+    violation_count = db.Column(db.Integer, default=0)
+    is_flagged = db.Column(db.Boolean, default=False)
     
     # Relationships
     answers = db.relationship('Answer', backref='attempt', lazy=True, cascade='all, delete-orphan')
@@ -141,3 +143,39 @@ class ProctoringEvent(db.Model):
     
     def __repr__(self):
         return f'<ProctoringEvent {self.event_type}>'
+
+class LoginEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    login_time = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(45))  # IPv6 support
+    user_agent = db.Column(db.Text)
+    device_info = db.Column(db.Text)  # Browser, OS details
+    location_data = db.Column(db.Text)  # Location if available
+    is_suspicious = db.Column(db.Boolean, default=False)
+    
+    # Relationships
+    user = db.relationship('User', backref=db.backref('login_events', lazy=True))
+    
+    def __repr__(self):
+        return f'<LoginEvent {self.user_id} at {self.login_time}>'
+
+class UserViolation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    violation_count = db.Column(db.Integer, default=0)
+    is_flagged = db.Column(db.Boolean, default=False)
+    flagged_at = db.Column(db.DateTime)
+    flagged_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # Admin who flagged
+    can_retake = db.Column(db.Boolean, default=False)
+    retake_approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    retake_approved_at = db.Column(db.DateTime)
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('violations', lazy=True))
+    flagged_by_admin = db.relationship('User', foreign_keys=[flagged_by])
+    approved_by_admin = db.relationship('User', foreign_keys=[retake_approved_by])
+    
+    def __repr__(self):
+        return f'<UserViolation {self.user_id} - {self.violation_count} violations>'
