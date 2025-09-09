@@ -900,7 +900,6 @@ def create_quiz():
             description=form.description.data,
             time_limit=form.time_limit.data,
             proctoring_enabled=form.proctoring_enabled.data,
-            shuffle_options=form.shuffle_options.data,
             creator_id=current_user.id
         )
         
@@ -909,8 +908,6 @@ def create_quiz():
             file = form.quiz_file.data
             if file and file.filename:
                 filename = secure_filename(file.filename)
-                quiz.created_from_file = True
-                quiz.source_filename = filename
                 
                 # Parse file and create questions
                 try:

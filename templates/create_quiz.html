@@ -42,26 +42,14 @@
                         <div class="form-text">Provide a brief description of the quiz content and instructions.</div>
                     </div>
                     
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                {{ form.proctoring_enabled(class="form-check-input") }}
-                                {{ form.proctoring_enabled.label(class="form-check-label") }}
-                            </div>
-                            <div class="form-text">
-                                <i class="fas fa-info-circle text-info"></i>
-                                Monitor participants during the quiz for suspicious activities.
-                            </div>
+                    <div class="mb-4">
+                        <div class="form-check">
+                            {{ form.proctoring_enabled(class="form-check-input") }}
+                            {{ form.proctoring_enabled.label(class="form-check-label") }}
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                {{ form.shuffle_options(class="form-check-input") }}
-                                {{ form.shuffle_options.label(class="form-check-label") }}
-                            </div>
-                            <div class="form-text">
-                                <i class="fas fa-shuffle text-info"></i>
-                                Randomize answer options for each participant to prevent cheating.
-                            </div>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle text-info"></i>
+                            Monitor participants during the quiz for suspicious activities.
                         </div>
                     </div>
                     

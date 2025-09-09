@@ -88,12 +88,7 @@
                     </div>
                     <div class="card-body">
                         {% if question.question_type == 'multiple_choice' %}
-                            {% if quiz.shuffle_options %}
-                                {% set options = question.get_shuffled_options() %}
-                            {% else %}
-                                {% set options = question.options|sort(attribute='order') %}
-                            {% endif %}
-                            {% for option in options %}
+                            {% for option in question.options|sort(attribute='order') %}
                             <div class="form-check mb-2">
                                 <input class="form-check-input question-input" type="radio" 
                                        name="question_{{ question.id }}" 

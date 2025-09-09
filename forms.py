@@ -38,7 +38,6 @@ class QuizForm(FlaskForm):
         NumberRange(min=1, max=300, message='Time limit must be between 1 and 300 minutes')
     ], default=60)
     proctoring_enabled = BooleanField('Enable Proctoring', default=True)
-    shuffle_options = BooleanField('Shuffle Answer Options for Each Participant', default=True)
     quiz_file = FileField('Upload Quiz File (TXT/CSV format)', validators=[
         FileAllowed(['txt', 'csv'], 'Only TXT and CSV files allowed!')
     ])
