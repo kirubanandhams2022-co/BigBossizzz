@@ -1,14 +1,21 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, session
+from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from app import app, db
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, DeviceLog, SecurityAlert
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from datetime import datetime, timedelta
 import json
 import logging
-from sqlalchemy import func
+import os
+import re
+import pandas as pd
+import PyPDF2
+import docx
+from io import BytesIO
+from sqlalchemy import func, text
 
 @app.route('/')
 def index():
@@ -473,6 +480,769 @@ def admin_export_database():
         as_attachment=True,
         download_name=f'database_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.xlsx'
     )
+
+# File Upload and Auto-Question Generation System
+
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'csv', 'xlsx', 'txt'}
+UPLOAD_FOLDER = 'uploads'
+
+# Create upload directory if it doesn't exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/upload-quiz-file', methods=['POST'])
+@login_required
+def upload_quiz_file():
+    """Upload file and extract candidate questions"""
+    if not current_user.is_host() and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'File type not supported. Use PDF, DOCX, CSV, XLSX, or TXT files.'}), 400
+    
+    try:
+        # Secure filename and save
+        filename = secure_filename(file.filename)
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{filename}"
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+        
+        # Create upload record
+        upload_record = UploadRecord(
+            host_id=current_user.id,
+            filename=filename,
+            mime_type=file.content_type,
+            stored_path=file_path
+        )
+        db.session.add(upload_record)
+        db.session.commit()
+        
+        # Parse file and extract candidate questions
+        candidate_questions = parse_file_for_questions(file_path, file.content_type)
+        
+        # Store candidate questions as JSON
+        upload_record.candidate_questions_json = json.dumps(candidate_questions)
+        upload_record.parsed = True
+        db.session.commit()
+        
+        return jsonify({
+            'upload_record_id': upload_record.id,
+            'candidate_count': len(candidate_questions),
+            'filename': filename,
+            'message': f'Successfully extracted {len(candidate_questions)} candidate questions'
+        })
+        
+    except Exception as e:
+        logging.error(f"File upload error: {e}")
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+@app.route('/api/upload-quiz-create-draft', methods=['POST'])
+@login_required
+def upload_quiz_create_draft():
+    """Create draft quiz from uploaded file"""
+    if not current_user.is_host() and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.json
+    upload_record_id = data.get('upload_record_id')
+    num_questions = data.get('N', 10)
+    quiz_title = data.get('title', 'Auto-Generated Quiz')
+    quiz_description = data.get('description', 'Quiz generated from uploaded file')
+    
+    upload_record = UploadRecord.query.get_or_404(upload_record_id)
+    
+    if upload_record.host_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        # Load candidate questions
+        candidate_questions = json.loads(upload_record.candidate_questions_json)
+        
+        # Select top N questions
+        selected_questions = select_top_questions(candidate_questions, num_questions)
+        
+        # Create draft quiz
+        quiz = Quiz(
+            title=quiz_title,
+            description=quiz_description,
+            creator_id=current_user.id,
+            auto_generate_from_upload=True,
+            draft_from_upload_id=upload_record.id,
+            is_active=False  # Draft mode
+        )
+        db.session.add(quiz)
+        db.session.flush()  # Get quiz ID
+        
+        # Create questions and options
+        for i, q_data in enumerate(selected_questions):
+            question = Question(
+                quiz_id=quiz.id,
+                question_text=q_data['question'],
+                question_type=q_data.get('type', 'multiple_choice'),
+                points=q_data.get('points', 1),
+                order=i + 1
+            )
+            db.session.add(question)
+            db.session.flush()  # Get question ID
+            
+            # Add options for multiple choice questions
+            if question.question_type in ['multiple_choice', 'true_false']:
+                for j, option_text in enumerate(q_data.get('options', [])):
+                    option = QuestionOption(
+                        question_id=question.id,
+                        option_text=option_text,
+                        is_correct=j == q_data.get('correct_option_index', 0),
+                        order=j + 1
+                    )
+                    db.session.add(option)
+        
+        upload_record.parsed_to_quiz_id = quiz.id
+        db.session.commit()
+        
+        return jsonify({
+            'draft_quiz_id': quiz.id,
+            'message': f'Created draft quiz with {len(selected_questions)} questions'
+        })
+        
+    except Exception as e:
+        logging.error(f"Draft creation error: {e}")
+        db.session.rollback()
+        return jsonify({'error': f'Failed to create draft: {str(e)}'}), 500
+
+def parse_file_for_questions(file_path, mime_type):
+    """Parse uploaded file to extract candidate questions"""
+    candidate_questions = []
+    
+    try:
+        if 'pdf' in mime_type:
+            candidate_questions = parse_pdf_questions(file_path)
+        elif 'docx' in mime_type or 'document' in mime_type:
+            candidate_questions = parse_docx_questions(file_path)
+        elif 'csv' in mime_type:
+            candidate_questions = parse_csv_questions(file_path)
+        elif 'spreadsheet' in mime_type or 'excel' in mime_type:
+            candidate_questions = parse_excel_questions(file_path)
+        elif 'text' in mime_type:
+            candidate_questions = parse_text_questions(file_path)
+        
+    except Exception as e:
+        logging.error(f"File parsing error: {e}")
+        
+    return candidate_questions
+
+def parse_pdf_questions(file_path):
+    """Extract questions from PDF file"""
+    questions = []
+    
+    try:
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+        
+        # Parse text for questions
+        questions = extract_questions_from_text(text)
+        
+    except Exception as e:
+        logging.error(f"PDF parsing error: {e}")
+    
+    return questions
+
+def parse_docx_questions(file_path):
+    """Extract questions from DOCX file"""
+    questions = []
+    
+    try:
+        doc = docx.Document(file_path)
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+        
+        # Parse text for questions
+        questions = extract_questions_from_text(text)
+        
+    except Exception as e:
+        logging.error(f"DOCX parsing error: {e}")
+    
+    return questions
+
+def parse_csv_questions(file_path):
+    """Extract questions from CSV file"""
+    questions = []
+    
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Expected columns: question, option_a, option_b, option_c, option_d, correct_answer
+        for _, row in df.iterrows():
+            if 'question' in df.columns:
+                question_data = {
+                    'question': str(row.get('question', '')),
+                    'type': 'multiple_choice',
+                    'options': [],
+                    'correct_option_index': 0,
+                    'confidence': 0.9  # High confidence for structured data
+                }
+                
+                # Extract options
+                option_cols = [col for col in df.columns if col.startswith('option')]
+                for col in option_cols:
+                    if pd.notna(row[col]):
+                        question_data['options'].append(str(row[col]))
+                
+                # Determine correct answer
+                if 'correct_answer' in df.columns:
+                    correct_text = str(row['correct_answer']).strip()
+                    for i, option in enumerate(question_data['options']):
+                        if option.strip().lower() == correct_text.lower():
+                            question_data['correct_option_index'] = i
+                            break
+                
+                if question_data['question'] and len(question_data['options']) >= 2:
+                    questions.append(question_data)
+        
+    except Exception as e:
+        logging.error(f"CSV parsing error: {e}")
+    
+    return questions
+
+def parse_excel_questions(file_path):
+    """Extract questions from Excel file"""
+    questions = []
+    
+    try:
+        df = pd.read_excel(file_path)
+        
+        # Similar to CSV parsing
+        for _, row in df.iterrows():
+            if 'question' in df.columns:
+                question_data = {
+                    'question': str(row.get('question', '')),
+                    'type': 'multiple_choice',
+                    'options': [],
+                    'correct_option_index': 0,
+                    'confidence': 0.9
+                }
+                
+                # Extract options
+                option_cols = [col for col in df.columns if 'option' in col.lower()]
+                for col in option_cols:
+                    if pd.notna(row[col]):
+                        question_data['options'].append(str(row[col]))
+                
+                # Determine correct answer
+                if 'correct_answer' in df.columns:
+                    correct_text = str(row['correct_answer']).strip()
+                    for i, option in enumerate(question_data['options']):
+                        if option.strip().lower() == correct_text.lower():
+                            question_data['correct_option_index'] = i
+                            break
+                
+                if question_data['question'] and len(question_data['options']) >= 2:
+                    questions.append(question_data)
+        
+    except Exception as e:
+        logging.error(f"Excel parsing error: {e}")
+    
+    return questions
+
+def parse_text_questions(file_path):
+    """Extract questions from plain text file"""
+    questions = []
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            text = file.read()
+        
+        questions = extract_questions_from_text(text)
+        
+    except Exception as e:
+        logging.error(f"Text parsing error: {e}")
+    
+    return questions
+
+def extract_questions_from_text(text):
+    """Extract questions from text using regex patterns"""
+    questions = []
+    
+    # Pattern 1: Numbered questions with options
+    question_pattern = r'(\d+\.?\s*)(.*?(?:\?|:))\s*(?:\n|$)((?:[A-D]\)|[A-D]\.|\([A-D]\)|[1-4]\.|[1-4]\))\s*.*?)(?=\n\d+\.|\nAnswer|\n[A-D]\)|$)'
+    
+    matches = re.finditer(question_pattern, text, re.MULTILINE | re.DOTALL)
+    
+    for match in matches:
+        question_text = match.group(2).strip()
+        options_text = match.group(3).strip()
+        
+        if question_text:
+            # Extract options
+            option_pattern = r'([A-D]\)|[A-D]\.|\([A-D]\)|[1-4]\.|[1-4]\))\s*(.*?)(?=\n[A-D]\)|\n[A-D]\.|\n\([A-D]\)|\n[1-4]\.|\n[1-4]\)|$)'
+            option_matches = re.finditer(option_pattern, options_text, re.MULTILINE | re.DOTALL)
+            
+            options = []
+            for opt_match in option_matches:
+                option_text = opt_match.group(2).strip()
+                if option_text:
+                    options.append(option_text)
+            
+            if len(options) >= 2:
+                # Look for answer indicators
+                answer_pattern = r'(?:Answer|Ans|Correct)[:\s]*([A-D]|[1-4])'
+                answer_match = re.search(answer_pattern, text[match.end():match.end()+200], re.IGNORECASE)
+                
+                correct_index = 0
+                if answer_match:
+                    answer_letter = answer_match.group(1).upper()
+                    if answer_letter in 'ABCD':
+                        correct_index = ord(answer_letter) - ord('A')
+                    elif answer_letter in '1234':
+                        correct_index = int(answer_letter) - 1
+                
+                question_data = {
+                    'question': question_text,
+                    'type': 'multiple_choice',
+                    'options': options,
+                    'correct_option_index': min(correct_index, len(options) - 1),
+                    'confidence': 0.7 if answer_match else 0.5
+                }
+                
+                questions.append(question_data)
+    
+    return questions
+
+def select_top_questions(candidate_questions, num_questions):
+    """Select top N questions based on confidence and completeness"""
+    
+    # Sort by confidence (highest first) and completeness
+    def question_score(q):
+        confidence = q.get('confidence', 0.5)
+        option_count = len(q.get('options', []))
+        has_answer = q.get('correct_option_index', -1) >= 0
+        
+        return confidence + (option_count / 10) + (0.2 if has_answer else 0)
+    
+    sorted_questions = sorted(candidate_questions, key=question_score, reverse=True)
+    
+    return sorted_questions[:num_questions]
+
+# Enhanced Security Measures and Advanced Features
+
+@app.route('/api/quiz/<int:quiz_id>/publish', methods=['POST'])
+@login_required
+def publish_quiz(quiz_id):
+    """Publish a draft quiz after host review"""
+    quiz = Quiz.query.get_or_404(quiz_id)
+    
+    if quiz.creator_id != current_user.id and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.json
+    lock_answers = data.get('lock_answers', True)
+    
+    # Activate the quiz
+    quiz.is_active = True
+    
+    # Lock answers if requested
+    if lock_answers:
+        for question in quiz.questions:
+            for option in question.options:
+                # Mark host-reviewed answers as final
+                pass  # Options are already set correctly
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Quiz published successfully'})
+
+@app.route('/api/quiz/<int:quiz_id>/delete', methods=['DELETE'])
+@login_required
+def delete_quiz(quiz_id):
+    """Delete quiz (soft delete by default)"""
+    quiz = Quiz.query.get_or_404(quiz_id)
+    
+    if quiz.creator_id != current_user.id and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    hard_delete = request.args.get('hard', 'false').lower() == 'true'
+    
+    if hard_delete and current_user.is_admin():
+        # Hard delete - remove completely
+        # First remove related upload files
+        if quiz.draft_from_upload_id:
+            upload_record = UploadRecord.query.get(quiz.draft_from_upload_id)
+            if upload_record and upload_record.stored_path:
+                try:
+                    os.remove(upload_record.stored_path)
+                except:
+                    pass
+                db.session.delete(upload_record)
+        
+        db.session.delete(quiz)
+        message = 'Quiz permanently deleted'
+    else:
+        # Soft delete
+        quiz.is_deleted = True
+        message = 'Quiz moved to trash'
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': message})
+
+@app.route('/api/quiz/<int:quiz_id>/restore', methods=['POST'])
+@login_required
+def restore_quiz(quiz_id):
+    """Restore a soft-deleted quiz"""
+    quiz = Quiz.query.get_or_404(quiz_id)
+    
+    if quiz.creator_id != current_user.id and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    quiz.is_deleted = False
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Quiz restored successfully'})
+
+@app.route('/host/participants')
+@login_required
+def host_participants():
+    """Enhanced participant management and login activity"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get participants who have taken host's quizzes
+    participants = db.session.query(User).join(QuizAttempt).join(Quiz).filter(
+        Quiz.creator_id == current_user.id if not current_user.is_admin() else True,
+        User.role == 'participant'
+    ).distinct().all()
+    
+    # Get detailed info for each participant
+    participant_data = []
+    for participant in participants:
+        # Get latest device log
+        latest_device_log = DeviceLog.query.filter_by(user_id=participant.id).order_by(
+            DeviceLog.logged_in_at.desc()
+        ).first()
+        
+        # Get quiz attempts
+        attempts = QuizAttempt.query.join(Quiz).filter(
+            QuizAttempt.participant_id == participant.id,
+            Quiz.creator_id == current_user.id if not current_user.is_admin() else True
+        ).all()
+        
+        # Get violation count
+        violation_count = 0
+        for attempt in attempts:
+            violation_count += ProctoringEvent.query.filter_by(attempt_id=attempt.id).count()
+        
+        participant_data.append({
+            'user': participant,
+            'latest_device': latest_device_log,
+            'attempts': attempts,
+            'violation_count': violation_count,
+            'status': 'online' if latest_device_log and 
+                     (datetime.utcnow() - latest_device_log.logged_in_at).seconds < 300 else 'offline'
+        })
+    
+    return render_template('host_participants.html', participant_data=participant_data)
+
+@app.route('/api/participant/<int:participant_id>/security-report')
+@login_required
+def participant_security_report(participant_id):
+    """Generate detailed security report for a participant"""
+    if not current_user.is_host() and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    participant = User.query.get_or_404(participant_id)
+    
+    # Get all attempts by this participant for current host's quizzes
+    attempts = QuizAttempt.query.join(Quiz).filter(
+        QuizAttempt.participant_id == participant_id,
+        Quiz.creator_id == current_user.id if not current_user.is_admin() else True
+    ).all()
+    
+    # Compile security data
+    security_data = {
+        'participant': {
+            'username': participant.username,
+            'email': participant.email,
+            'total_attempts': len(attempts)
+        },
+        'violations': [],
+        'device_logs': [],
+        'flagged_attempts': [],
+        'suspicious_patterns': []
+    }
+    
+    # Get violations
+    for attempt in attempts:
+        violations = ProctoringEvent.query.filter_by(attempt_id=attempt.id).all()
+        for violation in violations:
+            security_data['violations'].append({
+                'quiz_title': attempt.quiz.title,
+                'event_type': violation.event_type,
+                'severity': violation.severity,
+                'timestamp': violation.timestamp.isoformat(),
+                'details': violation.details
+            })
+    
+    # Get device logs
+    device_logs = DeviceLog.query.filter_by(user_id=participant_id).order_by(
+        DeviceLog.logged_in_at.desc()
+    ).limit(20).all()
+    
+    for log in device_logs:
+        security_data['device_logs'].append({
+            'ip_address': log.ip_address,
+            'device_type': log.device_type,
+            'browser_info': log.browser_info,
+            'timestamp': log.logged_in_at.isoformat(),
+            'is_suspicious': log.is_suspicious
+        })
+    
+    # Detect suspicious patterns
+    ip_addresses = set(log.ip_address for log in device_logs)
+    if len(ip_addresses) > 3:
+        security_data['suspicious_patterns'].append('Multiple IP addresses detected')
+    
+    user_agents = set(log.user_agent for log in device_logs if log.user_agent)
+    if len(user_agents) > 2:
+        security_data['suspicious_patterns'].append('Multiple devices/browsers detected')
+    
+    # Flagged attempts
+    flagged_attempts = [a for a in attempts if a.violation_count > 2]
+    for attempt in flagged_attempts:
+        security_data['flagged_attempts'].append({
+            'quiz_title': attempt.quiz.title,
+            'started_at': attempt.started_at.isoformat(),
+            'violation_count': attempt.violation_count,
+            'status': attempt.status
+        })
+    
+    return jsonify(security_data)
+
+@app.route('/api/monitoring/send-warning/<int:attempt_id>', methods=['POST'])
+@login_required
+def send_warning_to_participant(attempt_id):
+    """Send real-time warning to participant"""
+    if not current_user.is_host() and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    attempt = QuizAttempt.query.get_or_404(attempt_id)
+    
+    if attempt.quiz.creator_id != current_user.id and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.json
+    warning_message = data.get('message', 'Please follow the quiz guidelines and avoid suspicious activities.')
+    
+    # Create security alert
+    alert = SecurityAlert(
+        user_id=attempt.participant_id,
+        quiz_id=attempt.quiz_id,
+        attempt_id=attempt_id,
+        alert_type='host_warning',
+        severity='medium',
+        description=warning_message,
+        auto_action_taken='warning_sent'
+    )
+    db.session.add(alert)
+    db.session.commit()
+    
+    # In a real WebSocket implementation, this would send the message via WebSocket
+    # For now, we'll store it as a security alert that can be displayed to the participant
+    
+    return jsonify({'success': True, 'message': 'Warning sent successfully'})
+
+@app.route('/api/monitoring/auto-terminate/<int:attempt_id>', methods=['POST'])
+@login_required
+def auto_terminate_quiz(attempt_id):
+    """Automatically terminate quiz due to violations"""
+    attempt = QuizAttempt.query.get_or_404(attempt_id)
+    
+    # Check if auto-termination is enabled for this quiz
+    if not attempt.quiz.auto_terminate_on_violation:
+        return jsonify({'error': 'Auto-termination not enabled for this quiz'}), 400
+    
+    data = request.json
+    reason = data.get('reason', 'Multiple proctoring violations detected')
+    
+    # Terminate the quiz
+    attempt.status = 'terminated'
+    attempt.completed_at = datetime.utcnow()
+    attempt.termination_reason = reason
+    attempt.is_flagged = True
+    
+    # Create security alert
+    alert = SecurityAlert(
+        user_id=attempt.participant_id,
+        quiz_id=attempt.quiz_id,
+        attempt_id=attempt_id,
+        alert_type='auto_termination',
+        severity='high',
+        description=f'Quiz automatically terminated: {reason}',
+        auto_action_taken='quiz_terminated'
+    )
+    db.session.add(alert)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Quiz terminated due to violations'})
+
+@app.route('/api/device-log', methods=['POST'])
+@login_required
+def log_device_info():
+    """Log participant device information for security tracking"""
+    data = request.json
+    
+    # Detect suspicious behavior
+    is_suspicious = False
+    
+    # Check for suspicious user agents
+    suspicious_keywords = ['headless', 'phantom', 'selenium', 'webdriver', 'automation']
+    user_agent = data.get('userAgent', '').lower()
+    if any(keyword in user_agent for keyword in suspicious_keywords):
+        is_suspicious = True
+    
+    # Check for unusual screen resolutions
+    screen_resolution = data.get('screenResolution', '')
+    if screen_resolution:
+        try:
+            width, height = map(int, screen_resolution.split('x'))
+            if width < 800 or height < 600:  # Unusually small screens
+                is_suspicious = True
+        except:
+            pass
+    
+    # Get IP address
+    ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    
+    device_log = DeviceLog(
+        user_id=current_user.id,
+        quiz_id=data.get('quizId'),
+        ip_address=ip_address,
+        user_agent=data.get('userAgent'),
+        device_type=data.get('deviceType'),
+        browser_info=data.get('browserInfo'),
+        screen_resolution=screen_resolution,
+        timezone=data.get('timezone'),
+        is_suspicious=is_suspicious
+    )
+    
+    db.session.add(device_log)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'logged': True, 'suspicious': is_suspicious})
+
+# Database Export for Admin
+@app.route('/admin/export-database-sqlite')
+@login_required
+def export_database_sqlite():
+    """Export database as SQLite file for admin"""
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        import sqlite3
+        import tempfile
+        
+        # Create temporary SQLite database
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'_quizzes_{timestamp}.db')
+        sqlite_path = temp_file.name
+        temp_file.close()
+        
+        # Connect to SQLite
+        sqlite_conn = sqlite3.connect(sqlite_path)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # Export users
+        users = User.query.all()
+        sqlite_cursor.execute('''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT,
+                email TEXT,
+                role TEXT,
+                is_verified BOOLEAN,
+                created_at TEXT
+            )
+        ''')
+        
+        for user in users:
+            sqlite_cursor.execute('''
+                INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)
+            ''', (user.id, user.username, user.email, user.role, user.is_verified, 
+                  user.created_at.isoformat() if user.created_at else None))
+        
+        # Export quizzes
+        quizzes = Quiz.query.filter_by(is_deleted=False).all()
+        sqlite_cursor.execute('''
+            CREATE TABLE quizzes (
+                id INTEGER PRIMARY KEY,
+                title TEXT,
+                creator_username TEXT,
+                time_limit INTEGER,
+                proctoring_enabled BOOLEAN,
+                created_at TEXT
+            )
+        ''')
+        
+        for quiz in quizzes:
+            sqlite_cursor.execute('''
+                INSERT INTO quizzes VALUES (?, ?, ?, ?, ?, ?)
+            ''', (quiz.id, quiz.title, quiz.creator.username, quiz.time_limit, 
+                  quiz.proctoring_enabled, quiz.created_at.isoformat()))
+        
+        # Export quiz attempts
+        attempts = QuizAttempt.query.all()
+        sqlite_cursor.execute('''
+            CREATE TABLE quiz_attempts (
+                id INTEGER PRIMARY KEY,
+                participant_username TEXT,
+                quiz_title TEXT,
+                score REAL,
+                status TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                violation_count INTEGER
+            )
+        ''')
+        
+        for attempt in attempts:
+            sqlite_cursor.execute('''
+                INSERT INTO quiz_attempts VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (attempt.id, attempt.participant.username, attempt.quiz.title,
+                  attempt.score, attempt.status, attempt.started_at.isoformat(),
+                  attempt.completed_at.isoformat() if attempt.completed_at else None,
+                  attempt.violation_count))
+        
+        sqlite_conn.commit()
+        sqlite_conn.close()
+        
+        # Return file for download
+        return send_file(
+            sqlite_path,
+            mimetype='application/x-sqlite3',
+            as_attachment=True,
+            download_name=f'quizzes_{timestamp}.db'
+        )
+        
+    except Exception as e:
+        logging.error(f"Database export error: {e}")
+        flash('Database export failed.', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/users')
 @login_required
