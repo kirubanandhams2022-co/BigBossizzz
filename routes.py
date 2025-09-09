@@ -1,6 +1,6 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file
+from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file, make_response
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, DeviceLog, SecurityAlert
@@ -11,11 +11,24 @@ import json
 import logging
 import os
 import re
+import csv
 import pandas as pd
 import PyPDF2
 import docx
 from io import BytesIO
 from sqlalchemy import func, text
+
+# Excel/Spreadsheet generation imports
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+# PDF generation imports  
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 @app.route('/')
 def index():
