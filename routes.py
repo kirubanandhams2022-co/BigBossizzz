@@ -430,6 +430,50 @@ def admin_dashboard():
     
     return render_template('admin_dashboard.html', stats=stats, recent_users=recent_users)
 
+@app.route('/admin/export-database')
+@login_required
+def admin_export_database():
+    """Export complete database to Excel"""
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from io import BytesIO
+    
+    wb = Workbook()
+    
+    # Users Sheet
+    ws_users = wb.active
+    ws_users.title = "Users"
+    users_headers = ['ID', 'Username', 'Email', 'Role', 'Is Verified', 'Created At']
+    for col, header in enumerate(users_headers, 1):
+        cell = ws_users.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    
+    users = User.query.all()
+    for row, user in enumerate(users, 2):
+        ws_users.cell(row=row, column=1, value=user.id)
+        ws_users.cell(row=row, column=2, value=user.username)
+        ws_users.cell(row=row, column=3, value=user.email)
+        ws_users.cell(row=row, column=4, value=user.role)
+        ws_users.cell(row=row, column=5, value='Yes' if user.is_verified else 'No')
+        ws_users.cell(row=row, column=6, value=user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A')
+    
+    # Save to BytesIO
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    return send_file(
+        BytesIO(buffer.read()),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'database_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    )
+
 @app.route('/admin/users')
 @login_required
 def admin_users():
