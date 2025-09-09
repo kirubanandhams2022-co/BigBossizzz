@@ -42,21 +42,68 @@
                         <div class="form-text">Provide a brief description of the quiz content and instructions.</div>
                     </div>
                     
-                    <div class="mb-4">
-                        <div class="form-check">
-                            {{ form.proctoring_enabled(class="form-check-input") }}
-                            {{ form.proctoring_enabled.label(class="form-check-label") }}
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                {{ form.proctoring_enabled(class="form-check-input") }}
+                                {{ form.proctoring_enabled.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle text-info"></i>
+                                Monitor participants during the quiz for suspicious activities.
+                            </div>
                         </div>
-                        <div class="form-text">
-                            <i class="fas fa-info-circle text-info"></i>
-                            When enabled, the system will monitor participants during the quiz for suspicious activities.
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                {{ form.shuffle_options(class="form-check-input") }}
+                                {{ form.shuffle_options.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-text">
+                                <i class="fas fa-shuffle text-info"></i>
+                                Randomize answer options for each participant to prevent cheating.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-upload"></i> File Upload (Optional)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                {{ form.create_from_file(class="form-check-input", id="createFromFile") }}
+                                {{ form.create_from_file.label(class="form-check-label") }}
+                            </div>
+                            
+                            <div id="fileUploadSection" style="display: none;">
+                                <div class="mb-3">
+                                    {{ form.quiz_file.label(class="form-label") }}
+                                    {{ form.quiz_file(class="form-control") }}
+                                    <div class="form-text">
+                                        <strong>Supported formats:</strong> TXT, CSV<br>
+                                        <strong>TXT Format:</strong> Q: Question text<br>A) Option 1<br>B) Option 2<br>C) *Correct Option<br>D) Option 4<br><br>
+                                        <strong>CSV Format:</strong> Question, Option1, Option2, Option3, Option4, CorrectAnswer(1-4), Points
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="alert alert-info">
                         <i class="fas fa-lightbulb"></i>
-                        <strong>Next Steps:</strong> After creating the quiz, you'll be able to add questions, set answer options, and configure additional settings.
+                        <strong>Next Steps:</strong> After creating the quiz, you'll be able to add questions, set answer options, and configure additional settings. If you upload a file, questions will be automatically generated.
                     </div>
+                    
+                    <script>
+                    document.getElementById('createFromFile').addEventListener('change', function() {
+                        const fileSection = document.getElementById('fileUploadSection');
+                        if (this.checked) {
+                            fileSection.style.display = 'block';
+                        } else {
+                            fileSection.style.display = 'none';
+                        }
+                    });
+                    </script>
                     
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('host_dashboard') }}" class="btn btn-secondary">
