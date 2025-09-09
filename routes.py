@@ -563,7 +563,7 @@ def host_participants():
             'avg_score': avg_score,
             'violation_count': violation_count,
             'recent_login': recent_login,
-            'is_flagged': any(attempt.is_flagged for attempt in participant_attempts)
+            'is_flagged': False  # Will be tracked via UserViolation model
         }
     
     return render_template('host_participants.html', 
@@ -844,7 +844,6 @@ def log_proctoring_event():
             # Terminate the quiz attempt
             attempt.status = 'terminated'
             attempt.completed_at = datetime.utcnow()
-            attempt.is_flagged = True
             
             # Auto-flag the user for violations
             violation_record = UserViolation.query.filter_by(user_id=current_user.id).first()
