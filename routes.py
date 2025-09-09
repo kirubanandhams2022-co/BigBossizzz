@@ -913,9 +913,9 @@ def restore_quiz(quiz_id):
     
     return jsonify({'success': True, 'message': 'Quiz restored successfully'})
 
-@app.route('/host/participants')
+@app.route('/host/participants-advanced')
 @login_required
-def host_participants():
+def host_participants_advanced():
     """Enhanced participant management and login activity"""
     if not current_user.is_host() and not current_user.is_admin():
         flash('Access denied. Host privileges required.', 'error')
