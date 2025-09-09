@@ -531,12 +531,13 @@ def upload_quiz_file():
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
         
-        # Create upload record
+        # Create upload record with better error handling
         upload_record = UploadRecord(
             host_id=current_user.id,
             filename=filename,
-            mime_type=file.content_type,
-            stored_path=file_path
+            mime_type=file.content_type or 'application/octet-stream',
+            stored_path=file_path,
+            file_size=os.path.getsize(file_path)
         )
         db.session.add(upload_record)
         db.session.commit()
@@ -692,15 +693,28 @@ def parse_docx_questions(file_path):
     return questions
 
 def parse_csv_questions(file_path):
-    """Extract questions from CSV file"""
+    """Extract questions from CSV file with robust error handling"""
     questions = []
     
     try:
-        df = pd.read_csv(file_path)
+        # Try different encodings and delimiters
+        for encoding in ['utf-8', 'latin-1', 'cp1252']:
+            try:
+                df = pd.read_csv(file_path, encoding=encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            # If all encodings fail, return empty
+            logging.error(f"Could not decode CSV file: {file_path}")
+            return questions
         
+        if df.empty:
+            return questions
+            
         # Expected columns: question, option_a, option_b, option_c, option_d, correct_answer
-        for _, row in df.iterrows():
-            if 'question' in df.columns:
+        for idx, row in df.iterrows():
+            if 'question' in df.columns and pd.notna(row.get('question')):
                 question_data = {
                     'question': str(row.get('question', '')),
                     'type': 'multiple_choice',
@@ -787,13 +801,60 @@ def parse_text_questions(file_path):
     return questions
 
 def extract_questions_from_text(text):
-    """Extract questions from text using regex patterns"""
+    """Extract questions from text using improved regex patterns"""
     questions = []
     
-    # Pattern 1: Numbered questions with options
-    question_pattern = r'(\d+\.?\s*)(.*?(?:\?|:))\s*(?:\n|$)((?:[A-D]\)|[A-D]\.|\([A-D]\)|[1-4]\.|[1-4]\))\s*.*?)(?=\n\d+\.|\nAnswer|\n[A-D]\)|$)'
+    if not text or len(text.strip()) < 20:
+        return questions
     
-    matches = re.finditer(question_pattern, text, re.MULTILINE | re.DOTALL)
+    try:
+        # Clean and normalize text
+        text = re.sub(r'\s+', ' ', text.strip())
+        
+        # Enhanced patterns for different question formats
+        patterns = [
+            # Pattern 1: Numbered questions with options (1. Question? A) option B) option)
+            r'(\d+\.?\s*)(.*?\?)\s*((?:[A-Da-d][\)\.].*?)(?=[A-Da-d][\)\.]|$))',
+            # Pattern 2: Questions with options on new lines
+            r'(Question\s*\d*:?\s*)(.*?\?)\s*((?:[A-Da-d][\)\.].*?)(?=Question|\d+\.|$))',
+            # Pattern 3: Simple question-answer pairs
+            r'([^.!]*\?)\s*((?:[A-Da-d][\)\.].*?)(?=[^.!]*\?|$))'
+        ]
+        
+        # Try each pattern to extract questions
+        for pattern in patterns:
+            matches = re.finditer(pattern, text, re.MULTILINE | re.DOTALL)
+            
+            for match in matches:
+                try:
+                    if len(match.groups()) >= 2:
+                        question_text = match.group(-2).strip()  # Second to last group
+                        options_text = match.group(-1).strip()   # Last group
+                        
+                        if len(question_text) > 10:  # Meaningful question
+                            question_data = {
+                                'question': question_text,
+                                'type': 'multiple_choice',
+                                'options': [],
+                                'correct_option_index': 0,
+                                'confidence': 0.7
+                            }
+                            
+                            # Extract individual options
+                            option_parts = re.findall(r'[A-Da-d][\)\.]([^A-Da-d\)\.]*)(?=[A-Da-d][\)\.]|$)', options_text)
+                            question_data['options'] = [opt.strip() for opt in option_parts if opt.strip()]
+                            
+                            if len(question_data['options']) >= 2:
+                                questions.append(question_data)
+                                
+                except Exception as e:
+                    continue  # Skip malformed questions
+                    
+        return questions[:20]  # Limit to 20 questions max
+        
+    except Exception as e:
+        logging.error(f"Text extraction error: {e}")
+        return []
     
     for match in matches:
         question_text = match.group(2).strip()

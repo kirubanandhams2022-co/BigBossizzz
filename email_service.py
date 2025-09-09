@@ -7,6 +7,15 @@ from datetime import datetime
 def send_verification_email(user):
     """Send email verification to user"""
     try:
+        # Check if email is configured
+        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+            logging.warning(f"Email not configured. Auto-verifying user {user.email} for development")
+            # Auto-verify user for development/demo purposes
+            user.is_verified = True
+            from app import db
+            db.session.commit()
+            return True
+            
         token = user.generate_verification_token()
         verification_url = url_for('verify_email', token=token, _external=True)
         
@@ -60,6 +69,11 @@ def send_verification_email(user):
 def send_credentials_email(user, password):
     """Send login credentials to user after email verification"""
     try:
+        # Skip email if not configured - just log credentials
+        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+            logging.info(f"CREDENTIALS for {user.email} - Username: {user.username}, Password: {password}")
+            return True
+            
         login_url = url_for('login', _external=True)
         
         subject = 'Your Login Credentials - BigBossizzz'
