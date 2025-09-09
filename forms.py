@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, TextAreaField, SelectField, IntegerField, BooleanField, FieldList, FormField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange
 from wtforms.widgets import TextArea
@@ -37,6 +38,11 @@ class QuizForm(FlaskForm):
         NumberRange(min=1, max=300, message='Time limit must be between 1 and 300 minutes')
     ], default=60)
     proctoring_enabled = BooleanField('Enable Proctoring', default=True)
+    shuffle_options = BooleanField('Shuffle Answer Options for Each Participant', default=True)
+    quiz_file = FileField('Upload Quiz File (TXT/CSV format)', validators=[
+        FileAllowed(['txt', 'csv'], 'Only TXT and CSV files allowed!')
+    ])
+    create_from_file = BooleanField('Create Quiz from Uploaded File', default=False)
 
 class QuestionOptionForm(FlaskForm):
     option_text = StringField('Option', validators=[DataRequired(), Length(max=500)])
