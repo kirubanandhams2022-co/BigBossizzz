@@ -98,9 +98,6 @@ class QuizAttempt(db.Model):
     score = db.Column(db.Float)
     total_points = db.Column(db.Integer)
     status = db.Column(db.String(20), default='in_progress')  # 'in_progress', 'completed', 'abandoned', 'terminated'
-    proctoring_flags = db.Column(db.Text)  # JSON string for proctoring violations
-    violation_count = db.Column(db.Integer, default=0)
-    is_flagged = db.Column(db.Boolean, default=False)
     
     # Relationships
     answers = db.relationship('Answer', backref='attempt', lazy=True, cascade='all, delete-orphan')
