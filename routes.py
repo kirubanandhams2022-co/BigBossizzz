@@ -525,7 +525,7 @@ def upload_quiz_file():
     
     try:
         # Secure filename and save
-        filename = secure_filename(file.filename)
+        filename = secure_filename(file.filename or 'upload')
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         filename = f"{timestamp}_{filename}"
         file_path = os.path.join(UPLOAD_FOLDER, filename)
