@@ -43,6 +43,9 @@ class User(UserMixin, db.Model):
     def is_admin(self):
         return self.role == 'admin'
     
+    def is_participant(self):
+        return self.role == 'participant'
+    
     def __repr__(self):
         return f'<User {self.username}>'
 

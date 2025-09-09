@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Login Activity - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-clock me-2"></i>Login Activity</h2>
+                <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="user_filter" class="form-label">User</label>
+                            <select class="form-select" id="user_filter" name="user_id">
+                                <option value="">All Users</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}" {% if request.args.get('user_id') == user.id|string %}selected{% endif %}>
+                                    {{ user.username }} ({{ user.email }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="date_filter" class="form-label">Date Range</label>
+                            <select class="form-select" id="date_filter" name="days">
+                                <option value="7" {% if request.args.get('days') == '7' %}selected{% endif %}>Last 7 days</option>
+                                <option value="30" {% if request.args.get('days') == '30' %}selected{% endif %}>Last 30 days</option>
+                                <option value="90" {% if request.args.get('days') == '90' %}selected{% endif %}>Last 90 days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary d-block">
+                                <i class="fas fa-filter me-1"></i>Filter
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Login Events -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Login Activity</h5>
+                </div>
+                <div class="card-body">
+                    {% if login_events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Login Time</th>
+                                    <th>IP Address</th>
+                                    <th>Device</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in login_events %}
+                                <tr class="{% if event.is_suspicious %}table-warning{% endif %}">
+                                    <td>
+                                        <strong>{{ event.user.username }}</strong><br>
+                                        <small class="text-muted">{{ event.user.email }}</small>
+                                    </td>
+                                    <td>
+                                        <span data-bs-toggle="tooltip" title="{{ event.login_time.strftime('%Y-%m-%d %H:%M:%S UTC') }}">
+                                            {{ event.login_time.strftime('%m/%d %H:%M') }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <code>{{ event.ip_address or 'Unknown' }}</code>
+                                    </td>
+                                    <td>
+                                        <small>{{ event.device_info or 'Unknown' }}</small>
+                                    </td>
+                                    <td>
+                                        <small>{{ event.location_data or 'Not available' }}</small>
+                                    </td>
+                                    <td>
+                                        {% if event.is_suspicious %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>Suspicious
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Normal
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No login activity found</h5>
+                        <p class="text-muted">No login events match your current filters.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+})
+</script>
+{% endblock %}
