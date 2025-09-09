@@ -145,23 +145,14 @@ class ProctoringEvent(db.Model):
         return f'<ProctoringEvent {self.event_type}>'
 
 class LoginEvent(db.Model):
-    """Enhanced login event tracking with comprehensive device/location data"""
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     login_time = db.Column(db.DateTime, default=datetime.utcnow)
     ip_address = db.Column(db.String(45))  # IPv6 support
     user_agent = db.Column(db.Text)
-    device_info = db.Column(db.Text)  # JSON string for comprehensive device details
-    device_fingerprint = db.Column(db.Text)  # Enhanced device fingerprinting
+    device_info = db.Column(db.Text)  # Browser, OS details
     location_data = db.Column(db.Text)  # Location if available
-    location_info = db.Column(db.Text)  # JSON string for detailed location data
     is_suspicious = db.Column(db.Boolean, default=False)
-    blocked = db.Column(db.Boolean, default=False)
-    security_score = db.Column(db.Integer, default=100)  # Security confidence score
-    browser_language = db.Column(db.String(10))
-    timezone = db.Column(db.String(50))
-    screen_resolution = db.Column(db.String(20))
-    notes = db.Column(db.Text)  # Admin notes about the login
     
     # Relationships
     user = db.relationship('User', backref=db.backref('login_events', lazy=True))
@@ -170,26 +161,20 @@ class LoginEvent(db.Model):
         return f'<LoginEvent {self.user_id} at {self.login_time}>'
 
 class UserViolation(db.Model):
-    """Enhanced user violation tracking with admin control"""
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     violation_count = db.Column(db.Integer, default=0)
     is_flagged = db.Column(db.Boolean, default=False)
     flagged_at = db.Column(db.DateTime)
     flagged_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # Admin who flagged
-    unflagged_at = db.Column(db.DateTime)
-    unflagged_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # Admin who unflagged
     can_retake = db.Column(db.Boolean, default=False)
     retake_approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     retake_approved_at = db.Column(db.DateTime)
-    risk_level = db.Column(db.String(20), default='low')  # 'low', 'medium', 'high', 'critical'
-    permanent_flag = db.Column(db.Boolean, default=False)  # Cannot be unflagged
     notes = db.Column(db.Text)
     
     # Relationships
     user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('violations', lazy=True))
     flagged_by_admin = db.relationship('User', foreign_keys=[flagged_by])
-    unflagged_by_admin = db.relationship('User', foreign_keys=[unflagged_by])
     approved_by_admin = db.relationship('User', foreign_keys=[retake_approved_by])
     
     def __repr__(self):
