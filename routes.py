@@ -815,7 +815,7 @@ def log_proctoring_event():
         event = ProctoringEvent(
             attempt_id=attempt_id,
             event_type=data.get('type', 'unknown'),
-            description=data.get('description', 'Unknown violation'),
+            details=data.get('description', 'Unknown violation'),
             severity=data.get('severity', 'medium'),
             timestamp=datetime.utcnow()
         )

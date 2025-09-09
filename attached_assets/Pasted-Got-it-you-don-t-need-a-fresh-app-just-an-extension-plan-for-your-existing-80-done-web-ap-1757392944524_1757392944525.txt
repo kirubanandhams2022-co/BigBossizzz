@@ -1,0 +1,99 @@
+Got it 👍 — you don’t need a fresh app, just an **extension plan** for your existing 80%-done web app.
+That means I’ll map each feature we discussed to **incremental changes** you can make on top of what’s already there (backend + frontend + DB).
+
+Here’s how to integrate instead of rebuilding:
+
+---
+
+## 🔧 Modification Plan for Your Existing App
+
+### 1. **Database Changes**
+
+* Add the new tables (`proctor_event`, `device_log`, `upload_record`) into your existing schema.
+* Extend `submission` table with `status`, `report_sent`, `score`.
+* Extend `quiz` with `allow_view_responses`, `auto_generate_from_upload`.
+
+➡️ You don’t need a fresh DB, just use **`ALTER TABLE` + `CREATE TABLE`** migrations.
+
+---
+
+### 2. **Quiz Auto-Generation from File**
+
+* Add **file upload endpoint** (`/api/upload-quiz-file`).
+* Parse CSV/Excel → insert into `question` & `option_item`.
+* Mark quiz as `draft` → let host review & publish in existing quiz dashboard.
+* Reuse your quiz creation page: add a tab **“Import from file”**.
+
+---
+
+### 3. **Host Portal Enhancements**
+
+* Add a **Monitoring Panel**:
+
+  * Show list of logged-in participants with device info (`device_log`).
+  * Stream proctoring events (via **WebSocket**).
+* Add a **Download Reports** button → generate XLSX/PDF on demand or when all submissions complete.
+* Add **“Contact Admin”** button with admin details pulled from DB.
+
+---
+
+### 4. **Participant Portal Enhancements**
+
+* Add **proctoring module**:
+
+  * Detect **tab switch** (`document.visibilitychange`).
+  * **Camera check**: use face-api.js (in-browser) for face count.
+  * On suspicious event: show warning; if repeated, mark submission `terminated` & notify host/admin.
+* Add **“View Your Responses”** page after submit → fetch submission with per-question correctness.
+* Add **Download Your Report** button.
+* Ensure submission auto-emails result (via worker/job queue).
+
+---
+
+### 5. **Admin Portal Enhancements**
+
+* Add **Host/Participant management view**.
+* Add **Export DB** option: download SQLite or SQL dump file.
+* Display **support details** (contact info) so portals can show “Contact Admin”.
+
+---
+
+### 6. **Proctoring Integration**
+
+* Add small **JS module** to inject into quiz-taking page:
+
+  * Tab focus detection → send event to server.
+  * Camera → face count → if >1 face, trigger event.
+* Send these events to backend (`/api/proctor/event`) and broadcast to host/admin dashboards via WebSocket.
+
+---
+
+### 7. **Reports & Emails**
+
+* On **quiz submit** → queue background job:
+
+  * Grade submission.
+  * Generate participant result PDF/CSV.
+  * Email it to registered email.
+* On **host report request** → generate combined report + auto-email host.
+
+---
+
+## ✅ What You Don’t Need to Change
+
+* Login/Auth system → extend with roles if not already present.
+* Existing quiz/answer flow → just add `auto_generate`, `view responses`, `report export`.
+
+---
+
+👉 This way, you **keep your existing app** and only add:
+
+* a few DB tables,
+* endpoints,
+* small proctoring JS,
+* export/email workers,
+* minor UI extensions.
+
+---
+
+Kiru, do you want me to **write the SQL `ALTER TABLE` + `CREATE TABLE` migration scripts** so you can directly patch your current DB? That way you won’t touch the working part of your app, just extend it.
