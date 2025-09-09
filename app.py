@@ -55,8 +55,11 @@ login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
-    from models import User
-    return User.query.get(int(user_id))
+    try:
+        from models import User
+        return User.query.get(int(user_id))
+    except (ValueError, TypeError):
+        return None
 
 with app.app_context():
     # Import models to ensure tables are created
@@ -68,33 +71,30 @@ with app.app_context():
     
     # Default Admin Account
     if not User.query.filter_by(email='admin@platform.com').first():
-        admin = User(
-            username='admin',
-            email='admin@platform.com',
-            role='admin'
-        )
+        admin = User()
+        admin.username = 'admin'
+        admin.email = 'admin@platform.com'
+        admin.role = 'admin'
         admin.set_password('admin123')
         admin.is_verified = True
         db.session.add(admin)
     
     # Default Host Account
     if not User.query.filter_by(email='host@platform.com').first():
-        host = User(
-            username='host',
-            email='host@platform.com',
-            role='host'
-        )
+        host = User()
+        host.username = 'host'
+        host.email = 'host@platform.com'
+        host.role = 'host'
         host.set_password('host123')
         host.is_verified = True
         db.session.add(host)
     
     # Default Participant Account
     if not User.query.filter_by(email='participant@platform.com').first():
-        participant = User(
-            username='participant',
-            email='participant@platform.com',
-            role='participant'
-        )
+        participant = User()
+        participant.username = 'participant'
+        participant.email = 'participant@platform.com'
+        participant.role = 'participant'
         participant.set_password('participant123')
         participant.is_verified = True
         db.session.add(participant)
