@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+
+{% block title %}Live Monitoring - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-monitor-waveform me-2"></i>Live Participant Monitoring</h2>
+        <div>
+            <span class="badge bg-primary me-2" id="liveStatus">
+                <i class="fas fa-circle text-success"></i> Live
+            </span>
+            <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Live Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3 id="activeCount">{{ participants_online|length }}</h3>
+                    <p class="mb-0">Active Participants</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h3 id="violationCount">{{ recent_violations|length }}</h3>
+                    <p class="mb-0">Recent Violations</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3 id="avgProgress">-</h3>
+                    <p class="mb-0">Avg Progress</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3 id="totalQuizzes">{{ active_attempts|map(attribute='quiz')|unique|list|length }}</h3>
+                    <p class="mb-0">Active Quizzes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Live Participant Activity -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-users me-2"></i>Active Participants</h5>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                        <label class="form-check-label" for="autoRefresh">Auto Refresh</label>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="participantsTable">
+                            <thead>
+                                <tr>
+                                    <th>Participant</th>
+                                    <th>Quiz</th>
+                                    <th>Progress</th>
+                                    <th>Time</th>
+                                    <th>Violations</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="participantsBody">
+                                {% for data in participants_online %}
+                                <tr data-attempt-id="{{ data.attempt.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-2">
+                                                <i class="fas fa-circle text-success" style="font-size: 8px;"></i>
+                                            </div>
+                                            <div>
+                                                <strong>{{ data.attempt.participant.username }}</strong><br>
+                                                <small class="text-muted">{{ data.attempt.participant.email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>{{ data.quiz_title }}</strong><br>
+                                        <small class="text-muted">{{ data.attempt.quiz.time_limit }} min limit</small>
+                                    </td>
+                                    <td>
+                                        {% set progress = (data.attempt.answers|length / data.attempt.quiz.questions|length * 100) if data.attempt.quiz.questions else 0 %}
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar" role="progressbar" style="width: {{ progress }}%">
+                                                {{ progress|round }}%
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">{{ data.attempt.answers|length }}/{{ data.attempt.quiz.questions|length }} questions</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ data.time_elapsed }}</strong><br>
+                                        <small class="text-muted">elapsed</small>
+                                    </td>
+                                    <td>
+                                        {% if data.violation_count > 0 %}
+                                        <span class="badge bg-danger">{{ data.violation_count }}</span>
+                                        {% else %}
+                                        <span class="badge bg-success">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">Active</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('quiz_results', attempt_id=data.attempt.id) }}" class="btn btn-outline-primary" title="View Progress">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button class="btn btn-outline-warning" onclick="sendWarning({{ data.attempt.id }})" title="Send Warning">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        
+                        {% if not participants_online %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Active Participants</h5>
+                            <p class="text-muted">Participants will appear here when they start taking quizzes.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="col-lg-4">
+            <!-- Recent Violations -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6><i class="fas fa-shield-alt me-2"></i>Recent Violations</h6>
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    {% for violation in recent_violations[:10] %}
+                    <div class="alert alert-{{ 'danger' if violation.severity == 'high' else 'warning' if violation.severity == 'medium' else 'info' }} alert-sm mb-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ violation.event_type.replace('_', ' ').title() }}</strong><br>
+                                <small>{{ violation.attempt.participant.username }} - {{ violation.attempt.quiz.title }}</small>
+                            </div>
+                            <small class="text-muted">{{ violation.timestamp.strftime('%H:%M') }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not recent_violations %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <p class="text-muted mb-0">No recent violations</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Logins -->
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-sign-in-alt me-2"></i>Recent Logins</h6>
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    {% for login in recent_logins[:10] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <div>
+                            <strong>{{ login.user.username }}</strong><br>
+                            <small class="text-muted">{{ login.ip_address }}</small>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">{{ login.login_time.strftime('%H:%M') }}</small><br>
+                            {% if login.is_suspicious %}
+                            <span class="badge bg-warning">Suspicious</span>
+                            {% else %}
+                            <span class="badge bg-success">Normal</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not recent_logins %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-user-clock fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No recent logins</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let autoRefresh = true;
+let refreshInterval;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const autoRefreshToggle = document.getElementById('autoRefresh');
+    
+    autoRefreshToggle.addEventListener('change', function() {
+        autoRefresh = this.checked;
+        if (autoRefresh) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    startAutoRefresh();
+});
+
+function startAutoRefresh() {
+    refreshInterval = setInterval(updateLiveData, 5000); // Refresh every 5 seconds
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+}
+
+function updateLiveData() {
+    if (!autoRefresh) return;
+    
+    fetch('/api/monitoring/live-data')
+        .then(response => response.json())
+        .then(data => {
+            updateParticipantsTable(data.participants);
+            updateStatistics(data);
+            updateLiveStatus();
+        })
+        .catch(error => {
+            console.error('Error fetching live data:', error);
+            updateLiveStatus(false);
+        });
+}
+
+function updateParticipantsTable(participants) {
+    const tbody = document.getElementById('participantsBody');
+    
+    if (participants.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i><br>
+                    <h5 class="text-muted">No Active Participants</h5>
+                    <p class="text-muted">Participants will appear here when they start taking quizzes.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = participants.map(participant => `
+        <tr data-attempt-id="${participant.attempt_id}">
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="me-2">
+                        <i class="fas fa-circle text-success" style="font-size: 8px;"></i>
+                    </div>
+                    <div>
+                        <strong>${participant.participant_name}</strong>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <strong>${participant.quiz_title}</strong>
+            </td>
+            <td>
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar" role="progressbar" style="width: ${participant.progress_percentage}%">
+                        ${participant.progress_percentage}%
+                    </div>
+                </div>
+                <small class="text-muted">${participant.questions_answered}/${participant.total_questions} questions</small>
+            </td>
+            <td>
+                <strong>${participant.time_elapsed}</strong><br>
+                <small class="text-muted">remaining: ${participant.time_remaining}</small>
+            </td>
+            <td>
+                <span class="badge bg-${participant.violation_count > 0 ? 'danger' : 'success'}">${participant.violation_count}</span>
+                ${participant.latest_violation ? `<br><small class="text-muted">${participant.latest_violation}</small>` : ''}
+            </td>
+            <td>
+                <span class="badge bg-success">Active</span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <a href="/quiz/${participant.attempt_id}/results" class="btn btn-outline-primary" title="View Progress">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button class="btn btn-outline-warning" onclick="sendWarning(${participant.attempt_id})" title="Send Warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateStatistics(data) {
+    document.getElementById('activeCount').textContent = data.total_active;
+    
+    if (data.participants.length > 0) {
+        const avgProgress = data.participants.reduce((sum, p) => sum + p.progress_percentage, 0) / data.participants.length;
+        document.getElementById('avgProgress').textContent = Math.round(avgProgress) + '%';
+    } else {
+        document.getElementById('avgProgress').textContent = '-';
+    }
+}
+
+function updateLiveStatus(isOnline = true) {
+    const statusElement = document.getElementById('liveStatus');
+    if (isOnline) {
+        statusElement.innerHTML = '<i class="fas fa-circle text-success"></i> Live';
+        statusElement.className = 'badge bg-primary me-2';
+    } else {
+        statusElement.innerHTML = '<i class="fas fa-circle text-danger"></i> Offline';
+        statusElement.className = 'badge bg-danger me-2';
+    }
+}
+
+function sendWarning(attemptId) {
+    if (confirm('Send a warning message to this participant?')) {
+        // Implement warning functionality
+        fetch(`/api/monitoring/send-warning/${attemptId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: 'Warning: Please follow the quiz guidelines and avoid any suspicious activities.'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Warning sent successfully!');
+            } else {
+                alert('Failed to send warning: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to send warning');
+        });
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    stopAutoRefresh();
+});
+</script>
+{% endblock %}

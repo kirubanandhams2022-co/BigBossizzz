@@ -302,6 +302,94 @@ def host_dashboard():
                          recent_logins=recent_logins,
                          high_violations=high_violations)
 
+@app.route('/host/monitoring')
+@login_required  
+def host_monitoring():
+    """Real-time participant monitoring panel"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get active quiz attempts
+    active_attempts = QuizAttempt.query.filter_by(status='in_progress').join(Quiz).filter(
+        Quiz.creator_id == current_user.id if not current_user.is_admin() else True
+    ).all()
+    
+    # Get recent login events
+    recent_logins = LoginEvent.query.order_by(LoginEvent.login_time.desc()).limit(20).all()
+    
+    # Get recent proctoring events
+    recent_violations = ProctoringEvent.query.join(QuizAttempt).join(Quiz).filter(
+        Quiz.creator_id == current_user.id if not current_user.is_admin() else True
+    ).order_by(ProctoringEvent.timestamp.desc()).limit(50).all()
+    
+    # Get participant device info
+    participants_online = []
+    for attempt in active_attempts:
+        # Get latest login for this participant
+        latest_login = LoginEvent.query.filter_by(user_id=attempt.participant_id).order_by(
+            LoginEvent.login_time.desc()
+        ).first()
+        
+        # Get violation count for this attempt
+        violation_count = ProctoringEvent.query.filter_by(attempt_id=attempt.id).count()
+        
+        participants_online.append({
+            'attempt': attempt,
+            'latest_login': latest_login,
+            'violation_count': violation_count,
+            'time_elapsed': datetime.utcnow() - attempt.started_at,
+            'quiz_title': attempt.quiz.title
+        })
+    
+    return render_template('host_monitoring.html',
+                         active_attempts=active_attempts,
+                         participants_online=participants_online,
+                         recent_logins=recent_logins,
+                         recent_violations=recent_violations)
+
+@app.route('/api/monitoring/live-data')
+@login_required
+def get_live_monitoring_data():
+    """API endpoint for real-time monitoring data"""
+    if not current_user.is_host() and not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # Get active attempts
+    active_attempts = QuizAttempt.query.filter_by(status='in_progress').join(Quiz).filter(
+        Quiz.creator_id == current_user.id if not current_user.is_admin() else True
+    ).all()
+    
+    participants_data = []
+    for attempt in active_attempts:
+        # Get latest violations
+        recent_violations = ProctoringEvent.query.filter_by(attempt_id=attempt.id).order_by(
+            ProctoringEvent.timestamp.desc()
+        ).limit(5).all()
+        
+        # Calculate time remaining
+        time_elapsed = datetime.utcnow() - attempt.started_at
+        time_remaining = timedelta(minutes=attempt.quiz.time_limit) - time_elapsed
+        
+        participants_data.append({
+            'attempt_id': attempt.id,
+            'participant_name': attempt.participant.username,
+            'quiz_title': attempt.quiz.title,
+            'time_elapsed': str(time_elapsed).split('.')[0],
+            'time_remaining': str(time_remaining).split('.')[0] if time_remaining.total_seconds() > 0 else 'Overtime',
+            'violation_count': len(recent_violations),
+            'latest_violation': recent_violations[0].event_type if recent_violations else None,
+            'questions_answered': len(attempt.answers),
+            'total_questions': len(attempt.quiz.questions),
+            'progress_percentage': round((len(attempt.answers) / len(attempt.quiz.questions)) * 100) if attempt.quiz.questions else 0
+        })
+    
+    return jsonify({
+        'participants': participants_data,
+        'total_active': len(participants_data),
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
 @app.route('/participant/dashboard')
 @login_required
 def participant_dashboard():
