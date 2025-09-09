@@ -52,14 +52,10 @@ db.init_app(app)
 login_manager.init_app(app)
 mail.init_app(app)
 
-# Configure login manager
-try:
-    login_manager.login_view = 'login'
-    login_manager.login_message = 'Please log in to access this page.'
-    login_manager.login_message_category = 'info'
-except AttributeError:
-    # Fallback for older Flask-Login versions
-    pass
+# Configure login manager  
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -118,9 +114,13 @@ with app.app_context():
 # Import routes
 from routes import *
 
-if __name__ == '__main__':
-    # Only run if this file is executed directly
+# Only define run functionality if needed
+def run_app():
+    """Start the application server"""
     try:
         app.run(host='0.0.0.0', port=5000, debug=True)
     except Exception as e:
         logging.error(f"Failed to start application: {e}")
+
+if __name__ == '__main__':
+    run_app()
