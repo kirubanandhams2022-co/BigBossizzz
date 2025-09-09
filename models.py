@@ -60,6 +60,19 @@ class Quiz(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # New columns for advanced features
+    allow_view_responses = db.Column(db.Boolean, default=True)
+    auto_generate_from_upload = db.Column(db.Boolean, default=False)
+    draft_from_upload_id = db.Column(db.Integer, db.ForeignKey('upload_record.id'))
+    is_deleted = db.Column(db.Boolean, default=False)
+    
+    # Security settings
+    max_violations_allowed = db.Column(db.Integer, default=3)
+    auto_terminate_on_violation = db.Column(db.Boolean, default=True)
+    face_detection_required = db.Column(db.Boolean, default=True)
+    screen_recording_required = db.Column(db.Boolean, default=False)
+    browser_lockdown = db.Column(db.Boolean, default=True)
+    
     # Relationships
     questions = db.relationship('Question', backref='quiz', lazy=True, cascade='all, delete-orphan')
     attempts = db.relationship('QuizAttempt', backref='quiz', lazy=True, cascade='all, delete-orphan')
@@ -186,3 +199,66 @@ class UserViolation(db.Model):
     
     def __repr__(self):
         return f'<UserViolation {self.user_id} - {self.violation_count} violations>'
+
+# New models for advanced features
+
+class UploadRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    host_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    mime_type = db.Column(db.String(100))
+    stored_path = db.Column(db.String(500))
+    parsed = db.Column(db.Boolean, default=False)
+    parsed_to_quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'))
+    candidate_questions_json = db.Column(db.Text)  # JSON string of candidate questions
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    host = db.relationship('User', backref='uploads')
+    
+    def __repr__(self):
+        return f'<UploadRecord {self.filename}>'
+
+class DeviceLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'))
+    ip_address = db.Column(db.String(45))  # IPv6 compatible
+    user_agent = db.Column(db.Text)
+    device_type = db.Column(db.String(50))
+    browser_info = db.Column(db.Text)
+    screen_resolution = db.Column(db.String(20))
+    timezone = db.Column(db.String(50))
+    logged_in_at = db.Column(db.DateTime, default=datetime.utcnow)
+    session_duration = db.Column(db.Integer)  # in minutes
+    is_suspicious = db.Column(db.Boolean, default=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='device_logs')
+    quiz = db.relationship('Quiz', backref='device_logs')
+    
+    def __repr__(self):
+        return f'<DeviceLog {self.user_id}-{self.ip_address}>'
+
+class SecurityAlert(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'))
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'))
+    alert_type = db.Column(db.String(50), nullable=False)  # 'multiple_faces', 'suspicious_behavior', 'device_change', etc.
+    severity = db.Column(db.String(20), default='medium')  # 'low', 'medium', 'high', 'critical'
+    description = db.Column(db.Text)
+    auto_action_taken = db.Column(db.String(100))  # 'warning_sent', 'quiz_terminated', 'flagged_for_review'
+    resolved = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref='security_alerts')
+    quiz = db.relationship('Quiz', backref='security_alerts')
+    attempt = db.relationship('QuizAttempt', backref='security_alerts')
+    resolver = db.relationship('User', foreign_keys=[resolved_by])
+    
+    def __repr__(self):
+        return f'<SecurityAlert {self.alert_type}-{self.severity}>'

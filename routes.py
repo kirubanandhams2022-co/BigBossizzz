@@ -5,7 +5,7 @@ from app import app, db
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 from sqlalchemy import func

@@ -1,0 +1,368 @@
+# Secure Quiz App — Feature Specification & Database Schema (Updated per Kiru)
+
+**For:** Kiru's existing web app (\~80% complete)
+
+**Purpose of this update:**
+You asked to *modify* your current app (not rebuild). This document replaces the previous spec and focuses on **incremental changes** and concrete scripts/UI flows so you can add:
+
+* upload → auto-create N questions (host chooses N at submit)
+* automatic answer extraction from PDF/Docx/CSV with host review & override
+* host can download final reports after everyone finishes (auto-email + on-demand)
+* participant management + login activity view (fix server error guidance)
+* `.db` single-file export (SQLite) and hosting
+* host can delete unwanted quizzes from host portal
+
+---
+
+## 1) Summary of new behaviors to implement
+
+1. When host creates a quiz and uploads a file (PDF/DOCX/CSV/XLSX) and clicks **Submit**, the UI must prompt: "How many questions should I create from this file?" — host enters a number `N`.
+2. Server parses the file, extracts candidate Q/A items, **selects the top `N` questions** automatically and assigns a *predicted* correct answer for each (based on file cues / OCR heuristics). The server creates a **draft quiz** with those `N` questions and suggested `is_correct` flags.
+3. Host sees the draft in the existing quiz editor (new tab/panel): can edit question text, options, and **override** the selected correct answer (lock it) before publishing.
+4. Host can **delete** any auto-created quiz from Host Portal (soft-delete or hard-delete toggle configurable) — this must also remove draft files & parsed data.
+5. **Manage Participants / Login Activity** page: shows who belongs to host's class, who logged in, at what time, device info, IP, submission status, and proctor events. Fixes for "server error" are included (common causes & logs to check).
+6. After all participants finish the quiz (or host requests), host can download the report (CSV/XLSX/PDF). The system auto-emails individual results to participants and optionally the host when the full report is ready.
+7. Export single-file DB as `.db` (SQLite) for admin download and audit; endpoints to generate/copy `quizzes_YYYYMMDD_HHMMSS.db` securely.
+
+---
+
+## 2) Database migration scripts (incremental `ALTER` + `CREATE`)
+
+**Run these as migrations against your current DB.** They assume you already have `quiz`, `question`, `option_item`, `submission`, and `user_account` tables.
+
+```sql
+-- 1) New columns in quiz & submission
+ALTER TABLE quiz ADD COLUMN allow_view_responses INTEGER DEFAULT 1;
+ALTER TABLE quiz ADD COLUMN auto_generate_from_upload INTEGER DEFAULT 0;
+ALTER TABLE quiz ADD COLUMN draft_from_upload_id INTEGER; -- optional reference to upload_record
+
+ALTER TABLE submission ADD COLUMN status TEXT DEFAULT 'in_progress'; -- in_progress, submitted, terminated, flagged
+ALTER TABLE submission ADD COLUMN score REAL DEFAULT 0;
+ALTER TABLE submission ADD COLUMN report_sent INTEGER DEFAULT 0;
+
+-- 2) New supporting tables
+CREATE TABLE IF NOT EXISTS upload_record (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  host_id INTEGER REFERENCES user_account(id),
+  filename TEXT,
+  mime TEXT,
+  stored_path TEXT,
+  parsed INTEGER DEFAULT 0,
+  parsed_to_quiz_id INTEGER,
+  candidate_questions_json TEXT, -- store intermediate parsed candidates
+  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS proctor_event (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  submission_id INTEGER REFERENCES submission(id),
+  event_type TEXT,
+  event_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  details TEXT
+);
+
+CREATE TABLE IF NOT EXISTS device_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER REFERENCES user_account(id),
+  quiz_id INTEGER REFERENCES quiz(id),
+  ip TEXT,
+  user_agent TEXT,
+  device_type TEXT,
+  logged_in_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3) Soft-delete flag for quiz (so host can undelete if needed)
+ALTER TABLE quiz ADD COLUMN is_deleted INTEGER DEFAULT 0;
+
+-- 4) Indexes
+CREATE INDEX IF NOT EXISTS idx_upload_record_host ON upload_record(host_id);
+CREATE INDEX IF NOT EXISTS idx_submission_quiz_user ON submission(quiz_id, user_id);
+```
+
+**Notes:** If your DB engine doesn’t support `ALTER TABLE ... ADD COLUMN` exactly as written, adapt for your RDBMS. For SQLite the `ALTER TABLE ... ADD COLUMN` is allowed for adding columns.
+
+---
+
+## 3) File upload & parsing flow (detailed)
+
+### Frontend (Create Quiz page)
+
+1. Host selects **Upload file** on Create Quiz screen and chooses file.
+2. After upload, **do not** immediately publish. Instead call `POST /api/upload-quiz-file` and receive back `upload_record_id` + `candidate_count` (how many candidate Qs found).
+3. Immediately show a modal: **"How many questions would you like me to create from this file?"** with a numeric input defaulting to `min(candidate_count, 10)` and max `candidate_count`.
+4. Host selects `N` and clicks **Create Draft**. Frontend sends `POST /api/upload-quiz-create-draft` with `upload_record_id` and `N`.
+5. Server responds with `draft_quiz_id`. Frontend navigates to the quiz editor (draft view) showing `N` auto-created questions and predicted answers.
+6. Host edits/locks answers and clicks **Publish** (calls `POST /api/quiz/:id/publish`).
+
+### Backend (parsing, selection & predicted answers)
+
+* `POST /api/upload-quiz-file`:
+
+  * save the file in secure storage, create `upload_record` row, parse file to generate **candidate\_questions** list.
+  * return `{ upload_record_id, candidate_count }`.
+
+* `POST /api/upload-quiz-create-draft` { upload\_record\_id, N, quiz\_meta }
+
+  * load `upload_record.candidate_questions_json` (or re-parse if needed), pick top `N` candidate questions (ranking heuristic below), create `quiz` row with `auto_generate_from_upload=1` and `draft_from_upload_id = upload_record.id`.
+  * for each chosen candidate, create `question` + `option_item` rows and set `option_item.is_correct` based on predicted correct answer.
+  * return `draft_quiz_id`.
+
+#### Ranking & predicted-answer heuristic (practical approach)
+
+* For CSV/XLSX: if file contains `correctOption` or `answer` column, use it directly.
+* For DOCX/PDF: run OCR (if PDF image) then use regex to extract Q + options; use text clues ("Answer:", "Ans.", bold/underline in DOCX, or pattern like `(A)`, `(B)` etc.).
+* Rank quality by: completeness (question + >=2 options) + presence of explicit answer cue + OCR confidence.
+* Choose top `N` by rank.
+
+**Important:** always mark these questions as **draft** and require host review before quiz goes live.
+
+---
+
+## 4) APIs (expanded & exact endpoints you should add)
+
+* `POST /api/upload-quiz-file`
+
+  * Body: multipart file + host\_id
+  * Returns: `{ upload_record_id, candidate_count, message }`
+
+* `POST /api/upload-quiz-create-draft`
+
+  * Body: `{ upload_record_id, N, title, description, class_id, start_at, end_at, duration_seconds }`
+  * Server action: create quiz (draft), questions, options
+  * Returns: `{ draft_quiz_id }`
+
+* `GET /api/quiz/:id/draft`
+
+  * Returns draft quiz (questions, options, predicted\_is\_correct, locked\_flag)
+
+* `POST /api/quiz/:id/publish`
+
+  * Body: `{ lock_answers: boolean }` (if true, host-marked answers become canonical)
+  * Returns: `{ success }`
+
+* `DELETE /api/quiz/:id` (Host-only)
+
+  * Soft-delete by default (set `is_deleted = 1`), optional `?hard=true` for admin.
+  * Returns `{ success }`
+
+* `GET /api/host/:id/participants?quiz_id=...` — returns participants for host's class with login activity, device logs and submission status.
+
+* `GET /api/host/:id/report?quiz_id=...&format=csv|xlsx|pdf` — request report generation (synchronously for small quizzes, or queue for big ones). Returns file link.
+
+* `POST /api/submission/:id/finish` — grades submission, queues emails to participant & host (if host requested), marks `submission.report_sent` when email done.
+
+* `GET /api/admin/export-db` — admin-only, creates a copy of SQLite DB and returns secure download link (see section 7).
+
+---
+
+## 5) Host Portal UX specifics (additions)
+
+* **Draft Review Panel:** under Create Quiz → Drafts, show newly created draft quizzes from uploads. Each draft shows: list of auto-created questions, predicted correct answer highlighted, **Edit** and **Lock** toggles.
+
+* **Prompt Modal**: When uploading, the numeric modal asking for `N` (how many questions) with preview of first 3 candidate Qs.
+
+* **Delete Quiz:** On host quiz list, add Delete (soft) and a confirmation dialog. Soft-deleted quizzes are hidden by default but available in a "Trash" filter for 30 days.
+
+* **Download Report:** On host quiz page, show a button `Download Final Report` (disabled until either all expected participants have submitted OR host forces generation). Implement a small badge showing `X/Y submitted`.
+
+* **Contact Admin:** A persistent button that opens a form sending to `/api/support/message` and also includes admin contact details.
+
+---
+
+## 6) Manage Participants & Login Activity (what to show + server error fixes)
+
+### What to display
+
+For each participant in host's class (table view):
+
+* Participant name, email
+* Registered device(s) (user agent simplified), IP address (last login), last login time
+* Current session status: `online | offline | in_quiz | submitted | terminated`
+* Submission timestamp (if any) and score
+* Proctor events count (click to expand list)
+* Action buttons: View Submission / Download Participant Report / Message Participant
+
+### Fixing "Server error" (guidance)
+
+If Manage Participants page shows server error, check these common issues in order:
+
+1. **Backend route missing or auth failure** — ensure `GET /api/host/:id/participants` exists and host token is authorized. Check server logs for 401/403 errors.
+2. **DB query timeout / missing columns** — if you recently added migration columns, server code may try to SELECT columns that don't exist. Confirm migrations ran and columns exist (e.g., `device_log`, `submission.status`).
+3. **Large query payload** — if you fetch too much data (full proctor snapshots), paginate the response or only return summary fields and fetch details on demand.
+4. **JSON serialization errors** — watch for circular references or extremely large text fields (store candidate\_questions\_json as TEXT but avoid sending it all in participant list).
+5. **CORS / CSRF** — ensure frontend origin is allowed and CSRF token (if used) is sent.
+
+**Debug steps:**
+
+* Reproduce request in Postman with the host token; inspect response and HTTP status.
+* Tail the server logs while calling the route: `tail -f logs/app.log` and look for stack traces.
+* Run the offending SQL query directly against DB to see if it errors.
+
+If you want, paste the server error stack trace here and I’ll diagnose it specifically.
+
+---
+
+## 7) Single-file DB (`.db`) generation and secure download
+
+**Approach:** use **SQLite** for single-file DB. Keep the app using your current DB; add a step to create a copy and serve it to Admin.
+
+**Implementation steps:**
+
+1. Ensure your app’s DB is SQLite. If not, you can still export by running a schema + data dump. For easiest single-file downloads convert/copy relevant tables into a new SQLite file.
+2. API: `GET /api/admin/export-db`
+
+   * Server action: copy DB file (or create SQLite DB and COPY data) to `quizzes_YYYYMMDD_HHMMSS.db` in a secure temp folder.
+   * Generate a short-lived signed download link and return to admin.
+   * Optionally send email with link to admin.
+3. Retention: delete exported `.db` files after configurable TTL (e.g., 2 hours).
+
+**Security:** only Admin role may call export endpoint. Log export actions in an audit table.
+
+Example Node.js (sqlite3) copy snippet:
+
+```js
+const fs = require('fs');
+const src = '/var/data/production.db';
+const dest = `/tmp/quizzes_${timestamp}.db`;
+fs.copyFileSync(src, dest);
+// then serve dest as download with auth checks
+```
+
+---
+
+## 8) Deleting quizzes (Host feature)
+
+* Add endpoint `DELETE /api/quiz/:id` (Host role). Default action: **soft-delete** (`is_deleted=1`).
+* Optionally add an Admin-only `DELETE /api/quiz/:id?hard=true` which removes rows permanently (careful).
+* UI: Add 'Trash' filter so deleted items can be restored within configurable days (e.g., 30 days), then permanently purged.
+
+**Server-side caution:** ensure you also remove any temporary uploaded files tied to the quiz (from `upload_record.stored_path`) when hard-deleting.
+
+---
+
+## 9) Proctoring & auto-terminate for multi-face detection (reminder + how to wire up)
+
+* When face-api in browser detects `faceCount >= 2`:
+
+  1. Send `POST /api/proctor/event` with `{ submission_id, event_type: 'multiple_faces', details: '2 faces detected' }`.
+  2. If it is the first event within the submission window -> server sets `proctor_event` and sends a websocket notification to host; show participant a warning overlay.
+  3. If a second `multiple_faces` event occurs (or other major violation) -> server sets `submission.status = 'terminated'`, persists final proctor\_event, and notifies host & admin.
+
+* Implement `warnings_count` per submission (count proctor\_event rows of type `multiple_faces|camera_off|tab_switch`) or store a `warnings` JSON column on `submission`.
+
+---
+
+## 10) Grading, report generation & emailing (practical flow)
+
+1. On `POST /api/submission/:id/finish` server will:
+
+   * Grade automatically by comparing `response.option_id` to `option_item.is_correct` (or use manual override by host for locked answers).
+   * Compute `submission.score` and set `submitted_at` and `status='submitted'`.
+   * Insert a `report_job` into job queue to generate individual PDF/CSV and to send email to participant.
+2. Host report generation: when host clicks **Download Final Report**, check if all expected participants have `status='submitted'` OR allow host to force generation.
+
+   * Generate combined spreadsheet: rows for each participant with metadata + per-question marks + proctor event summary.
+   * Send file to host email & return file link.
+
+**File formats & libraries**
+
+* Node: `exceljs` or `xlsx` for spreadsheets; `puppeteer` to print HTML -> PDF.
+* Python: `openpyxl` / `xlsxwriter`; `weasyprint`/`wkhtmltopdf` for PDF.
+
+---
+
+## 11) Implementation checklist & file map (what to modify in your existing project)
+
+**Backend** (code changes)
+
+* [ ] Add migration scripts & run them.
+* [ ] Implement `POST /api/upload-quiz-file` and parsing pipeline (CSV first, DOCX/PDF later).
+* [ ] Implement `POST /api/upload-quiz-create-draft` (select top N candidates).
+* [ ] Implement `GET /api/quiz/:id/draft`, `POST /api/quiz/:id/publish`, `DELETE /api/quiz/:id`.
+* [ ] Add proctor event ingestion endpoint and websocket push logic.
+* [ ] Implement report generation & email queueing.
+* [ ] Add admin-only `/api/admin/export-db` to copy & serve `.db` file.
+
+**Frontend** (code changes)
+
+* [ ] Create prompt modal for N questions after file upload.
+* [ ] Draft review editor page showing predicted correct answers and lock toggles.
+* [ ] Host dashboard: add Delete quiz, Download final report buttons, Trash view.
+* [ ] Manage Participants page: show login activity & device logs; fix server error by testing API response.
+* [ ] Participant quiz page: integrate proctoring JS (face count + visibility) and warning/terminate UI.
+
+**Jobs & Storage**
+
+* [ ] Add job worker for heavy tasks (report generation, file parsing, DB copy).
+* [ ] Configure secure storage for uploaded files and exported DBs; cleanup policy.
+
+**Security & Privacy**
+
+* [ ] Consent modal for camera and recording.
+* [ ] Role checks on new endpoints.
+* [ ] Logs & audit for DB export and deletions.
+
+---
+
+## 12) Useful code snippets & pseudocode
+
+### A) Frontend: prompt after upload (React-style pseudocode)
+
+```jsx
+// after file upload -> response { upload_record_id, candidate_count }
+openModal({
+  title: 'Create questions from uploaded file',
+  body: (
+    <>
+      <p>{candidate_count} candidate questions found.</p>
+      <label>How many questions to create?</label>
+      <input type="number" min={1} max={candidate_count} defaultValue={Math.min(10,candidate_count)} />
+    </>
+  ),
+  onConfirm: (n) => api.post('/api/upload-quiz-create-draft', { upload_record_id, n, title })
+});
+```
+
+### B) Backend: pick top N candidates (pseudocode)
+
+```js
+function selectTopN(candidates, N) {
+  candidates.forEach(c => {
+    c.score = 0;
+    if (c.hasQuestion && c.options.length>=2) c.score += 2;
+    if (c.explicitAnswerCue) c.score += 3;
+    if (c.ocr_confidence) c.score += c.ocr_confidence * 2;
+  });
+  return candidates.sort((a,b) => b.score - a.score).slice(0, N);
+}
+```
+
+### C) Report generation trigger (pseudocode)
+
+```js
+// when host clicks download or when all submitted
+if (allParticipantsSubmitted || hostForces) {
+  jobQueue.add('generateReport', { quizId, hostId, format });
+}
+```
+
+---
+
+## 13) Acceptance tests you should run
+
+1. Upload CSV with 20 Qs → choose N=10 → draft created with 10 Qs; predicted answers present; edit one answer and publish.
+2. Upload a PDF (image) → OCR extracts candidates; candidate\_count > 0; pick N works.
+3. Participant starts quiz → switches tab → proctor\_event logged and host receives warning; on second violation, submission terminates.
+4. After all participants submit, host clicks Download Final Report → receives XLSX with per-question marks + proctor summary; each participant receives their individual email with attachment.
+5. Host deletes a draft quiz → `is_deleted=1`; Trash view shows it; hard-delete removes DB rows and uploaded file.
+6. Admin exports DB → receives `.db` download link which opens in SQLite browser.
+
+---
+
+## 14) If you want I can now (pick one):
+
+* Generate the exact **SQL migration file** ready for your DB engine (SQLite/MySQL/Postgres).
+* Generate a working **Node.js + Express** mini-module that implements `POST /api/upload-quiz-file`, `POST /api/upload-quiz-create-draft`, and `DELETE /api/quiz/:id` (so you can plug into your app).
+* Generate the React **modal + draft review component** (single-file) that you can paste into your frontend.
+
+Tell me which artifact you want and I will generate it right here.
