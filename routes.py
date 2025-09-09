@@ -205,19 +205,13 @@ def login():
             
             is_suspicious = recent_logins > 5 or different_ips > 3 or different_devices > 5
             
-            # Create login event record with enhanced tracking
+            # Create login event record
             login_event = LoginEvent(
                 user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 device_info=json.dumps(device_info),
-                device_fingerprint=json.dumps(device_info),  # Enhanced fingerprinting
-                is_suspicious=is_suspicious,
-                location_info=None,  # Can be enhanced with GeoIP lookup
-                security_score=95 if not is_suspicious else 50,
-                browser_language=request.headers.get('Accept-Language', '').split(',')[0] if request.headers.get('Accept-Language') else None,
-                timezone=None,  # Can be captured via JavaScript
-                screen_resolution=None  # Can be captured via JavaScript
+                is_suspicious=is_suspicious
             )
             
             db.session.add(login_event)
