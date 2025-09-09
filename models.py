@@ -95,7 +95,8 @@ class Question(db.Model):
     def get_shuffled_options(self):
         """Return shuffled options for this question"""
         import random
-        options = list(self.options)
+        from app import db
+        options = db.session.query(QuestionOption).filter_by(question_id=self.id).all()
         random.shuffle(options)
         return options
     
@@ -129,7 +130,9 @@ class QuizAttempt(db.Model):
         correct_answers = 0
         total_points = 0
         
-        for answer in self.answers:
+        from app import db
+        answers = db.session.query(Answer).filter_by(attempt_id=self.id).all()
+        for answer in answers:
             total_points += answer.question.points
             if answer.is_correct:
                 correct_answers += answer.question.points
