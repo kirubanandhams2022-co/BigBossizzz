@@ -11,6 +11,19 @@ class ProctoringManager {
         this.context = null;
         this.detectionInterval = null;
         
+        // WebSocket connection for real-time monitoring
+        this.socket = null;
+        this.socketReconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        
+        // Enhanced face detection
+        this.faceDetectionModel = null;
+        this.lastDetectedFaces = 0;
+        this.noFaceDetectedCount = 0;
+        this.multipleFaceDetectedCount = 0;
+        this.suspiciousMovementCount = 0;
+        this.previousImageData = null;
+        
         // Enhanced violation tracking
         this.violationCount = 0;
         this.highSeverityCount = 0;
@@ -46,7 +59,9 @@ class ProctoringManager {
         try {
             await this.requestPermissions();
             this.setupEventListeners();
+            this.initWebSocket();
             this.startMonitoring();
+            this.startAdvancedFaceDetection();
             this.showProctoringStatus('active');
         } catch (error) {
             console.error('Proctoring initialization failed:', error);
@@ -109,6 +124,216 @@ class ProctoringManager {
         this.context = this.canvas.getContext('2d');
         this.canvas.width = 640;
         this.canvas.height = 480;
+    }
+    
+    initWebSocket() {
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/proctoring/${this.attemptId}`;
+            
+            this.socket = new WebSocket(wsUrl);
+            
+            this.socket.onopen = () => {
+                console.log('WebSocket connected for real-time monitoring');
+                this.socketReconnectAttempts = 0;
+                this.sendWebSocketMessage('connection_established', {
+                    timestamp: new Date().toISOString(),
+                    userAgent: navigator.userAgent,
+                    screenResolution: `${screen.width}x${screen.height}`
+                });
+            };
+            
+            this.socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                this.handleWebSocketMessage(data);
+            };
+            
+            this.socket.onclose = () => {
+                console.log('WebSocket connection closed');
+                this.reconnectWebSocket();
+            };
+            
+            this.socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+        } catch (error) {
+            console.warn('WebSocket not available, falling back to HTTP polling');
+            this.startPollingFallback();
+        }
+    }
+    
+    reconnectWebSocket() {
+        if (this.socketReconnectAttempts < this.maxReconnectAttempts && !this.isTerminated) {
+            this.socketReconnectAttempts++;
+            setTimeout(() => {
+                console.log(`Attempting WebSocket reconnection (${this.socketReconnectAttempts}/${this.maxReconnectAttempts})`);
+                this.initWebSocket();
+            }, 3000 * this.socketReconnectAttempts);
+        }
+    }
+    
+    sendWebSocketMessage(type, data) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: type,
+                attemptId: this.attemptId,
+                timestamp: new Date().toISOString(),
+                data: data
+            }));
+        }
+    }
+    
+    handleWebSocketMessage(message) {
+        switch (message.type) {
+            case 'warning':
+                this.showWarningMessage(message.data.message);
+                break;
+            case 'terminate_quiz':
+                this.terminateQuiz(message.data.reason);
+                break;
+            case 'host_message':
+                this.showHostMessage(message.data.message);
+                break;
+        }
+    }
+    
+    startPollingFallback() {
+        // Fallback to HTTP polling if WebSocket is not available
+        setInterval(() => {
+            this.sendViolationUpdate();
+        }, 10000);
+    }
+    
+    async startAdvancedFaceDetection() {
+        // Load face detection model if available
+        try {
+            if (typeof cv !== 'undefined') {
+                console.log('OpenCV.js detected, using advanced face detection');
+                this.faceDetectionModel = new cv.CascadeClassifier();
+                this.faceDetectionModel.load('haarcascade_frontalface_default.xml');
+            }
+        } catch (error) {
+            console.log('Advanced face detection not available, using basic detection');
+        }
+        
+        // Start face detection loop
+        this.faceDetectionLoop();
+    }
+    
+    faceDetectionLoop() {
+        if (this.isTerminated) return;
+        
+        if (this.videoElement && this.videoElement.readyState === 4) {
+            this.context.drawImage(this.videoElement, 0, 0, 640, 480);
+            
+            // Get current image data
+            const currentImageData = this.context.getImageData(0, 0, 640, 480);
+            
+            // Detect faces
+            const faceCount = this.detectFaces(currentImageData);
+            
+            // Check for violations
+            this.checkFaceViolations(faceCount);
+            
+            // Detect suspicious movement
+            if (this.previousImageData) {
+                this.detectSuspiciousMovement(currentImageData, this.previousImageData);
+            }
+            
+            this.previousImageData = currentImageData;
+            this.lastDetectedFaces = faceCount;
+            
+            // Send real-time update
+            this.sendWebSocketMessage('face_detection_update', {
+                faceCount: faceCount,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Continue detection loop
+        setTimeout(() => this.faceDetectionLoop(), 2000);
+    }
+    
+    detectFaces(imageData) {
+        // Simple face detection using pixel analysis
+        // In a real implementation, you would use a proper face detection library
+        
+        const data = imageData.data;
+        let skinPixels = 0;
+        let totalPixels = data.length / 4;
+        
+        // Simplified skin color detection
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // Basic skin color detection
+            if (r > 95 && g > 40 && b > 20 && 
+                Math.max(r, g, b) - Math.min(r, g, b) > 15 && 
+                Math.abs(r - g) > 15 && r > g && r > b) {
+                skinPixels++;
+            }
+        }
+        
+        const skinRatio = skinPixels / totalPixels;
+        
+        // Estimate face count based on skin ratio
+        if (skinRatio > 0.02 && skinRatio < 0.15) {
+            return 1; // One face detected
+        } else if (skinRatio > 0.15) {
+            return Math.floor(skinRatio / 0.08); // Multiple faces
+        }
+        
+        return 0; // No face detected
+    }
+    
+    checkFaceViolations(faceCount) {
+        if (faceCount === 0) {
+            this.noFaceDetectedCount++;
+            if (this.noFaceDetectedCount > 5) { // 10 seconds of no face
+                this.logViolation('no_face_detected', 'Participant not visible in camera', 'high');
+                this.noFaceDetectedCount = 0;
+            }
+        } else if (faceCount > 1) {
+            this.multipleFaceDetectedCount++;
+            if (this.multipleFaceDetectedCount > 3) { // 6 seconds of multiple faces
+                this.logViolation('multiple_faces', `${faceCount} faces detected in camera`, 'high');
+                this.multipleFaceDetectedCount = 0;
+            }
+        } else {
+            // Reset counters when normal
+            this.noFaceDetectedCount = 0;
+            this.multipleFaceDetectedCount = 0;
+        }
+    }
+    
+    detectSuspiciousMovement(currentData, previousData) {
+        let totalDiff = 0;
+        const data1 = currentData.data;
+        const data2 = previousData.data;
+        
+        // Calculate pixel differences
+        for (let i = 0; i < data1.length; i += 16) { // Sample every 4th pixel for performance
+            const diff = Math.abs(data1[i] - data2[i]) + 
+                        Math.abs(data1[i + 1] - data2[i + 1]) + 
+                        Math.abs(data1[i + 2] - data2[i + 2]);
+            totalDiff += diff;
+        }
+        
+        const avgDiff = totalDiff / (data1.length / 16);
+        
+        // Detect suspicious rapid movement
+        if (avgDiff > 50) {
+            this.suspiciousMovementCount++;
+            if (this.suspiciousMovementCount > 10) {
+                this.logViolation('suspicious_movement', 'Rapid or suspicious movement detected', 'medium');
+                this.suspiciousMovementCount = 0;
+            }
+        } else {
+            this.suspiciousMovementCount = Math.max(0, this.suspiciousMovementCount - 1);
+        }
     }
 
     setupEventListeners() {

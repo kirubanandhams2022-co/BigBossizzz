@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk User Management - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users-cog me-2"></i>Bulk User Management</h2>
+        <div>
+            <a href="{{ url_for('admin_export_database') }}" class="btn btn-success me-2">
+                <i class="fas fa-download me-1"></i>Export Database
+            </a>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Admin
+            </a>
+        </div>
+    </div>
+
+    <form method="POST" id="bulkUserForm">
+        <div class="card">
+            <div class="card-header">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>User Selection</h5>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAll()">
+                                Select All
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectNone()">
+                                Select None
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th width="50">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleAll()">
+                                </th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Last Login</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="user_ids" value="{{ user.id }}" class="user-checkbox">
+                                </td>
+                                <td>
+                                    <strong>{{ user.username }}</strong>
+                                </td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'primary' if user.role == 'host' else 'info' }}">
+                                        {{ user.role.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if user.is_verified %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">-</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-cogs me-2"></i>Bulk Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="action" class="form-label">Select Action</label>
+                            <select name="action" id="action" class="form-select" onchange="toggleRoleSelection()">
+                                <option value="">Choose an action...</option>
+                                <option value="activate">Activate Users</option>
+                                <option value="deactivate">Deactivate Users</option>
+                                <option value="change_role">Change Role</option>
+                                <option value="delete" class="text-danger">Delete Users</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3" id="roleSelection" style="display: none;">
+                            <label for="new_role" class="form-label">New Role</label>
+                            <select name="new_role" id="new_role" class="form-select">
+                                <option value="host">Host</option>
+                                <option value="participant">Participant</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted">
+                        <small><span id="selectedCount">0</span> users selected</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="executeBtn" disabled onclick="return confirmAction()">
+                        <i class="fas fa-play me-1"></i>Execute Action
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleAll() {
+    const selectAll = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateSelectedCount();
+}
+
+function selectAll() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    checkboxes.forEach(checkbox => checkbox.checked = true);
+    document.getElementById('selectAllCheckbox').checked = true;
+    updateSelectedCount();
+}
+
+function selectNone() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    checkboxes.forEach(checkbox => checkbox.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+    const count = selectedCheckboxes.length;
+    
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('executeBtn').disabled = count === 0 || !document.getElementById('action').value;
+}
+
+function toggleRoleSelection() {
+    const action = document.getElementById('action').value;
+    const roleSelection = document.getElementById('roleSelection');
+    
+    if (action === 'change_role') {
+        roleSelection.style.display = 'block';
+    } else {
+        roleSelection.style.display = 'none';
+    }
+    
+    updateSelectedCount();
+}
+
+function confirmAction() {
+    const action = document.getElementById('action').value;
+    const selectedCount = document.querySelectorAll('.user-checkbox:checked').length;
+    
+    let message = '';
+    
+    switch (action) {
+        case 'activate':
+            message = `Are you sure you want to activate ${selectedCount} users?`;
+            break;
+        case 'deactivate':
+            message = `Are you sure you want to deactivate ${selectedCount} users?`;
+            break;
+        case 'change_role':
+            const newRole = document.getElementById('new_role').value;
+            message = `Are you sure you want to change the role of ${selectedCount} users to ${newRole}?`;
+            break;
+        case 'delete':
+            message = `WARNING: Are you sure you want to PERMANENTLY DELETE ${selectedCount} users? This action cannot be undone!`;
+            break;
+    }
+    
+    return confirm(message);
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+    
+    document.getElementById('action').addEventListener('change', updateSelectedCount);
+});
+</script>
+{% endblock %}
