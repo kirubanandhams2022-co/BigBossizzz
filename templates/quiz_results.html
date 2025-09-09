@@ -13,7 +13,15 @@
                         <a href="{{ url_for('participant_dashboard') }}" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left"></i> Back to Dashboard
                         </a>
+                        {% if current_user.is_participant() %}
+                            <a href="{{ url_for('download_participant_report', attempt_id=attempt.id) }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Download Report
+                            </a>
+                        {% endif %}
                         {% if current_user.is_host() or current_user.is_admin() %}
+                            <a href="{{ url_for('download_host_report', attempt_id=attempt.id) }}" class="btn btn-primary">
+                                <i class="fas fa-file-pdf"></i> Download Report
+                            </a>
                             <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-primary">
                                 <i class="fas fa-tachometer-alt"></i> Host Dashboard
                             </a>
