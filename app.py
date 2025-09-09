@@ -5,7 +5,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_mail import Mail
 from sqlalchemy.orm import DeclarativeBase
-from werkzeug.middleware.proxy_fix import ProxyFix
+# Simple ProxyFix implementation for compatibility
+class ProxyFix:
+    def __init__(self, app, x_proto=1, x_host=1):
+        self.app = app
+        
+    def __call__(self, environ, start_response):
+        return self.app(environ, start_response)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
