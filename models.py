@@ -131,11 +131,15 @@ class QuizAttempt(db.Model):
         total_points = 0
         
         from app import db
-        answers = db.session.query(Answer).filter_by(attempt_id=self.id).all()
-        for answer in answers:
-            total_points += answer.question.points
+        # Get answers with their associated questions
+        answers_with_questions = db.session.query(Answer, Question).join(
+            Question, Answer.question_id == Question.id
+        ).filter(Answer.attempt_id == self.id).all()
+        
+        for answer, question in answers_with_questions:
+            total_points += question.points
             if answer.is_correct:
-                correct_answers += answer.question.points
+                correct_answers += question.points
         
         self.score = (correct_answers / total_points * 100) if total_points > 0 else 0
         self.total_points = total_points
