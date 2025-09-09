@@ -64,18 +64,24 @@ except AttributeError:
 @login_manager.user_loader
 def load_user(user_id):
     try:
+        # Import User lazily to avoid circular imports
         from models import User
         return User.query.get(int(user_id))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, ImportError):
         return None
 
 with app.app_context():
-    # Import models to ensure tables are created
-    import models
-    db.create_all()
-    
-    # Create default accounts if they don't exist
-    from models import User
+    # Import models once to ensure tables are created
+    try:
+        import models
+        db.create_all()
+        
+        # Use the already imported User model
+        User = models.User
+    except Exception as e:
+        logging.error(f"Database initialization error: {e}")
+        # Import User as fallback
+        from models import User
     
     # Default Admin Account
     if not User.query.filter_by(email='admin@platform.com').first():
