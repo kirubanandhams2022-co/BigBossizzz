@@ -1585,8 +1585,10 @@ def host_login_activity():
         flash('Access denied. Host privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Get recent login events for participants
-    login_events = db.session.query(LoginEvent, User).join(User).filter(
+    # Get recent login events for participants with proper eager loading
+    login_events = LoginEvent.query.options(
+        db.joinedload(LoginEvent.user)
+    ).join(User).filter(
         User.role == 'participant'
     ).order_by(LoginEvent.login_time.desc()).limit(50).all()
     
@@ -2572,7 +2574,10 @@ def admin_violations():
         flash('Access denied.', 'error')
         return redirect(url_for('dashboard'))
     
-    violations = ProctoringEvent.query.join(QuizAttempt).join(User).order_by(ProctoringEvent.timestamp.desc()).limit(100).all()
+    violations = ProctoringEvent.query.options(
+        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.user),
+        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz).joinedload(Quiz.creator)
+    ).order_by(ProctoringEvent.timestamp.desc()).limit(100).all()
     return render_template('admin_violations.html', violations=violations)
 
 @app.route('/admin/user/<int:user_id>/edit-credentials', methods=['POST'])
