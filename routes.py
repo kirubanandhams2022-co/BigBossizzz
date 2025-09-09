@@ -453,46 +453,69 @@ def admin_dashboard():
 @app.route('/admin/export-database')
 @login_required
 def admin_export_database():
-    """Export complete database to Excel"""
+    """Export complete database to Excel with comprehensive error handling"""
     if not current_user.is_admin():
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from io import BytesIO
-    
-    wb = Workbook()
-    
-    # Users Sheet
-    ws_users = wb.active
-    ws_users.title = "Users"
-    users_headers = ['ID', 'Username', 'Email', 'Role', 'Is Verified', 'Created At']
-    for col, header in enumerate(users_headers, 1):
-        cell = ws_users.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    
-    users = User.query.all()
-    for row, user in enumerate(users, 2):
-        ws_users.cell(row=row, column=1, value=user.id)
-        ws_users.cell(row=row, column=2, value=user.username)
-        ws_users.cell(row=row, column=3, value=user.email)
-        ws_users.cell(row=row, column=4, value=user.role)
-        ws_users.cell(row=row, column=5, value='Yes' if user.is_verified else 'No')
-        ws_users.cell(row=row, column=6, value=user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A')
-    
-    # Save to BytesIO
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    
-    return send_file(
-        BytesIO(buffer.read()),
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=f'database_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    )
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from io import BytesIO
+        
+        wb = Workbook()
+        
+        # Users Sheet
+        ws_users = wb.active
+        ws_users.title = "Users"
+        users_headers = ['ID', 'Username', 'Email', 'Role', 'Is Verified', 'Created At']
+        
+        for col, header in enumerate(users_headers, 1):
+            cell = ws_users.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        
+        # Fetch users with error handling
+        try:
+            users = User.query.all()
+        except Exception as e:
+            logging.error(f"Database error fetching users: {e}")
+            flash('Error accessing user data for export.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        for row, user in enumerate(users, 2):
+            try:
+                ws_users.cell(row=row, column=1, value=user.id)
+                ws_users.cell(row=row, column=2, value=user.username or 'N/A')
+                ws_users.cell(row=row, column=3, value=user.email or 'N/A')
+                ws_users.cell(row=row, column=4, value=user.role or 'N/A')
+                ws_users.cell(row=row, column=5, value='Yes' if user.is_verified else 'No')
+                ws_users.cell(row=row, column=6, value=user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A')
+            except Exception as e:
+                logging.warning(f"Error exporting user {user.id}: {e}")
+                continue
+        
+        # Save to BytesIO with error handling
+        try:
+            buffer = BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+        except Exception as e:
+            logging.error(f"Error creating Excel file: {e}")
+            flash('Error generating export file.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        return send_file(
+            BytesIO(buffer.read()),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'database_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+        
+    except Exception as e:
+        logging.error(f"Unexpected error in database export: {e}")
+        flash('Database export failed due to an unexpected error.', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 # File Upload and Auto-Question Generation System
 
@@ -673,39 +696,101 @@ def parse_file_for_questions(file_path, mime_type):
     return candidate_questions
 
 def parse_pdf_questions(file_path):
-    """Extract questions from PDF file"""
+    """Extract questions from PDF file with enhanced error handling"""
     questions = []
     
     try:
-        with open(file_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text()
+        # Validate file exists and is readable
+        if not os.path.exists(file_path):
+            logging.error(f"PDF file not found: {file_path}")
+            return questions
+            
+        if os.path.getsize(file_path) == 0:
+            logging.error(f"PDF file is empty: {file_path}")
+            return questions
         
-        # Parse text for questions
-        questions = extract_questions_from_text(text)
+        with open(file_path, 'rb') as file:
+            try:
+                pdf_reader = PyPDF2.PdfReader(file)
+                
+                if len(pdf_reader.pages) == 0:
+                    logging.warning(f"PDF has no pages: {file_path}")
+                    return questions
+                
+                text = ""
+                for page_num, page in enumerate(pdf_reader.pages):
+                    try:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+                    except Exception as e:
+                        logging.warning(f"Error extracting text from page {page_num}: {e}")
+                        continue
+                        
+                if len(text.strip()) < 10:
+                    logging.warning(f"PDF contains very little text: {file_path}")
+                    return questions
+                
+                # Parse text for questions with error handling
+                questions = extract_questions_from_text(text)
+                
+            except PyPDF2.errors.PdfReadError as e:
+                logging.error(f"PDF read error: {e}")
+            except Exception as e:
+                logging.error(f"Unexpected PDF parsing error: {e}")
         
     except Exception as e:
-        logging.error(f"PDF parsing error: {e}")
+        logging.error(f"File access error for PDF {file_path}: {e}")
     
     return questions
 
 def parse_docx_questions(file_path):
-    """Extract questions from DOCX file"""
+    """Extract questions from DOCX file with enhanced error handling"""
     questions = []
     
     try:
-        doc = docx.Document(file_path)
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
+        # Validate file exists and is readable
+        if not os.path.exists(file_path):
+            logging.error(f"DOCX file not found: {file_path}")
+            return questions
+            
+        if os.path.getsize(file_path) == 0:
+            logging.error(f"DOCX file is empty: {file_path}")
+            return questions
         
-        # Parse text for questions
-        questions = extract_questions_from_text(text)
+        try:
+            doc = docx.Document(file_path)
+            text = ""
+            
+            if len(doc.paragraphs) == 0:
+                logging.warning(f"DOCX has no paragraphs: {file_path}")
+                return questions
+            
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    text += paragraph.text + "\n"
+            
+            # Also extract text from tables if present
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            text += cell.text + "\n"
+                            
+            if len(text.strip()) < 10:
+                logging.warning(f"DOCX contains very little text: {file_path}")
+                return questions
+            
+            # Parse text for questions with error handling
+            questions = extract_questions_from_text(text)
+            
+        except docx.opc.exceptions.PackageNotFoundError as e:
+            logging.error(f"Invalid DOCX format: {e}")
+        except Exception as e:
+            logging.error(f"Unexpected DOCX parsing error: {e}")
         
     except Exception as e:
-        logging.error(f"DOCX parsing error: {e}")
+        logging.error(f"File access error for DOCX {file_path}: {e}")
     
     return questions
 
@@ -2317,11 +2402,16 @@ def quiz_results(attempt_id):
 @app.route('/download/participant-report/<int:attempt_id>')
 @login_required
 def download_participant_report(attempt_id):
-    """Download participant report as PDF"""
-    attempt = QuizAttempt.query.get_or_404(attempt_id)
-    
-    if attempt.participant_id != current_user.id:
-        flash('Access denied.', 'error')
+    """Download participant report as PDF with comprehensive error handling"""
+    try:
+        attempt = QuizAttempt.query.get_or_404(attempt_id)
+        
+        if attempt.participant_id != current_user.id:
+            flash('Access denied.', 'error')
+            return redirect(url_for('participant_dashboard'))
+    except Exception as e:
+        logging.error(f"Error fetching quiz attempt {attempt_id}: {e}")
+        flash('Quiz attempt not found.', 'error')
         return redirect(url_for('participant_dashboard'))
     
     from reportlab.lib.pagesizes import letter, A4
