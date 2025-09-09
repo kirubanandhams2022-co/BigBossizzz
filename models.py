@@ -57,6 +57,9 @@ class Quiz(db.Model):
     time_limit = db.Column(db.Integer, default=60)  # in minutes
     is_active = db.Column(db.Boolean, default=True)
     proctoring_enabled = db.Column(db.Boolean, default=True)
+    shuffle_options = db.Column(db.Boolean, default=True)  # Shuffle options for each participant
+    created_from_file = db.Column(db.Boolean, default=False)  # Quiz created from uploaded file
+    source_filename = db.Column(db.String(255))  # Original filename if created from file
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -78,6 +81,13 @@ class Question(db.Model):
     # Relationships
     options = db.relationship('QuestionOption', backref='question', lazy=True, cascade='all, delete-orphan')
     answers = db.relationship('Answer', backref='question', lazy=True, cascade='all, delete-orphan')
+    
+    def get_shuffled_options(self):
+        """Return shuffled options for this question"""
+        import random
+        options = list(self.options)
+        random.shuffle(options)
+        return options
     
     def __repr__(self):
         return f'<Question {self.id}>'

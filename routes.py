@@ -879,23 +879,54 @@ def log_proctoring_event():
         print(f"Error logging proctoring event: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+import os
+import csv
+import io
+from werkzeug.utils import secure_filename
+
 @app.route('/quiz/create', methods=['GET', 'POST'])
 @login_required
 def create_quiz():
-    """Create a new quiz"""
+    """Create a new quiz with optional file upload"""
     if not current_user.is_host() and not current_user.is_admin():
         flash('Access denied. Host privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
     form = QuizForm()
     if form.validate_on_submit():
+        # Create the quiz
         quiz = Quiz(
             title=form.title.data,
             description=form.description.data,
             time_limit=form.time_limit.data,
             proctoring_enabled=form.proctoring_enabled.data,
+            shuffle_options=form.shuffle_options.data,
             creator_id=current_user.id
         )
+        
+        # Handle file upload if selected
+        if form.create_from_file.data and form.quiz_file.data:
+            file = form.quiz_file.data
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                quiz.created_from_file = True
+                quiz.source_filename = filename
+                
+                # Parse file and create questions
+                try:
+                    questions_data = parse_quiz_file(file)
+                    db.session.add(quiz)
+                    db.session.commit()
+                    
+                    # Create questions from parsed data
+                    for q_data in questions_data:
+                        create_question_from_data(quiz, q_data)
+                    
+                    flash(f'Quiz created successfully from file "{filename}"! {len(questions_data)} questions added.', 'success')
+                    return redirect(url_for('edit_quiz', quiz_id=quiz.id))
+                except Exception as e:
+                    flash(f'Error parsing file: {str(e)}', 'error')
+                    return render_template('create_quiz.html', form=form)
         
         db.session.add(quiz)
         db.session.commit()
@@ -904,6 +935,89 @@ def create_quiz():
         return redirect(url_for('edit_quiz', quiz_id=quiz.id))
     
     return render_template('create_quiz.html', form=form)
+
+def parse_quiz_file(file):
+    """Parse uploaded quiz file and return questions data"""
+    questions_data = []
+    content = file.read().decode('utf-8')
+    file.seek(0)  # Reset file pointer
+    
+    if file.filename.endswith('.csv'):
+        csv_reader = csv.reader(io.StringIO(content))
+        for row in csv_reader:
+            if len(row) >= 6:  # Question, Option1, Option2, Option3, Option4, CorrectAnswer
+                question_data = {
+                    'question_text': row[0].strip(),
+                    'options': [row[i].strip() for i in range(1, 5)],
+                    'correct_answer': int(row[5]) - 1 if row[5].isdigit() else 0,
+                    'points': int(row[6]) if len(row) > 6 and row[6].isdigit() else 1
+                }
+                questions_data.append(question_data)
+    else:  # TXT format
+        lines = content.split('\n')
+        current_question = None
+        options = []
+        correct_answer = 0
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                if current_question and options:
+                    questions_data.append({
+                        'question_text': current_question,
+                        'options': options,
+                        'correct_answer': correct_answer,
+                        'points': 1
+                    })
+                    current_question = None
+                    options = []
+                    correct_answer = 0
+                continue
+                
+            if line.startswith('Q:') or line.startswith('Question:'):
+                current_question = line.split(':', 1)[1].strip()
+            elif line.startswith(('A)', 'B)', 'C)', 'D)')) or line.startswith(('1.', '2.', '3.', '4.')):
+                option_text = line[2:].strip() if line[1] in ').' else line[3:].strip()
+                if line.startswith('*') or '(correct)' in line.lower():
+                    correct_answer = len(options)
+                    option_text = option_text.replace('*', '').replace('(correct)', '').strip()
+                options.append(option_text)
+        
+        # Add last question if exists
+        if current_question and options:
+            questions_data.append({
+                'question_text': current_question,
+                'options': options,
+                'correct_answer': correct_answer,
+                'points': 1
+            })
+    
+    return questions_data
+
+def create_question_from_data(quiz, question_data):
+    """Create a question and its options from parsed data"""
+    question = Question(
+        quiz_id=quiz.id,
+        question_text=question_data['question_text'],
+        question_type='multiple_choice',
+        points=question_data.get('points', 1),
+        order=len(quiz.questions)
+    )
+    
+    db.session.add(question)
+    db.session.commit()
+    
+    # Create options
+    for i, option_text in enumerate(question_data['options']):
+        option = QuestionOption(
+            question_id=question.id,
+            option_text=option_text,
+            is_correct=(i == question_data['correct_answer']),
+            order=i
+        )
+        db.session.add(option)
+    
+    db.session.commit()
 
 @app.route('/quiz/<int:quiz_id>/edit', methods=['GET', 'POST'])
 @login_required
