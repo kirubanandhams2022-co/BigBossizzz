@@ -32,8 +32,9 @@ class ProctoringManager {
         this.lastViolationTime = null;
         this.violationBuffer = [];
         
-        // Configuration
+        // Configuration - Enhanced like Moodle Proctoring Pro
         this.config = {
+            // Core proctoring features
             faceDetection: true,
             tabSwitchDetection: true,
             fullscreenEnforcement: true,
@@ -47,25 +48,60 @@ class ProctoringManager {
             copyPasteDisabled: true,
             devToolsDetection: true,
             printScreenBlocked: true,
-            selectTextDisabled: true
+            selectTextDisabled: true,
+            
+            // NEW: Moodle Proctoring Pro-like features
+            intervalCapture: true,
+            captureIntervalMs: 30000, // 30 seconds like Moodle Proctoring Pro
+            imageQuality: 0.8,
+            preExamFaceVerification: true,
+            faceVerificationRequired: true,
+            screenResizeDetection: true,
+            windowResizeDetection: true,
+            browserChangeDetection: true,
+            bulkImageAnalysis: true,
+            autoTerminateOnViolations: true,
+            violationThreshold: 5
         };
+        
+        // NEW: Interval capture system
+        this.intervalCaptureTimer = null;
+        this.capturedImages = [];
+        this.faceVerificationStatus = 'pending';
+        this.preExamVerificationComplete = false;
         
         this.init();
     }
 
     async init() {
-        console.log('Initializing proctoring system...');
+        console.log('Initializing Enhanced Proctoring System (Moodle Proctoring Pro style)...');
         
         try {
+            // NEW: Pre-exam face verification like Moodle Proctoring Pro
+            if (this.config.preExamFaceVerification) {
+                await this.performPreExamVerification();
+            }
+            
             await this.requestPermissions();
             this.setupEventListeners();
+            this.setupEnhancedDetection(); // NEW: Enhanced detection methods
             this.initWebSocket();
             this.startMonitoring();
             this.startAdvancedFaceDetection();
+            
+            // NEW: Start interval-based captures like Moodle Proctoring Pro
+            if (this.config.intervalCapture) {
+                this.startIntervalCapture();
+            }
+            
             this.showProctoringStatus('active');
         } catch (error) {
             console.error('Proctoring initialization failed:', error);
             this.showProctoringStatus('error', error.message);
+            // If pre-verification fails, block quiz access
+            if (error.type === 'face_verification_failed') {
+                this.blockQuizAccess(error.message);
+            }
         }
     }
 
@@ -331,6 +367,149 @@ class ProctoringManager {
         
         // Continue detection loop
         setTimeout(() => this.faceDetectionLoop(), 2000);
+    }
+
+    // NEW: Pre-exam face verification like Moodle Proctoring Pro
+    async performPreExamVerification() {
+        return new Promise((resolve, reject) => {
+            console.log('Starting pre-exam face verification...');
+            
+            // Show verification modal
+            this.showVerificationModal();
+            
+            // Wait for user to capture verification image
+            document.getElementById('capture-verification-btn').addEventListener('click', async () => {
+                try {
+                    const verificationImage = await this.captureVerificationImage();
+                    const verified = await this.verifyUserIdentity(verificationImage);
+                    
+                    if (verified) {
+                        this.preExamVerificationComplete = true;
+                        this.faceVerificationStatus = 'verified';
+                        this.hideVerificationModal();
+                        resolve();
+                    } else {
+                        const error = new Error('Face verification failed. Please ensure good lighting and look directly at the camera.');
+                        error.type = 'face_verification_failed';
+                        reject(error);
+                    }
+                } catch (error) {
+                    error.type = 'face_verification_failed';
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    // NEW: Enhanced detection setup like Moodle Proctoring Pro
+    setupEnhancedDetection() {
+        // Screen resize detection
+        if (this.config.screenResizeDetection) {
+            let originalWidth = window.screen.width;
+            let originalHeight = window.screen.height;
+            
+            setInterval(() => {
+                if (window.screen.width !== originalWidth || window.screen.height !== originalHeight) {
+                    this.logViolation('screen_resize', 
+                        `Screen resolution changed from ${originalWidth}x${originalHeight} to ${window.screen.width}x${window.screen.height}`, 
+                        'medium');
+                    originalWidth = window.screen.width;
+                    originalHeight = window.screen.height;
+                }
+            }, 5000);
+        }
+
+        // Window resize detection
+        if (this.config.windowResizeDetection) {
+            let originalWindowWidth = window.innerWidth;
+            let originalWindowHeight = window.innerHeight;
+            
+            window.addEventListener('resize', () => {
+                const newWidth = window.innerWidth;
+                const newHeight = window.innerHeight;
+                
+                if (Math.abs(newWidth - originalWindowWidth) > 50 || Math.abs(newHeight - originalWindowHeight) > 50) {
+                    this.logViolation('window_resize', 
+                        `Browser window resized significantly from ${originalWindowWidth}x${originalWindowHeight} to ${newWidth}x${newHeight}`, 
+                        'medium');
+                }
+                
+                originalWindowWidth = newWidth;
+                originalWindowHeight = newHeight;
+            });
+        }
+
+        // Enhanced developer tools detection
+        if (this.config.devToolsDetection) {
+            this.detectDevTools();
+        }
+    }
+
+    // NEW: Interval-based image capture like Moodle Proctoring Pro
+    startIntervalCapture() {
+        console.log(`Starting interval capture every ${this.config.captureIntervalMs / 1000} seconds`);
+        
+        this.intervalCaptureTimer = setInterval(async () => {
+            if (this.isActive && !this.isTerminated) {
+                try {
+                    const capturedImage = await this.captureCurrentFrame();
+                    await this.sendCapturedImage(capturedImage);
+                    this.capturedImages.push({
+                        timestamp: new Date().toISOString(),
+                        image: capturedImage,
+                        analyzed: false
+                    });
+                    
+                    // Keep only last 100 images
+                    if (this.capturedImages.length > 100) {
+                        this.capturedImages.shift();
+                    }
+                } catch (error) {
+                    console.error('Interval capture failed:', error);
+                    this.logViolation('capture_failed', 'Failed to capture webcam image', 'low');
+                }
+            }
+        }, this.config.captureIntervalMs);
+    }
+
+    // NEW: Enhanced developer tools detection
+    detectDevTools() {
+        let devtools = {
+            open: false,
+            orientation: null
+        };
+        
+        setInterval(() => {
+            const threshold = 160;
+            let orientation = window.outerHeight - window.innerHeight > threshold ? 'vertical' : 'horizontal';
+            
+            if (!(window.outerHeight - window.innerHeight > threshold) && 
+                !(window.outerWidth - window.innerWidth > threshold)) {
+                devtools.open = false;
+            } else {
+                if (!devtools.open || devtools.orientation !== orientation) {
+                    devtools.open = true;
+                    devtools.orientation = orientation;
+                    this.logViolation('devtools_opened', 
+                        `Developer tools detected (${orientation} orientation)`, 
+                        'high');
+                }
+            }
+        }, 1000);
+        
+        // Additional F12 key detection
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+                (e.ctrlKey && e.shiftKey && e.key === 'C') ||
+                (e.ctrlKey && e.shiftKey && e.key === 'J')) {
+                e.preventDefault();
+                this.logViolation('devtools_shortcut', 
+                    `Developer tools shortcut blocked: ${e.key}`, 
+                    'high');
+                return false;
+            }
+        });
     }
     
     detectFaces(imageData) {
@@ -1377,6 +1556,115 @@ class ProctoringManager {
         else if (userAgent.indexOf('Edge') > -1) browser = 'Edge';
         
         return `${browser} ${navigator.appVersion}`;
+    }
+
+    // NEW: Helper methods for Moodle Proctoring Pro-style features
+    showVerificationModal() {
+        const modal = document.createElement('div');
+        modal.id = 'face-verification-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 10000; display: flex;
+            align-items: center; justify-content: center; color: white;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: #343a40; padding: 30px; border-radius: 10px; text-align: center; max-width: 500px;">
+                <h2 style="margin-bottom: 20px;">🔐 Identity Verification Required</h2>
+                <p style="margin-bottom: 20px;">Please verify your identity before starting the exam.</p>
+                <p style="margin-bottom: 30px; font-size: 0.9em; color: #adb5bd;">
+                    Look directly at the camera and ensure good lighting for best results.
+                </p>
+                <div id="verification-preview" style="margin-bottom: 20px; width: 320px; height: 240px; background: #000; border-radius: 8px; margin: 0 auto 20px;"></div>
+                <button id="capture-verification-btn" class="btn btn-primary" style="margin-right: 10px;">
+                    📸 Capture & Verify
+                </button>
+                <button id="cancel-verification-btn" class="btn btn-secondary">Cancel</button>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Handle cancel
+        document.getElementById('cancel-verification-btn').addEventListener('click', () => {
+            this.hideVerificationModal();
+            window.location.href = '/dashboard';
+        });
+    }
+
+    async captureVerificationImage() {
+        if (!this.videoElement || !this.canvas) {
+            throw new Error('Camera not available for verification');
+        }
+        
+        // Capture current frame
+        this.context.drawImage(this.videoElement, 0, 0, 640, 480);
+        return this.canvas.toDataURL('image/jpeg', this.config.imageQuality);
+    }
+
+    async verifyUserIdentity(imageData) {
+        try {
+            const response = await fetch('/api/proctoring/verify-identity', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: imageData,
+                    attemptId: this.attemptId
+                })
+            });
+            
+            const result = await response.json();
+            return result.verified === true;
+        } catch (error) {
+            console.error('Identity verification failed:', error);
+            return false; // Fail safe
+        }
+    }
+
+    hideVerificationModal() {
+        const modal = document.getElementById('face-verification-modal');
+        if (modal) modal.remove();
+    }
+
+    blockQuizAccess(message) {
+        document.body.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #dc3545; color: white; font-family: Arial;">
+                <div style="text-align: center; max-width: 600px; padding: 40px;">
+                    <h1 style="margin-bottom: 30px;">🚫 Access Denied</h1>
+                    <h3 style="margin-bottom: 20px;">Face Verification Failed</h3>
+                    <p style="margin-bottom: 30px; font-size: 1.1em;">${message}</p>
+                    <p>Please contact your instructor for assistance.</p>
+                    <button onclick="window.location.href='/dashboard'" style="margin-top: 20px; padding: 10px 20px; background: white; color: #dc3545; border: none; border-radius: 5px; cursor: pointer;">
+                        Return to Dashboard
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    async captureCurrentFrame() {
+        if (!this.videoElement || !this.canvas) {
+            throw new Error('Camera not available for capture');
+        }
+        
+        this.context.drawImage(this.videoElement, 0, 0, 640, 480);
+        return this.canvas.toDataURL('image/jpeg', this.config.imageQuality);
+    }
+
+    async sendCapturedImage(imageData) {
+        try {
+            await fetch('/api/proctoring/image-capture', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: imageData,
+                    attemptId: this.attemptId,
+                    timestamp: new Date().toISOString()
+                })
+            });
+        } catch (error) {
+            console.error('Failed to send captured image:', error);
+        }
     }
 }
 
