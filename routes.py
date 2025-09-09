@@ -1319,6 +1319,257 @@ def quiz_results(attempt_id):
                          questions=questions,
                          answers=answers)
 
+@app.route('/download/participant-report/<int:attempt_id>')
+@login_required
+def download_participant_report(attempt_id):
+    """Download participant report as PDF"""
+    attempt = QuizAttempt.query.get_or_404(attempt_id)
+    
+    if attempt.participant_id != current_user.id:
+        flash('Access denied.', 'error')
+        return redirect(url_for('participant_dashboard'))
+    
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.darkblue,
+        spaceAfter=30,
+        alignment=1  # Center alignment
+    )
+    
+    story = []
+    
+    # Title
+    story.append(Paragraph("Quiz Results Report", title_style))
+    story.append(Spacer(1, 20))
+    
+    # Quiz Information
+    quiz_info = [
+        ['Quiz Title:', attempt.quiz.title],
+        ['Participant:', attempt.participant.username],
+        ['Score:', f"{attempt.score:.1f}%" if attempt.score else 'N/A'],
+        ['Started:', attempt.started_at.strftime('%Y-%m-%d %H:%M:%S')],
+        ['Completed:', attempt.completed_at.strftime('%Y-%m-%d %H:%M:%S') if attempt.completed_at else 'Not completed'],
+        ['Status:', attempt.status.title()]
+    ]
+    
+    quiz_table = Table(quiz_info, colWidths=[2*inch, 4*inch])
+    quiz_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('BACKGROUND', (1, 0), (1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(quiz_table)
+    story.append(Spacer(1, 30))
+    
+    # Questions and Answers
+    story.append(Paragraph("Detailed Results", styles['Heading2']))
+    story.append(Spacer(1, 20))
+    
+    answers = {answer.question_id: answer for answer in attempt.answers}
+    
+    for i, question in enumerate(attempt.quiz.questions, 1):
+        # Question
+        story.append(Paragraph(f"Question {i}: {question.question_text}", styles['Heading3']))
+        story.append(Spacer(1, 10))
+        
+        answer = answers.get(question.id)
+        
+        if question.question_type in ['multiple_choice', 'true_false']:
+            # Show options
+            options_data = [['Option', 'Your Answer', 'Correct Answer']]
+            for option in question.options:
+                is_selected = '✓' if answer and answer.selected_option_id == option.id else ''
+                is_correct = '✓' if option.is_correct else ''
+                options_data.append([option.option_text, is_selected, is_correct])
+            
+            options_table = Table(options_data, colWidths=[3*inch, 1*inch, 1*inch])
+            options_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(options_table)
+            
+            # Result
+            if answer:
+                if answer.is_correct:
+                    result_text = f"<para><b>Result:</b> <font color='green'>Correct</font> (+{question.points} points)</para>"
+                else:
+                    result_text = f"<para><b>Result:</b> <font color='red'>Incorrect</font> (0 points)</para>"
+            else:
+                result_text = "<para><b>Result:</b> Not answered (0 points)</para>"
+            
+            story.append(Spacer(1, 10))
+            story.append(Paragraph(result_text, styles['Normal']))
+            
+        elif question.question_type == 'text':
+            if answer and answer.text_answer:
+                story.append(Paragraph(f"<b>Your Answer:</b> {answer.text_answer}", styles['Normal']))
+                if answer.is_correct == None:
+                    story.append(Paragraph("<i>This answer requires manual grading.</i>", styles['Normal']))
+            else:
+                story.append(Paragraph("<b>Your Answer:</b> No answer provided", styles['Normal']))
+        
+        story.append(Spacer(1, 20))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    # Return as download
+    return send_file(
+        BytesIO(buffer.read()),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'quiz_report_{attempt.quiz.title}_{attempt.participant.username}.pdf'
+    )
+
+@app.route('/download/host-report/<int:attempt_id>')
+@login_required
+def download_host_report(attempt_id):
+    """Download detailed host report as Excel"""
+    attempt = QuizAttempt.query.get_or_404(attempt_id)
+    
+    if attempt.quiz.creator_id != current_user.id and not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('host_dashboard'))
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Fill, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    from io import BytesIO
+    
+    # Create workbook
+    wb = Workbook()
+    
+    # Quiz Summary Sheet
+    ws1 = wb.active
+    ws1.title = "Quiz Summary"
+    
+    # Headers
+    ws1['A1'] = "Quiz Results Summary"
+    ws1['A1'].font = Font(size=16, bold=True)
+    ws1['A1'].fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    
+    # Quiz info
+    quiz_data = [
+        ["Quiz Title", attempt.quiz.title],
+        ["Participant", attempt.participant.username],
+        ["Email", attempt.participant.email],
+        ["Score", f"{attempt.score:.1f}%" if attempt.score else 'N/A'],
+        ["Points Earned", f"{attempt.score * attempt.total_points / 100:.0f}" if attempt.score and attempt.total_points else 'N/A'],
+        ["Total Points", attempt.total_points or 0],
+        ["Started", attempt.started_at.strftime('%Y-%m-%d %H:%M:%S')],
+        ["Completed", attempt.completed_at.strftime('%Y-%m-%d %H:%M:%S') if attempt.completed_at else 'Not completed'],
+        ["Status", attempt.status.title()],
+        ["Time Taken", str(attempt.completed_at - attempt.started_at) if attempt.completed_at else 'N/A']
+    ]
+    
+    for row, (label, value) in enumerate(quiz_data, 3):
+        ws1[f'A{row}'] = label
+        ws1[f'B{row}'] = value
+        ws1[f'A{row}'].font = Font(bold=True)
+    
+    # Detailed Answers Sheet
+    ws2 = wb.create_sheet("Detailed Answers")
+    headers = ["Question #", "Question Text", "Question Type", "Points", "Your Answer", "Correct Answer", "Result", "Points Earned"]
+    
+    for col, header in enumerate(headers, 1):
+        ws2.cell(row=1, column=col, value=header)
+        ws2.cell(row=1, column=col).font = Font(bold=True)
+        ws2.cell(row=1, column=col).fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
+    
+    answers = {answer.question_id: answer for answer in attempt.answers}
+    
+    for row, question in enumerate(attempt.quiz.questions, 2):
+        answer = answers.get(question.id)
+        
+        ws2.cell(row=row, column=1, value=row-1)
+        ws2.cell(row=row, column=2, value=question.question_text)
+        ws2.cell(row=row, column=3, value=question.question_type.title())
+        ws2.cell(row=row, column=4, value=question.points)
+        
+        if question.question_type in ['multiple_choice', 'true_false']:
+            if answer and answer.selected_option_id:
+                selected_option = next((opt for opt in question.options if opt.id == answer.selected_option_id), None)
+                ws2.cell(row=row, column=5, value=selected_option.option_text if selected_option else 'Unknown')
+            else:
+                ws2.cell(row=row, column=5, value='Not answered')
+            
+            correct_option = next((opt for opt in question.options if opt.is_correct), None)
+            ws2.cell(row=row, column=6, value=correct_option.option_text if correct_option else 'No correct answer set')
+            
+            if answer:
+                if answer.is_correct:
+                    ws2.cell(row=row, column=7, value='Correct')
+                    ws2.cell(row=row, column=8, value=question.points)
+                    ws2.cell(row=row, column=7).fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+                else:
+                    ws2.cell(row=row, column=7, value='Incorrect')
+                    ws2.cell(row=row, column=8, value=0)
+                    ws2.cell(row=row, column=7).fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            else:
+                ws2.cell(row=row, column=7, value='Not answered')
+                ws2.cell(row=row, column=8, value=0)
+        
+        elif question.question_type == 'text':
+            ws2.cell(row=row, column=5, value=answer.text_answer if answer and answer.text_answer else 'Not answered')
+            ws2.cell(row=row, column=6, value='Manual grading required')
+            ws2.cell(row=row, column=7, value='Needs review' if answer and answer.text_answer else 'Not answered')
+            ws2.cell(row=row, column=8, value='TBD')
+    
+    # Auto-adjust column widths
+    for ws in [ws1, ws2]:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Save to BytesIO
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    return send_file(
+        BytesIO(buffer.read()),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'detailed_report_{attempt.quiz.title}_{attempt.participant.username}.xlsx'
+    )
+
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
