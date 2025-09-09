@@ -1161,6 +1161,145 @@ class ProctoringManager {
         
         return summary;
     }
+    
+    // Enhanced auto-termination functionality
+    terminateQuizImmediately(reason) {
+        if (this.isTerminated) return;
+        
+        this.isTerminated = true;
+        console.error('Auto-terminating quiz:', reason);
+        
+        // Send termination request to server
+        fetch(`/api/monitoring/auto-terminate/${this.attemptId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ reason: reason })
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.showTerminationScreen(reason);
+            }
+        }).catch(error => {
+            console.error('Failed to terminate quiz:', error);
+            // Force termination anyway
+            this.showTerminationScreen(reason);
+        });
+    }
+    
+    showTerminationScreen(reason) {
+        // Create full-screen termination overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #dc3545;
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        `;
+        
+        const messageBox = document.createElement('div');
+        messageBox.style.cssText = `
+            text-align: center;
+            padding: 40px;
+            max-width: 600px;
+        `;
+        
+        messageBox.innerHTML = `
+            <h1 style="margin-bottom: 30px; font-size: 3em;">🚫 QUIZ TERMINATED</h1>
+            <h2 style="margin-bottom: 20px;">Security Violation Detected</h2>
+            <p style="font-size: 1.2em; margin-bottom: 30px;">${reason}</p>
+            <p style="font-size: 1em;">Contact your instructor if you believe this is an error.</p>
+            <p style="font-size: 0.9em; margin-top: 30px;">This session has been recorded for review.</p>
+        `;
+        
+        overlay.appendChild(messageBox);
+        document.body.appendChild(overlay);
+        
+        // Completely lock down the page
+        this.lockdownPage();
+        
+        // Auto-redirect after 10 seconds
+        setTimeout(() => {
+            window.location.href = '/participant/dashboard';
+        }, 10000);
+    }
+    
+    lockdownPage() {
+        // Block all keyboard events
+        document.addEventListener('keydown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+        
+        // Block right-click
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        }, true);
+        
+        // Block text selection
+        document.addEventListener('selectstart', function(e) {
+            e.preventDefault();
+            return false;
+        }, true);
+    }
+    
+    // Enhanced device logging for security tracking
+    logDeviceInfo() {
+        const deviceInfo = {
+            userAgent: navigator.userAgent,
+            screenResolution: `${screen.width}x${screen.height}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            language: navigator.language,
+            platform: navigator.platform,
+            cookieEnabled: navigator.cookieEnabled,
+            onLine: navigator.onLine,
+            quizId: this.quizId || null
+        };
+        
+        deviceInfo.deviceType = this.detectDeviceType();
+        deviceInfo.browserInfo = this.getBrowserInfo();
+        
+        // Send to server for logging
+        fetch('/api/device-log', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(deviceInfo)
+        }).catch(error => {
+            console.error('Failed to log device info:', error);
+        });
+    }
+    
+    detectDeviceType() {
+        const userAgent = navigator.userAgent;
+        if (/tablet/i.test(userAgent)) return 'tablet';
+        if (/mobile/i.test(userAgent)) return 'mobile';
+        return 'desktop';
+    }
+    
+    getBrowserInfo() {
+        const userAgent = navigator.userAgent;
+        let browser = 'Unknown';
+        
+        if (userAgent.indexOf('Chrome') > -1) browser = 'Chrome';
+        else if (userAgent.indexOf('Firefox') > -1) browser = 'Firefox';
+        else if (userAgent.indexOf('Safari') > -1) browser = 'Safari';
+        else if (userAgent.indexOf('Edge') > -1) browser = 'Edge';
+        
+        return `${browser} ${navigator.appVersion}`;
+    }
 }
 
 // Global initialization function
