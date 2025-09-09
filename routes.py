@@ -508,7 +508,7 @@ def allowed_file(filename):
 @app.route('/api/upload-quiz-file', methods=['POST'])
 @login_required
 def upload_quiz_file():
-    """Upload file and extract candidate questions"""
+    """Upload file and extract candidate questions with enhanced security"""
     if not current_user.is_host() and not current_user.is_admin():
         return jsonify({'error': 'Access denied'}), 403
     
@@ -523,6 +523,18 @@ def upload_quiz_file():
     if not allowed_file(file.filename):
         return jsonify({'error': 'File type not supported. Use PDF, DOCX, CSV, XLSX, or TXT files.'}), 400
     
+    # Check file size (max 10MB)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    file.seek(0, 2)  # Seek to end to get size
+    file_size = file.tell()
+    file.seek(0)  # Reset to beginning
+    
+    if file_size > MAX_FILE_SIZE:
+        return jsonify({'error': 'File too large. Maximum size is 10MB.'}), 400
+    
+    if file_size == 0:
+        return jsonify({'error': 'File is empty.'}), 400
+    
     try:
         # Secure filename and save
         filename = secure_filename(file.filename or 'upload')
@@ -531,16 +543,21 @@ def upload_quiz_file():
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
         
-        # Create upload record with better error handling
-        upload_record = UploadRecord(
-            host_id=current_user.id,
-            filename=filename,
-            mime_type=file.content_type or 'application/octet-stream',
-            stored_path=file_path,
-            file_size=os.path.getsize(file_path)
-        )
-        db.session.add(upload_record)
-        db.session.commit()
+        # Create upload record with proper validation
+        try:
+            upload_record = UploadRecord(
+                host_id=current_user.id,
+                filename=filename,
+                mime_type=file.content_type or 'application/octet-stream',
+                stored_path=file_path,
+                file_size=file_size,
+                parsed=False
+            )
+            db.session.add(upload_record)
+            db.session.commit()
+        except Exception as e:
+            logging.error(f"Database error creating upload record: {e}")
+            return jsonify({'error': 'Failed to save upload record'}), 500
         
         # Parse file and extract candidate questions
         candidate_questions = parse_file_for_questions(file_path, file.content_type)
