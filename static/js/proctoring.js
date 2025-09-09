@@ -70,54 +70,132 @@ class ProctoringManager {
     }
 
     async requestPermissions() {
+        // Enhanced browser compatibility check
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('Camera access not supported by this browser');
+            // Try older browser APIs as fallback
+            if (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia) {
+                console.warn('Using legacy getUserMedia API');
+                return this.requestPermissionsLegacy();
+            } else {
+                throw new Error('Camera access not supported by this browser. Please use a modern browser like Chrome, Firefox, or Safari.');
+            }
+        }
+
+        // Check for HTTPS requirement
+        if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+            throw new Error('Camera access requires a secure connection (HTTPS). Please access this page via HTTPS.');
         }
 
         try {
-            // Request camera and microphone access
+            // Request camera and microphone access with enhanced error handling
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                    frameRate: { ideal: 15 }
+                    width: { ideal: 640, min: 320 },
+                    height: { ideal: 480, min: 240 },
+                    frameRate: { ideal: 15, min: 10 },
+                    facingMode: 'user'
                 },
                 audio: this.config.audioMonitoring
             });
 
             // Setup video element for face detection
             this.setupVideoElement();
+            console.log('Camera access granted successfully');
             
         } catch (error) {
+            console.error('Camera access error:', error);
+            
             if (error.name === 'NotAllowedError') {
-                throw new Error('Camera permission denied. Please allow camera access to continue.');
+                throw new Error('Camera permission denied. Please click "Allow" when prompted and refresh the page.');
             } else if (error.name === 'NotFoundError') {
-                throw new Error('No camera found. Please connect a camera to continue.');
+                throw new Error('No camera found. Please connect a camera and refresh the page.');
+            } else if (error.name === 'OverconstrainedError') {
+                console.warn('Camera constraints too strict, trying with basic settings');
+                return this.requestBasicPermissions();
+            } else if (error.name === 'SecurityError') {
+                throw new Error('Security error accessing camera. Please ensure you are on a secure connection.');
             } else {
                 throw new Error(`Camera access error: ${error.message}`);
             }
         }
     }
+    
+    async requestBasicPermissions() {
+        try {
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            });
+            this.setupVideoElement();
+            console.log('Basic camera access granted');
+        } catch (error) {
+            throw new Error(`Even basic camera access failed: ${error.message}`);
+        }
+    }
+    
+    requestPermissionsLegacy() {
+        return new Promise((resolve, reject) => {
+            const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            
+            getUserMedia.call(navigator, {
+                video: true,
+                audio: false
+            }, (stream) => {
+                this.mediaStream = stream;
+                this.setupVideoElement();
+                resolve();
+            }, (error) => {
+                reject(new Error(`Legacy camera access failed: ${error.message}`));
+            });
+        });
+    }
 
     setupVideoElement() {
-        // Create hidden video element for face detection
-        this.videoElement = document.createElement('video');
-        this.videoElement.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 200px;
-            height: 150px;
-            z-index: 9999;
-            border: 2px solid #ffc107;
-            border-radius: 8px;
-            background: #000;
-        `;
-        this.videoElement.autoplay = true;
-        this.videoElement.muted = true;
-        this.videoElement.srcObject = this.mediaStream;
-        
-        document.body.appendChild(this.videoElement);
+        try {
+            // Create video element for face detection with enhanced error handling
+            this.videoElement = document.createElement('video');
+            this.videoElement.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 200px;
+                height: 150px;
+                z-index: 9999;
+                border: 2px solid #28a745;
+                border-radius: 8px;
+                background: #000;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            `;
+            this.videoElement.autoplay = true;
+            this.videoElement.muted = true;
+            this.videoElement.playsInline = true; // Important for iOS
+            
+            // Add error handling for video element
+            this.videoElement.onerror = (e) => {
+                console.error('Video element error:', e);
+                this.recordViolation('video_error', 'Video playback error', 'medium');
+            };
+            
+            this.videoElement.onloadedmetadata = () => {
+                console.log('Video metadata loaded successfully');
+            };
+            
+            // Set video source
+            if (this.mediaStream) {
+                this.videoElement.srcObject = this.mediaStream;
+            } else {
+                throw new Error('No media stream available');
+            }
+            
+            document.body.appendChild(this.videoElement);
+            
+            // Add status indicator
+            this.createStatusIndicator();
+            
+        } catch (error) {
+            console.error('Error setting up video element:', error);
+            throw new Error(`Video setup failed: ${error.message}`);
+        }
 
         // Setup canvas for face detection
         this.canvas = document.createElement('canvas');
