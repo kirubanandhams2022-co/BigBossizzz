@@ -31,6 +31,15 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 
+# Global context processor to inject greeting variables
+@app.context_processor
+def inject_greeting():
+    """Inject time-based greeting and icon into all templates"""
+    return {
+        'greeting': get_time_greeting(),
+        'greeting_icon': get_greeting_icon()
+    }
+
 @app.route('/')
 def index():
     """Home page - Redirect to register/login"""
@@ -1637,49 +1646,77 @@ def admin_create_user():
 @app.route('/host/participants')
 @login_required
 def host_participants():
-    """Enhanced Host view of participants with management features"""
+    """Course-based participant management for hosts"""
     if not current_user.is_host() and not current_user.is_admin():
         flash('Access denied. Host privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Get all participants and their data
-    participants = User.query.filter_by(role='participant').all()
+    # Get courses assigned to this host (or all courses if admin)
+    if current_user.is_admin():
+        assigned_courses = Course.query.filter_by(is_active=True).all()
+    else:
+        # Get courses where this user is assigned as host
+        host_assignments = HostCourseAssignment.query.filter_by(host_id=current_user.id).all()
+        assigned_courses = [assignment.course for assignment in host_assignments if assignment.course.is_active]
     
-    # Get all attempts for quizzes created by this host
-    host_quizzes = Quiz.query.filter_by(creator_id=current_user.id).all()
-    quiz_ids = [quiz.id for quiz in host_quizzes]
+    # Get participants enrolled in these courses
+    course_participants = {}
+    all_attempts = []
     
-    attempts = QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(quiz_ids)).order_by(QuizAttempt.started_at.desc()).all()
-    
-    # Get participant statistics
-    participant_stats = {}
-    for participant in participants:
-        participant_attempts = [attempt for attempt in attempts if attempt.participant_id == participant.id]
-        completed_attempts = [attempt for attempt in participant_attempts if attempt.status == 'completed']
-        avg_score = sum([attempt.score for attempt in completed_attempts if attempt.score]) / len(completed_attempts) if completed_attempts else 0
+    for course in assigned_courses:
+        # Get participants enrolled in this course
+        enrollments = ParticipantEnrollment.query.filter_by(course_id=course.id).all()
+        participants = [enrollment.participant for enrollment in enrollments]
         
-        # Get violation count
-        violation_count = 0
-        for attempt in participant_attempts:
-            violation_count += ProctoringEvent.query.filter_by(attempt_id=attempt.id).count()
+        # Get quizzes for this course created by the current host (or all if admin)
+        if current_user.is_admin():
+            course_quizzes = Quiz.query.filter_by(course_id=course.id, is_active=True).all()
+        else:
+            course_quizzes = Quiz.query.filter_by(course_id=course.id, creator_id=current_user.id, is_active=True).all()
         
-        # Get recent login
-        recent_login = LoginEvent.query.filter_by(user_id=participant.id).order_by(LoginEvent.login_time.desc()).first()
+        # Get attempts for these quizzes
+        quiz_ids = [quiz.id for quiz in course_quizzes]
+        if quiz_ids:
+            course_attempts = QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(quiz_ids)).order_by(QuizAttempt.started_at.desc()).all()
+            all_attempts.extend(course_attempts)
+        else:
+            course_attempts = []
         
-        participant_stats[participant.id] = {
-            'total_attempts': len(participant_attempts),
-            'completed_attempts': len(completed_attempts),
-            'avg_score': avg_score,
-            'violation_count': violation_count,
-            'recent_login': recent_login,
-            'is_flagged': False  # Will be tracked via UserViolation model
+        # Calculate participant statistics for this course
+        participant_stats = {}
+        for participant in participants:
+            participant_attempts = [attempt for attempt in course_attempts if attempt.participant_id == participant.id]
+            completed_attempts = [attempt for attempt in participant_attempts if attempt.status == 'completed']
+            avg_score = sum([attempt.score for attempt in completed_attempts if attempt.score]) / len(completed_attempts) if completed_attempts else 0
+            
+            # Get violation count
+            violation_count = 0
+            for attempt in participant_attempts:
+                violation_count += ProctoringEvent.query.filter_by(attempt_id=attempt.id).count()
+            
+            # Get recent login
+            recent_login = LoginEvent.query.filter_by(user_id=participant.id).order_by(LoginEvent.login_time.desc()).first()
+            
+            participant_stats[participant.id] = {
+                'total_attempts': len(participant_attempts),
+                'completed_attempts': len(completed_attempts),
+                'avg_score': avg_score,
+                'violation_count': violation_count,
+                'recent_login': recent_login,
+                'is_flagged': False  # Will be tracked via UserViolation model
+            }
+        
+        course_participants[course] = {
+            'participants': participants,
+            'quizzes': course_quizzes,
+            'attempts': course_attempts,
+            'stats': participant_stats
         }
     
     return render_template('host_participants.html', 
-                         participants=participants,
-                         attempts=attempts, 
-                         host_quizzes=host_quizzes,
-                         participant_stats=participant_stats)
+                         course_participants=course_participants,
+                         assigned_courses=assigned_courses,
+                         attempts=all_attempts)
 
 @app.route('/host/participant/<int:participant_id>/manage', methods=['GET', 'POST'])
 @login_required

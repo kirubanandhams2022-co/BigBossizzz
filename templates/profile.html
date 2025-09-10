@@ -89,9 +89,14 @@
 
 <!-- Personal Information -->
 <div class="mt-4">
-    <h4 class="text-dark mb-3">Personal Information</h4>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="text-dark mb-0">Personal Information</h4>
+        <button id="editToggle" class="btn btn-primary btn-sm" onclick="toggleEditMode()">
+            <i class="fas fa-edit"></i> Edit Profile
+        </button>
+    </div>
     
-    <div class="info-card">
+    <div id="personalInfoCard" class="info-card">
         <div class="stat-row">
             <div>
                 <i class="fas fa-envelope text-muted me-2"></i>
@@ -147,7 +152,7 @@
 </div>
 
 <!-- Form for editing (initially hidden) -->
-<div id="editForm" style="display: none;">
+<div id="editForm" style="display: none;" class="mt-4">
     <div class="mt-4">
         <h4 class="text-dark mb-3">Edit Profile</h4>
         <form method="POST" enctype="multipart/form-data">
@@ -346,6 +351,28 @@
 
 {% block extra_scripts %}
 <script>
+function toggleEditMode() {
+    const infoSection = document.querySelector('.mt-4:nth-of-type(2)'); // Personal Information section
+    const editForm = document.getElementById('editForm');
+    const editToggle = document.getElementById('editToggle');
+    
+    if (editForm.style.display === 'none') {
+        // Show edit form
+        infoSection.style.display = 'none';
+        editForm.style.display = 'block';
+        editToggle.innerHTML = '<i class="fas fa-times"></i> Cancel';
+        editToggle.classList.remove('btn-primary');
+        editToggle.classList.add('btn-secondary');
+    } else {
+        // Show info section
+        infoSection.style.display = 'block';
+        editForm.style.display = 'none';
+        editToggle.innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
+        editToggle.classList.remove('btn-secondary');
+        editToggle.classList.add('btn-primary');
+    }
+}
+
 function togglePassword(inputId, button) {
     const input = document.getElementById(inputId);
     const icon = button.querySelector('i');

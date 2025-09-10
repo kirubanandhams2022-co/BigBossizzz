@@ -14,54 +14,162 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     
+    <!-- Loading Screen Styles -->
+    <style>
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+
+        .loading-container {
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .running-container {
+            position: relative;
+            margin: 0 auto 2rem;
+            width: 400px;
+            height: 100px;
+            overflow: hidden;
+        }
+
+        .runner {
+            position: absolute;
+            left: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            animation: runAcross 3s linear infinite;
+            z-index: 3;
+        }
+
+        .chasers {
+            position: absolute;
+            left: -200px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            animation: chase 3s linear infinite;
+            z-index: 2;
+        }
+
+        @keyframes runAcross {
+            0% { left: -50px; }
+            100% { left: 400px; }
+        }
+
+        @keyframes chase {
+            0% { left: -200px; }
+            100% { left: 350px; }
+        }
+
+        .brand-name {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #8b5cf6, #6366f1, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            animation: brandGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes brandGlow {
+            0%, 100% { text-shadow: 0 0 20px rgba(0, 123, 255, 0.3); }
+            50% { text-shadow: 0 0 30px rgba(0, 123, 255, 0.8); }
+        }
+
+        .loading-text {
+            font-size: 1.5rem;
+            font-weight: 300;
+            margin-bottom: 1rem;
+            animation: fadeInOut 2s ease-in-out infinite;
+        }
+
+        .loading-subtitle {
+            font-size: 1rem;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+            animation: fadeInOut 2s ease-in-out infinite 0.5s;
+        }
+
+        .progress-bar-container {
+            width: 300px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6, #6366f1);
+            border-radius: 2px;
+            animation: progressMove 2s ease-in-out infinite;
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes progressMove {
+            0% { width: 0%; margin-left: 0%; }
+            50% { width: 70%; margin-left: 15%; }
+            100% { width: 0%; margin-left: 100%; }
+        }
+
+        .dots {
+            display: inline-block;
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+    </style>
+    
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <!-- Security Monitoring Loading Screen -->
+    <!-- Simple Loading Screen -->
     <div id="loading-screen" class="loading-screen">
-        <div class="loading-content">
-            <div class="security-monitoring">
-                <div class="monitoring-zone">
-                    <div class="person-silhouette">
-                        <i class="fas fa-user fa-3x"></i>
-                    </div>
-                    <div class="scanning-grid"></div>
-                    <div class="radar-sweep"></div>
-                    <div class="robotic-eye-scanner">
-                        <div class="eye-outer">
-                            <div class="eye-iris">
-                                <div class="eye-pupil"></div>
-                            </div>
-                        </div>
-                        <div class="tech-rings">
-                            <div class="ring ring-1"></div>
-                            <div class="ring ring-2"></div>
-                            <div class="ring ring-3"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="security-status">
-                    <div class="status-indicators">
-                        <span class="indicator active">🔴 MONITORING</span>
-                        <span class="indicator">🟡 ANALYZING</span>
-                        <span class="indicator">🟢 SECURE</span>
-                    </div>
-                </div>
+        <div class="loading-container">
+            <div class="brand-name">
+                <i class="fas fa-eye"></i> BigBossizzz
             </div>
-            <h3 class="mt-4 text-light">
-                <i class="fas fa-robot text-info me-2"></i>
-                <span class="robotic-eye-icon">👁</span>
-                <strong>BigBossizzz</strong>
-            </h3>
-            <p class="text-light-emphasis">🛡️ Initializing Security Monitoring...</p>
-            <div class="progress" style="width: 300px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%; background: linear-gradient(90deg, #00ff41, #0066cc);"></div>
+            
+            <div class="running-container">
+                <div class="runner">🏃‍♂️</div>
+                <div class="chasers">👥👥👥</div>
             </div>
-            <div class="security-messages mt-3">
-                <div class="typing-text">
-                    <span class="typed-text"></span>
-                    <span class="cursor">█</span>
-                </div>
+            
+            <div class="loading-text">
+                Processing your request<span class="dots"></span>
+            </div>
+            
+            <div class="loading-subtitle">
+                Please wait while we secure your session
+            </div>
+            
+            <div class="progress-bar-container">
+                <div class="progress-fill"></div>
             </div>
         </div>
     </div>
@@ -123,6 +231,50 @@
                                 <li><a class="dropdown-item" href="{{ url_for('profile') }}">
                                     <i class="fas fa-user-edit"></i> Profile
                                 </a></li>
+                                {% if current_user.is_admin() %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header"><i class="fas fa-cogs"></i> System Management</h6></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">
+                                        <i class="fas fa-users"></i> User Management
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_quiz_management') }}">
+                                        <i class="fas fa-clipboard-list"></i> Quiz Management
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_course_management') }}">
+                                        <i class="fas fa-graduation-cap"></i> Course Management
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_violations') }}">
+                                        <i class="fas fa-exclamation-triangle"></i> Security Violations
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_violation_appeals') }}">
+                                        <i class="fas fa-balance-scale"></i> Violation Appeals
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_export_database') }}">
+                                        <i class="fas fa-database"></i> Database Export
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_system_settings') }}">
+                                        <i class="fas fa-cog"></i> System Settings
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_audit_logs') }}">
+                                        <i class="fas fa-file-alt"></i> Audit Logs
+                                    </a></li>
+                                {% endif %}
+                                {% if current_user.is_host() %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header"><i class="fas fa-chalkboard-teacher"></i> Host Management</h6></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('create_quiz') }}">
+                                        <i class="fas fa-plus"></i> Create Quiz
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('host_participants') }}">
+                                        <i class="fas fa-users"></i> Manage Participants
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('host_monitoring') }}">
+                                        <i class="fas fa-eye"></i> Live Monitoring
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('host_login_activity') }}">
+                                        <i class="fas fa-sign-in-alt"></i> Login Activity
+                                    </a></li>
+                                {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('logout') }}">
                                     <i class="fas fa-sign-out-alt"></i> Logout

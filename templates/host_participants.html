@@ -4,96 +4,119 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-users"></i> Quiz Participants</h1>
+    <h1><i class="fas fa-users"></i> {{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!</h1>
+    <p class="text-muted mb-0">Manage Students & Quiz Participants by Course</p>
     <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left"></i> Dashboard
     </a>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Quiz Attempts by Participants</h5>
-    </div>
-    <div class="card-body">
-        {% if attempts %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Participant</th>
-                        <th>Email</th>
-                        <th>Quiz</th>
-                        <th>Score</th>
-                        <th>Status</th>
-                        <th>Started</th>
-                        <th>Completed</th>
-                        <th>Violations</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for attempt in attempts %}
-                    <tr>
-                        <td><strong>{{ attempt.participant.username }}</strong></td>
-                        <td>{{ attempt.participant.email }}</td>
-                        <td>{{ attempt.quiz.title }}</td>
-                        <td>
-                            {% if attempt.score is not none %}
-                                <span class="badge 
-                                    {% if attempt.score >= 80 %}bg-success
-                                    {% elif attempt.score >= 60 %}bg-warning
-                                    {% else %}bg-danger{% endif %}">
-                                    {{ attempt.score|round(1) }}%
-                                </span>
-                            {% else %}
-                                <span class="text-muted">Not graded</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge 
-                                {% if attempt.status == 'completed' %}bg-success
-                                {% elif attempt.status == 'in_progress' %}bg-primary
-                                {% else %}bg-secondary{% endif %}">
-                                {{ attempt.status.replace('_', ' ').title() }}
-                            </span>
-                        </td>
-                        <td>{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'N/A' }}</td>
-                        <td>{{ attempt.completed_at.strftime('%Y-%m-%d %H:%M') if attempt.completed_at else 'N/A' }}</td>
-                        <td>
-                            {% set violations = attempt.proctoring_events|length %}
-                            {% if violations > 0 %}
-                                <span class="badge bg-warning">{{ violations }}</span>
-                            {% else %}
-                                <span class="badge bg-success">0</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-outline-primary">
-                                    <i class="fas fa-eye"></i> View
-                                </a>
-                                {% if violations > 0 %}
-                                <button type="button" class="btn btn-outline-warning" 
-                                        onclick="showViolations({{ attempt.id }}, '{{ attempt.participant.username }}')">
-                                    <i class="fas fa-exclamation-triangle"></i> Violations
-                                </button>
+{% if course_participants %}
+    {% for course, data in course_participants.items() %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-book"></i> 
+                    {{ course.name }} 
+                    <span class="badge bg-secondary">{{ course.code }}</span>
+                </h5>
+                <span class="text-muted">{{ data.participants|length }} participant(s)</span>
+            </div>
+            {% if course.description %}
+            <p class="text-muted mb-0 mt-2">{{ course.description }}</p>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if data.participants %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Participant</th>
+                            <th>Email</th>
+                            <th>Total Attempts</th>
+                            <th>Completed</th>
+                            <th>Avg Score</th>
+                            <th>Violations</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for participant in data.participants %}
+                        {% set stats = data.stats[participant.id] %}
+                        <tr>
+                            <td><strong>{{ participant.username }}</strong></td>
+                            <td>{{ participant.email }}</td>
+                            <td>{{ stats.total_attempts }}</td>
+                            <td>{{ stats.completed_attempts }}</td>
+                            <td>
+                                {% if stats.avg_score > 0 %}
+                                    <span class="badge 
+                                        {% if stats.avg_score >= 80 %}bg-success
+                                        {% elif stats.avg_score >= 60 %}bg-warning
+                                        {% else %}bg-danger{% endif %}">
+                                        {{ stats.avg_score|round(1) }}%
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
                                 {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td>
+                                {% if stats.violation_count > 0 %}
+                                    <span class="badge bg-warning">{{ stats.violation_count }}</span>
+                                {% else %}
+                                    <span class="badge bg-success">0</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if stats.recent_login %}
+                                    {{ stats.recent_login.login_time.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" 
+                                            onclick="showParticipantDetails({{ participant.id }}, '{{ participant.username }}', '{{ course.name }}')">
+                                        <i class="fas fa-eye"></i> Details
+                                    </button>
+                                    {% if stats.violation_count > 0 %}
+                                    <button type="button" class="btn btn-outline-warning" 
+                                            onclick="showParticipantViolations({{ participant.id }}, '{{ participant.username }}')">
+                                        <i class="fas fa-exclamation-triangle"></i> Violations
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-user-plus fa-2x text-muted mb-3"></i>
+                <h6>No participants enrolled</h6>
+                <p class="text-muted">No participants are currently enrolled in this course.</p>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
+    </div>
+    {% endfor %}
+{% else %}
+<div class="card">
+    <div class="card-body">
         <div class="text-center py-5">
-            <i class="fas fa-users fa-3x text-muted mb-3"></i>
-            <h5>No participants yet</h5>
-            <p class="text-muted">Participants who take your quizzes will appear here.</p>
+            <i class="fas fa-chalkboard-teacher fa-3x text-muted mb-3"></i>
+            <h5>No courses assigned</h5>
+            <p class="text-muted">You haven't been assigned to any courses yet. Contact your administrator to get access to courses.</p>
         </div>
-        {% endif %}
     </div>
 </div>
+{% endif %}
 
 <!-- Violations Modal -->
 <div class="modal fade" id="violationsModal" tabindex="-1">
