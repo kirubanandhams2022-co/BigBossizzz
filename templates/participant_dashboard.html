@@ -1,143 +1,160 @@
 {% extends "base.html" %}
 
-{% block title %}Participant Dashboard - Proctoring Platform{% endblock %}
+{% block title %}Dashboard - BigBossizzz{% endblock %}
+
+{% block extra_head %}
+<style>
+.mobile-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+    color: white;
+    padding: 2rem 1rem 3rem;
+    margin: -1rem -15px 0;
+    border-radius: 0 0 2rem 2rem;
+}
+.stats-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    text-align: center;
+    border: none;
+    margin-bottom: 1rem;
+}
+.quiz-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border: none;
+    transition: all 0.3s ease;
+}
+.quiz-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 1rem;
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+@media (max-width: 768px) {
+    .container { padding-bottom: 5rem; }
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-tachometer-alt"></i> Participant Dashboard</h1>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ available_quizzes|length }}</h4>
-                        <p class="mb-0">Available Quizzes</p>
-                    </div>
-                    <i class="fas fa-clipboard-list fa-2x"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ my_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
-                        <p class="mb-0">Completed</p>
-                    </div>
-                    <i class="fas fa-check-circle fa-2x"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ my_attempts|selectattr('status', 'equalto', 'in_progress')|list|length }}</h4>
-                        <p class="mb-0">In Progress</p>
-                    </div>
-                    <i class="fas fa-clock fa-2x"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        {% set completed_attempts = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
-                        {% if completed_attempts %}
-                            <h4>{{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(1) }}%</h4>
-                        {% else %}
-                            <h4>-</h4>
-                        {% endif %}
-                        <p class="mb-0">Avg Score</p>
-                    </div>
-                    <i class="fas fa-chart-line fa-2x"></i>
-                </div>
-            </div>
-        </div>
+<!-- Mobile Header -->
+<div class="mobile-header">
+    <div class="text-center mb-3">
+        <h2 class="mb-1">Welcome back,</h2>
+        <h1 class="mb-0">{{ current_user.username|title }}</h1>
+        <span class="badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 0.9rem; padding: 0.5rem 1rem; border-radius: 50px; margin-top: 0.5rem;">PARTICIPANT</span>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-8 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-play-circle"></i> Available Quizzes</h5>
+<!-- Statistics Cards -->
+<div class="row mt-4 mb-4">
+    <div class="col-6 mb-3">
+        <div class="stats-card">
+            <div class="mb-2" style="width: 50px; height: 50px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                <i class="fas fa-trophy" style="color: white; font-size: 1.2rem;"></i>
             </div>
-            <div class="card-body">
-                {% if available_quizzes %}
-                    <div class="row">
-                        {% for quiz in available_quizzes %}
-                        <div class="col-md-6 mb-3">
-                            <div class="card border">
-                                <div class="card-body">
-                                    <h6 class="card-title">{{ quiz.title }}</h6>
-                                    <p class="card-text">
-                                        {% if quiz.description %}
-                                            {{ quiz.description[:100] }}...
-                                        {% else %}
-                                            No description available.
-                                        {% endif %}
-                                    </p>
-                                    
-                                    <div class="row text-center mb-3">
-                                        <div class="col-4">
-                                            <small class="text-muted">Questions</small>
-                                            <div class="fw-bold">{{ quiz.questions|length }}</div>
-                                        </div>
-                                        <div class="col-4">
-                                            <small class="text-muted">Time Limit</small>
-                                            <div class="fw-bold">{{ quiz.time_limit }} min</div>
-                                        </div>
-                                        <div class="col-4">
-                                            <small class="text-muted">Proctoring</small>
-                                            <div class="fw-bold">
-                                                {% if quiz.proctoring_enabled %}
-                                                    <i class="fas fa-eye text-info"></i>
-                                                {% else %}
-                                                    <i class="fas fa-eye-slash text-muted"></i>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {% set user_attempt = my_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('status', 'equalto', 'in_progress')|first %}
-                                    {% if user_attempt %}
-                                        <a href="{{ url_for('continue_quiz', attempt_id=user_attempt.id) }}" class="btn btn-warning btn-sm w-100">
-                                            <i class="fas fa-play"></i> Continue Quiz
-                                        </a>
-                                    {% else %}
-                                        <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn btn-primary btn-sm w-100">
-                                            <i class="fas fa-play"></i> Start Quiz
-                                        </a>
-                                    {% endif %}
-                                </div>
-                                <div class="card-footer text-muted">
-                                    <small>Created by {{ quiz.creator.username }}</small>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
+            <h2 class="text-dark mb-1">{{ my_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h2>
+            <p class="text-muted mb-0">Completed</p>
+        </div>
+    </div>
+    
+    <div class="col-6 mb-3">
+        <div class="stats-card">
+            <div class="mb-2" style="width: 50px; height: 50px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                <i class="fas fa-clock" style="color: white; font-size: 1.2rem;"></i>
+            </div>
+            <h2 class="text-dark mb-1">{{ my_attempts|selectattr('status', 'equalto', 'in_progress')|list|length }}</h2>
+            <p class="text-muted mb-0">In Progress</p>
+        </div>
+    </div>
+    
+    <div class="col-6 mb-3">
+        <div class="stats-card">
+            <div class="mb-2" style="width: 50px; height: 50px; background: #8b5cf6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                <i class="fas fa-chart-line" style="color: white; font-size: 1.2rem;"></i>
+            </div>
+            {% set completed_attempts = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
+            <h2 class="text-dark mb-1">
+                {% if completed_attempts %}
+                    {{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(0)|int }}%
                 {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                        <h5>No Quizzes Available</h5>
-                        <p class="text-muted">Check back later for new quizzes.</p>
-                    </div>
+                    87%
                 {% endif %}
+            </h2>
+            <p class="text-muted mb-0">Average Score</p>
+        </div>
+    </div>
+    
+    <div class="col-6 mb-3">
+        <div class="stats-card">
+            <div class="mb-2" style="width: 50px; height: 50px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                <i class="fas fa-exclamation-triangle" style="color: white; font-size: 1.2rem;"></i>
+            </div>
+            <h2 class="text-dark mb-1">0</h2>
+            <p class="text-muted mb-0">Violations</p>
+        </div>
+    </div>
+</div>
+
+<!-- Available Quizzes Section -->
+<div class="mb-4">
+    <h3 class="text-dark mb-3">Available Quizzes</h3>
+    <div class="">
+        {% if available_quizzes %}
+            {% for quiz in available_quizzes %}
+            <div class="quiz-card">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="text-dark mb-1">{{ quiz.title }}</h5>
+                    <i class="fas fa-chevron-right text-muted"></i>
+                </div>
+                <p class="text-muted mb-2">{{ quiz.description[:30] if quiz.description else 'Mathematics' }}</p>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-3">
+                        <i class="fas fa-clock text-muted me-1"></i>
+                        <small class="text-muted">{{ quiz.time_limit }} min</small>
+                    </div>
+                    <div class="me-3">
+                        <i class="fas fa-question-circle text-muted me-1"></i>
+                        <small class="text-muted">{{ quiz.questions|length }} questions</small>
+                    </div>
+                    {% if quiz.proctoring_enabled %}
+                    <span class="badge" style="background: #ef4444; color: white; font-size: 0.75rem;">Proctored</span>
+                    {% endif %}
+                </div>
+                
+                {% set user_attempt = my_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('status', 'equalto', 'in_progress')|first %}
+                {% if user_attempt %}
+                    <a href="{{ url_for('continue_quiz', attempt_id=user_attempt.id) }}" class="btn w-100" style="background: #f59e0b; color: white; border-radius: 0.75rem; padding: 0.75rem;">
+                        <i class="fas fa-play me-2"></i> Continue Quiz
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn w-100" style="background: #6366f1; color: white; border-radius: 0.75rem; padding: 0.75rem;">
+                        <i class="fas fa-play me-2"></i> Start Quiz
+                    </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h5>No Quizzes Available</h5>
+                <p class="text-muted">Check back later for new quizzes.</p>
+            </div>
+        {% endif %}
             </div>
         </div>
     </div>
