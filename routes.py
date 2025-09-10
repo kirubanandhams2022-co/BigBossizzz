@@ -33,8 +33,10 @@ from reportlab.lib.units import inch
 
 @app.route('/')
 def index():
-    """Home page"""
-    return render_template('index.html')
+    """Home page - Redirect to register/login"""
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('register'))
 
 @app.route('/default-accounts')
 def default_accounts():
@@ -321,7 +323,9 @@ def host_dashboard():
                          recent_attempts=recent_attempts,
                          participants=participants,
                          recent_logins=recent_logins,
-                         high_violations=high_violations)
+                         high_violations=high_violations,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
 
 @app.route('/host/monitoring')
 @login_required  
@@ -421,7 +425,11 @@ def participant_dashboard():
     # Get participant's quiz attempts
     my_attempts = QuizAttempt.query.filter_by(participant_id=current_user.id).order_by(QuizAttempt.started_at.desc()).all()
     
-    return render_template('participant_dashboard.html', available_quizzes=available_quizzes, my_attempts=my_attempts)
+    return render_template('participant_dashboard.html', 
+                         available_quizzes=available_quizzes, 
+                         my_attempts=my_attempts,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
 
 @app.route('/quiz_listing')
 @login_required
@@ -439,7 +447,9 @@ def quiz_listing():
     
     return render_template('quiz_listing.html', 
                          available_quizzes=available_quizzes,
-                         my_attempts=my_attempts)
+                         my_attempts=my_attempts,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
 
 @app.route('/admin/dashboard')
 @login_required
@@ -467,7 +477,11 @@ def admin_dashboard():
         'total_attempts': total_attempts
     }
     
-    return render_template('admin_dashboard.html', stats=stats, recent_users=recent_users)
+    return render_template('admin_dashboard.html', 
+                         stats=stats, 
+                         recent_users=recent_users,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
 
 @app.route('/admin/export-database')
 @login_required
@@ -2734,7 +2748,10 @@ def profile():
         flash('Profile updated successfully!', 'success')
         return redirect(url_for('profile'))
     
-    return render_template('profile.html', form=form)
+    return render_template('profile.html', 
+                         form=form,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
 
 
 @app.route('/api/quiz/<int:quiz_id>/questions')
