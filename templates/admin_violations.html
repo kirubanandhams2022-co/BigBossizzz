@@ -34,8 +34,8 @@
                     <tr class="{% if violation.severity == 'high' %}table-danger{% elif violation.severity == 'medium' %}table-warning{% endif %}">
                         <td>{{ violation.timestamp.strftime('%Y-%m-%d %H:%M:%S') if violation.timestamp else 'N/A' }}</td>
                         <td>
-                            <strong>{{ violation.attempt.user.username }}</strong>
-                            <br><small class="text-muted">{{ violation.attempt.user.email }}</small>
+                            <strong>{{ violation.attempt.participant.username }}</strong>
+                            <br><small class="text-muted">{{ violation.attempt.participant.email }}</small>
                         </td>
                         <td>
                             <strong>{{ violation.attempt.quiz.title }}</strong>
