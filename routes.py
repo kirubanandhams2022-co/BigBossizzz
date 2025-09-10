@@ -422,6 +422,24 @@ def participant_dashboard():
     
     return render_template('participant_dashboard.html', available_quizzes=available_quizzes, my_attempts=my_attempts)
 
+@app.route('/quiz_listing')
+@login_required
+def quiz_listing():
+    """Quiz listing page with mobile interface"""
+    if current_user.role != 'participant':
+        flash('Access denied. Participants only.', 'error')
+        return redirect(url_for('index'))
+    
+    # Get available quizzes for this participant
+    available_quizzes = Quiz.query.filter_by(is_active=True).all()
+    
+    # Get participant's quiz attempts
+    my_attempts = QuizAttempt.query.filter_by(participant_id=current_user.id).order_by(QuizAttempt.started_at.desc()).all()
+    
+    return render_template('quiz_listing.html', 
+                         available_quizzes=available_quizzes,
+                         my_attempts=my_attempts)
+
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
