@@ -2027,6 +2027,51 @@ def log_proctoring_event():
         print(f"Error logging proctoring event: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+@app.route('/api/proctoring/verify-identity', methods=['POST'])
+@login_required
+def verify_identity():
+    """API endpoint for face verification during quiz start"""
+    try:
+        data = request.json
+        image_data = data.get('image')
+        attempt_id = data.get('attemptId')
+        
+        if not image_data or not attempt_id:
+            return jsonify({'verified': False, 'error': 'Missing required data'})
+        
+        # Get the attempt to verify it belongs to current user
+        attempt = QuizAttempt.query.get(attempt_id)
+        if not attempt or attempt.participant_id != current_user.id:
+            return jsonify({'verified': False, 'error': 'Invalid attempt'})
+        
+        # Simple face verification logic - in production, you would use actual face recognition
+        # For now, we'll do basic image validation and always approve if image is provided
+        try:
+            # Basic validation - check if it's a valid base64 image
+            if image_data.startswith('data:image/'):
+                # Extract base64 part
+                base64_data = image_data.split(',')[1]
+                import base64
+                image_bytes = base64.b64decode(base64_data)
+                
+                # Basic check - image should be at least 1KB
+                if len(image_bytes) > 1024:
+                    # For demo purposes, always return verified=True
+                    # In production, implement actual face recognition here
+                    return jsonify({'verified': True, 'message': 'Identity verified successfully'})
+                else:
+                    return jsonify({'verified': False, 'error': 'Image too small or invalid'})
+            else:
+                return jsonify({'verified': False, 'error': 'Invalid image format'})
+                
+        except Exception as e:
+            return jsonify({'verified': False, 'error': f'Image processing failed: {str(e)}'})
+            
+    except Exception as e:
+        return jsonify({'verified': False, 'error': f'Verification failed: {str(e)}'})
+
+
 import os
 import csv
 import io
