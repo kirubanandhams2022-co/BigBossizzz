@@ -15,16 +15,44 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 53, 255, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 48, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.2) 0%, transparent 50%);
+            animation: gradientShift 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes gradientShift {
+            0% {
+                opacity: 0.8;
+                transform: scale(1) rotate(0deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1.1) rotate(10deg);
+            }
         }
 
         .loading-container {
             text-align: center;
             color: #fff;
+            position: relative;
+            z-index: 10;
         }
 
         .eye-container {
@@ -38,11 +66,11 @@
             position: absolute;
             width: 120px;
             height: 60px;
-            background: linear-gradient(45deg, #007bff, #0056b3);
+            background: linear-gradient(45deg, #8b5cf6, #6366f1);
             border-radius: 60px 60px 0 0;
             transform-origin: center bottom;
             animation: eyeBlink 2s ease-in-out infinite;
-            box-shadow: 0 0 30px rgba(0, 123, 255, 0.5);
+            box-shadow: 0 0 30px rgba(139, 92, 246, 0.8), 0 0 60px rgba(99, 102, 241, 0.4);
         }
 
         .eye::before {
@@ -194,9 +222,12 @@
         .brand-name {
             font-size: 2rem;
             font-weight: bold;
-            color: #007bff;
+            background: linear-gradient(45deg, #8b5cf6, #6366f1, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             margin-bottom: 1rem;
-            text-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+            text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
             animation: brandGlow 3s ease-in-out infinite;
         }
 
