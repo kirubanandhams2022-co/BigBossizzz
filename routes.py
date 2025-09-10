@@ -2760,7 +2760,7 @@ def admin_violations():
     
     # Build query with filters
     query = ProctoringEvent.query.options(
-        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.user),
+        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.participant),
         db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz).joinedload(Quiz.creator)
     )
     
