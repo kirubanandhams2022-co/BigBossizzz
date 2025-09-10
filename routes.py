@@ -17,6 +17,7 @@ import PyPDF2
 import docx
 from io import BytesIO
 from sqlalchemy import func, text
+from utils import get_time_greeting, get_greeting_icon
 
 # Excel/Spreadsheet generation imports
 from openpyxl import Workbook
@@ -2713,7 +2714,12 @@ def profile():
 
         # Update profile
         current_user.username = form.username.data
-        current_user.email = form.email.data
+        
+        # Handle email change without verification requirement
+        if form.email.data != current_user.email:
+            current_user.email = form.email.data
+            current_user.is_verified = True  # Auto-verify for profile updates
+            flash('Email updated successfully!', 'success')
         
         # Update password if provided
         if form.current_password.data and form.new_password.data:
