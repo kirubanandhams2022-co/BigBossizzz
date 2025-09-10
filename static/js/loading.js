@@ -225,11 +225,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const typedTextElement = document.querySelector('.typed-text');
     if (typedTextElement) {
         const texts = [
-            'Initializing security protocols...',
-            'Loading proctoring modules...',
-            'Connecting to database...',
-            'Setting up user interface...',
-            'Ready to secure your exams!'
+            '🔍 Scanning participant identity...',
+            '🛡️ Initializing security protocols...',
+            '📡 Activating monitoring systems...',
+            '🤖 AI surveillance online...',
+            '👁️ Robotic eye tracker ready...',
+            '🎯 Facial recognition active...',
+            '⚡ Neural network analyzing...',
+            '✅ Security monitoring engaged!'
         ];
         
         let textIndex = 0;
