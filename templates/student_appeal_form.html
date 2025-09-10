@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Appeal - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h4><i class="fas fa-balance-scale"></i> Submit Violation Appeal</h4>
+            </div>
+            <div class="card-body">
+                {% if violation %}
+                    <!-- Violation Summary -->
+                    <div class="alert alert-danger mb-4">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Your Account Status</h5>
+                        <p><strong>Status:</strong> Flagged due to security violations</p>
+                        <p><strong>Violation Count:</strong> {{ violation.violation_count }}</p>
+                        <p><strong>Flagged Date:</strong> {{ violation.flagged_at.strftime('%Y-%m-%d %H:%M') if violation.flagged_at else 'N/A' }}</p>
+                        <p><strong>Current Restriction:</strong> Cannot take new exams until appeal is approved</p>
+                    </div>
+
+                    <!-- Appeal Guidelines -->
+                    <div class="alert alert-info mb-4">
+                        <h5><i class="fas fa-info-circle"></i> Appeal Guidelines</h5>
+                        <ul class="mb-0">
+                            <li>Explain the circumstances that led to the security violations</li>
+                            <li>Provide any technical issues you experienced during exams</li>
+                            <li>Acknowledge understanding of proctoring rules</li>
+                            <li>Demonstrate commitment to following guidelines in future</li>
+                            <li>Be honest and detailed in your explanation</li>
+                        </ul>
+                    </div>
+
+                    <!-- Appeal Form -->
+                    <form method="POST">
+                        <div class="mb-4">
+                            <label for="appeal_reason" class="form-label">
+                                <strong>Explain why you believe your appeal should be approved</strong>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <textarea 
+                                class="form-control" 
+                                id="appeal_reason" 
+                                name="appeal_reason" 
+                                rows="8" 
+                                required
+                                placeholder="Please provide a detailed explanation including:
+- What happened during your exam(s) that caused the violations
+- Any technical issues you experienced (browser problems, internet connectivity, etc.)
+- Steps you will take to ensure this doesn't happen again
+- Why you believe you should be given another chance
+
+Be specific and honest. The administrator will review your case carefully."
+                            ></textarea>
+                            <div class="form-text">Minimum 50 characters required. Be thorough and honest.</div>
+                        </div>
+
+                        <!-- Acknowledgment -->
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="acknowledge" required>
+                                <label class="form-check-label" for="acknowledge">
+                                    <strong>I acknowledge that:</strong>
+                                    <ul class="mt-2 mb-0">
+                                        <li>I understand the proctoring rules and security requirements</li>
+                                        <li>I will follow all guidelines strictly in future exams</li>
+                                        <li>I understand that future violations may result in permanent restrictions</li>
+                                        <li>The information provided in this appeal is truthful and complete</li>
+                                    </ul>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="alert alert-secondary mb-4">
+                            <h6><i class="fas fa-envelope"></i> Your Contact Information</h6>
+                            <p><strong>Username:</strong> {{ current_user.username }}</p>
+                            <p><strong>Email:</strong> {{ current_user.email }}</p>
+                            <small class="text-muted">Make sure your email is correct as administrators will use it to contact you if needed.</small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-paper-plane"></i> Submit Appeal
+                            </button>
+                        </div>
+                    </form>
+
+                {% else %}
+                    <!-- No Violations -->
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                        <h4>No Violations Found</h4>
+                        <p class="text-muted mb-4">Your account is in good standing. You don't have any flagged violations that require an appeal.</p>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if violation and violation.notes %}
+        <!-- Previous Appeals/Notes History -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Appeal History</h5>
+            </div>
+            <div class="card-body">
+                <pre class="bg-light p-3 rounded small">{{ violation.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const textarea = document.getElementById('appeal_reason');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    if (textarea && submitBtn) {
+        textarea.addEventListener('input', function() {
+            if (this.value.length < 50) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Appeal too short (' + this.value.length + '/50)';
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Appeal';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

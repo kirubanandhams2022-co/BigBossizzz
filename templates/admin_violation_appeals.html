@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Violation Appeals - BigBossizzz Admin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-balance-scale text-warning"></i> Student Violation Appeals</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Admin</a></li>
+                    <li class="breadcrumb-item active">Violation Appeals</li>
+                </ol>
+            </nav>
+        </div>
+        
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h5 class="card-title">Pending Appeals</h5>
+                                <h3>{{ pending_appeals|length }}</h3>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-exclamation-triangle fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h5 class="card-title">Recent Violations</h5>
+                                <h3>{{ recent_violations|length }}</h3>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-eye fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Appeals Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-clock text-warning"></i> Pending Student Appeals</h4>
+            </div>
+            <div class="card-body">
+                {% if pending_appeals %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Email</th>
+                                    <th>Violations</th>
+                                    <th>Flagged Date</th>
+                                    <th>Appeal Details</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for violation, user in pending_appeals %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ user.username }}</strong>
+                                        {% if violation.is_flagged %}
+                                            <span class="badge bg-danger ms-1">Flagged</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ violation.violation_count }} violations</span>
+                                    </td>
+                                    <td>{{ violation.flagged_at.strftime('%Y-%m-%d %H:%M') if violation.flagged_at else 'N/A' }}</td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ violation.notes|truncate(100) if violation.notes else 'No appeal details' }}
+                                        </small>
+                                        {% if violation.notes %}
+                                            <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#notesModal{{ violation.id }}">
+                                                View Full
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#approveModal{{ violation.id }}">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#denyModal{{ violation.id }}">
+                                                <i class="fas fa-times"></i> Deny
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Approve Modal -->
+                                <div class="modal fade" id="approveModal{{ violation.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ url_for('admin_approve_appeal', violation_id=violation.id) }}">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Approve Appeal - {{ user.username }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p>Are you sure you want to approve this appeal? This will allow <strong>{{ user.username }}</strong> to retake exams.</p>
+                                                    <div class="mb-3">
+                                                        <label for="admin_notes_approve_{{ violation.id }}" class="form-label">Admin Notes (Optional)</label>
+                                                        <textarea class="form-control" id="admin_notes_approve_{{ violation.id }}" name="admin_notes" rows="3" placeholder="Additional notes or conditions..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <input type="hidden" name="decision" value="approve">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-success">Approve Appeal</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Deny Modal -->
+                                <div class="modal fade" id="denyModal{{ violation.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ url_for('admin_approve_appeal', violation_id=violation.id) }}">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Deny Appeal - {{ user.username }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p>Are you sure you want to deny this appeal? The student will remain flagged and cannot retake exams.</p>
+                                                    <div class="mb-3">
+                                                        <label for="admin_notes_deny_{{ violation.id }}" class="form-label">Reason for Denial <span class="text-danger">*</span></label>
+                                                        <textarea class="form-control" id="admin_notes_deny_{{ violation.id }}" name="admin_notes" rows="3" placeholder="Explain why this appeal is being denied..." required></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <input type="hidden" name="decision" value="deny">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-danger">Deny Appeal</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Notes Modal -->
+                                {% if violation.notes %}
+                                <div class="modal fade" id="notesModal{{ violation.id }}" tabindex="-1">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Full Appeal Details - {{ user.username }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <pre class="bg-light p-3 rounded">{{ violation.notes }}</pre>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h4>No Pending Appeals</h4>
+                        <p class="text-muted">All student appeals have been processed.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent High-Severity Violations for Context -->
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-exclamation-circle text-danger"></i> Recent High-Severity Violations</h4>
+                <small class="text-muted">For context when reviewing appeals</small>
+            </div>
+            <div class="card-body">
+                {% if recent_violations %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Quiz</th>
+                                    <th>Violation Type</th>
+                                    <th>Severity</th>
+                                    <th>Date</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event, attempt, user, quiz in recent_violations[:10] %}
+                                <tr>
+                                    <td><strong>{{ user.username }}</strong></td>
+                                    <td>{{ quiz.title }}</td>
+                                    <td>{{ event.event_type.replace('_', ' ').title() }}</td>
+                                    <td>
+                                        {% if event.severity == 'critical' %}
+                                            <span class="badge bg-danger">Critical</span>
+                                        {% elif event.severity == 'high' %}
+                                            <span class="badge bg-warning">High</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ event.severity.title() }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ event.timestamp.strftime('%m/%d %H:%M') }}</td>
+                                    <td>
+                                        <small class="text-muted">{{ event.details[:50] }}{% if event.details|length > 50 %}...{% endif %}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No recent high-severity violations.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

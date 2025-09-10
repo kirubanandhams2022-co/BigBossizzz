@@ -72,6 +72,13 @@
                                 </a>
                             </li>
                         {% endif %}
+                        {% if current_user.is_authenticated and current_user.role == 'participant' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('student_request_appeal') }}">
+                                    <i class="fas fa-balance-scale"></i> Appeal Violations
+                                </a>
+                            </li>
+                        {% endif %}
                     {% endif %}
                 </ul>
                 

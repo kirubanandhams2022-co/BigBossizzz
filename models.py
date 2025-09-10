@@ -170,8 +170,7 @@ class QuizAttempt(db.Model):
     total_points = db.Column(db.Integer)
     status = db.Column(db.String(20), default='in_progress')  # 'in_progress', 'completed', 'abandoned', 'terminated'
     
-    # Relationships (participant backref is defined in User model)
-    quiz = db.relationship('Quiz', backref=db.backref('attempts', lazy=True))
+    # Relationships (participant and quiz backrefs are defined in User and Quiz models)
     answers = db.relationship('Answer', backref='attempt', lazy=True, cascade='all, delete-orphan')
     
     def calculate_score(self):

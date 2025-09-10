@@ -2868,6 +2868,94 @@ def admin_system_settings():
     
     return render_template('admin_system_settings.html')
 
+@app.route('/admin/violation-appeals')
+@login_required
+def admin_violation_appeals():
+    """Admin page to manage student violation appeals"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get users with pending appeals (flagged users who requested reconsideration)
+    pending_appeals = db.session.query(UserViolation, User).join(
+        User, UserViolation.user_id == User.id
+    ).filter(
+        UserViolation.is_flagged == True,
+        UserViolation.can_retake == False,
+        UserViolation.notes.ilike('%appeal%')
+    ).order_by(UserViolation.flagged_at.desc()).all()
+    
+    # Get recent violations for context
+    recent_violations = db.session.query(ProctoringEvent, QuizAttempt, User, Quiz).join(
+        QuizAttempt, ProctoringEvent.attempt_id == QuizAttempt.id
+    ).join(
+        User, QuizAttempt.participant_id == User.id
+    ).join(
+        Quiz, QuizAttempt.quiz_id == Quiz.id
+    ).filter(
+        ProctoringEvent.severity.in_(['high', 'critical'])
+    ).order_by(ProctoringEvent.timestamp.desc()).limit(50).all()
+    
+    return render_template('admin_violation_appeals.html', 
+                         pending_appeals=pending_appeals,
+                         recent_violations=recent_violations)
+
+@app.route('/admin/approve-appeal/<int:violation_id>', methods=['POST'])
+@login_required
+def admin_approve_appeal(violation_id):
+    """Admin approves a student's violation appeal"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    violation = UserViolation.query.get_or_404(violation_id)
+    decision = request.form.get('decision')  # 'approve' or 'deny'
+    admin_notes = request.form.get('admin_notes', '')
+    
+    if decision == 'approve':
+        violation.can_retake = True
+        violation.retake_approved_by = current_user.id
+        violation.retake_approved_at = datetime.utcnow()
+        violation.notes += f"\n\n[ADMIN APPROVAL - {current_user.username}]: Appeal approved. {admin_notes}"
+        flash(f'Appeal approved for {violation.user.username}. They can now retake exams.', 'success')
+    else:
+        violation.notes += f"\n\n[ADMIN DENIAL - {current_user.username}]: Appeal denied. {admin_notes}"
+        flash(f'Appeal denied for {violation.user.username}.', 'info')
+    
+    db.session.commit()
+    return redirect(url_for('admin_violation_appeals'))
+
+@app.route('/student/request-appeal', methods=['GET', 'POST'])
+@login_required
+def student_request_appeal():
+    """Student requests appeal for security violations"""
+    if current_user.is_admin() or current_user.is_host():
+        flash('This page is for students only.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Check if user has violations
+    violation = UserViolation.query.filter_by(user_id=current_user.id, is_flagged=True).first()
+    
+    if request.method == 'POST':
+        if not violation:
+            flash('You do not have any flagged violations to appeal.', 'error')
+            return redirect(url_for('dashboard'))
+        
+        appeal_reason = request.form.get('appeal_reason', '').strip()
+        if not appeal_reason:
+            flash('Please provide a reason for your appeal.', 'error')
+            return render_template('student_appeal_form.html', violation=violation)
+        
+        # Add appeal to notes
+        current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        violation.notes += f"\n\n[STUDENT APPEAL - {current_time}]: {appeal_reason}"
+        db.session.commit()
+        
+        flash('Your appeal has been submitted. An administrator will review it shortly.', 'success')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('student_appeal_form.html', violation=violation)
+
 @app.route('/admin/audit-logs')
 @login_required
 def admin_audit_logs():
