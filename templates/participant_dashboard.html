@@ -155,77 +155,8 @@
                 <p class="text-muted">Check back later for new quizzes.</p>
             </div>
         {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-history"></i> My Quiz History</h5>
-            </div>
-            <div class="card-body">
-                {% if my_attempts %}
-                    {% for attempt in my_attempts[:10] %}
-                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                            <div>
-                                <div class="fw-bold">{{ attempt.quiz.title }}</div>
-                                <small class="text-muted">{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') }}</small>
-                            </div>
-                            <div class="text-end">
-                                {% if attempt.status == 'completed' %}
-                                    <span class="badge bg-success">{{ attempt.score|round(1) if attempt.score else 'N/A' }}%</span>
-                                    <br><a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-outline-primary btn-sm mt-1">
-                                        <i class="fas fa-eye"></i> View
-                                    </a>
-                                {% elif attempt.status == 'in_progress' %}
-                                    <span class="badge bg-warning">In Progress</span>
-                                    <br><a href="{{ url_for('continue_quiz', attempt_id=attempt.id) }}" class="btn btn-outline-warning btn-sm mt-1">
-                                        <i class="fas fa-play"></i> Continue
-                                    </a>
-                                {% else %}
-                                    <span class="badge bg-secondary">{{ attempt.status.title() }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-history fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">No quiz history yet</p>
-                        <small class="text-muted">Start taking quizzes to see your history here.</small>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        
-        {% if my_attempts|selectattr('status', 'equalto', 'completed')|list %}
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5><i class="fas fa-trophy"></i> Performance</h5>
-            </div>
-            <div class="card-body">
-                {% set completed = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
-                {% if completed %}
-                    <div class="text-center">
-                        <h4 class="text-success">{{ (completed|map(attribute='score')|sum / completed|length)|round(1) }}%</h4>
-                        <p class="text-muted mb-3">Average Score</p>
-                        
-                        <div class="row">
-                            <div class="col-6">
-                                <h6 class="text-primary">{{ completed|map(attribute='score')|max|round(1) }}%</h6>
-                                <small class="text-muted">Best Score</small>
-                            </div>
-                            <div class="col-6">
-                                <h6 class="text-info">{{ completed|length }}</h6>
-                                <small class="text-muted">Completed</small>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
+
+<!-- Bottom Navigation -->\n<div class=\"bottom-nav d-md-none\">\n    <div class=\"row text-center\">\n        <div class=\"col-3\">\n            <a href=\"{{ url_for('participant_dashboard') }}\" class=\"text-decoration-none\">\n                <i class=\"fas fa-home\" style=\"color: #6366f1; font-size: 1.5rem;\"></i>\n                <div style=\"color: #6366f1; font-size: 0.75rem; font-weight: 600;\">Dashboard</div>\n            </a>\n        </div>\n        <div class=\"col-3\">\n            <a href=\"#\" class=\"text-decoration-none text-muted\">\n                <i class=\"fas fa-chart-bar\" style=\"font-size: 1.5rem;\"></i>\n                <div style=\"font-size: 0.75rem;\">Statistics</div>\n            </a>\n        </div>\n        <div class=\"col-3\">\n            <a href=\"{{ url_for('profile') }}\" class=\"text-decoration-none text-muted\">\n                <i class=\"fas fa-user\" style=\"font-size: 1.5rem;\"></i>\n                <div style=\"font-size: 0.75rem;\">Profile</div>\n            </a>\n        </div>\n        <div class=\"col-3\">\n            <a href=\"#\" class=\"text-decoration-none text-muted\">\n                <i class=\"fas fa-cog\" style=\"font-size: 1.5rem;\"></i>\n                <div style=\"font-size: 0.75rem;\">Settings</div>\n            </a>\n        </div>\n    </div>\n</div>
 {% endblock %}
