@@ -136,11 +136,25 @@
                     {% endif %}
                 </div>
                 
-                {% set user_attempt = my_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('status', 'equalto', 'in_progress')|first %}
-                {% if user_attempt %}
-                    <a href="{{ url_for('continue_quiz', attempt_id=user_attempt.id) }}" class="btn w-100" style="background: #f59e0b; color: white; border-radius: 0.75rem; padding: 0.75rem;">
+                {% set user_attempt_in_progress = my_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('status', 'equalto', 'in_progress')|first %}
+                {% set user_attempt_completed = my_attempts|selectattr('quiz_id', 'equalto', quiz.id)|selectattr('status', 'equalto', 'completed')|first %}
+                {% if user_attempt_in_progress %}
+                    <a href="{{ url_for('continue_quiz', attempt_id=user_attempt_in_progress.id) }}" class="btn w-100" style="background: #f59e0b; color: white; border-radius: 0.75rem; padding: 0.75rem;">
                         <i class="fas fa-play me-2"></i> Continue Quiz
                     </a>
+                {% elif user_attempt_completed %}
+                    <div class="row">
+                        <div class="col-6">
+                            <a href="{{ url_for('quiz_results', attempt_id=user_attempt_completed.id) }}" class="btn w-100" style="background: #10b981; color: white; border-radius: 0.75rem; padding: 0.75rem;">
+                                <i class="fas fa-eye me-2"></i> View Answers
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <span class="btn w-100" style="background: #6b7280; color: white; border-radius: 0.75rem; padding: 0.75rem; cursor: default;">
+                                <i class="fas fa-check me-2"></i> Completed
+                            </span>
+                        </div>
+                    </div>
                 {% else %}
                     <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn w-100" style="background: #6366f1; color: white; border-radius: 0.75rem; padding: 0.75rem;">
                         <i class="fas fa-play me-2"></i> Start Quiz
