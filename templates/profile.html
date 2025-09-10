@@ -161,8 +161,14 @@
             <div class="info-card">
             <!-- Profile Picture Upload -->
             <div class="text-center mb-4">
-                <input type="file" name="profile_picture" accept="image/*" class="form-control mb-2">
-                <small class="text-muted">Upload a new profile picture</small>
+                <div class="mb-3">
+                    {% if current_user.profile_picture and current_user.profile_picture != 'default.png' %}
+                        <img src="{{ url_for('static', filename=current_user.profile_picture) }}" alt="Current Profile Picture" 
+                             class="rounded-circle mb-2" width="80" height="80" style="object-fit: cover;">
+                    {% endif %}
+                </div>
+                <input type="file" name="profile_picture" accept="image/*" class="form-control mb-2" id="profilePictureInput">
+                <small class="text-muted">Upload a new profile picture (JPG, PNG, GIF - Max 5MB)</small>
             </div>
             
             <div class="mb-3">
