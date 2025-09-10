@@ -1838,6 +1838,37 @@ def host_login_activity():
     
     return render_template('host_login_activity.html', login_events=login_events)
 
+
+@app.route('/host/live-monitoring')
+@login_required
+def host_live_monitoring():
+    """Live violation monitoring dashboard for hosts"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all active quizzes by this host
+    active_quizzes = Quiz.query.filter_by(creator_id=current_user.id).all()
+    
+    # Get recent violations across all their quizzes
+    recent_violations = db.session.query(
+        ProctoringEvent, QuizAttempt, User, Quiz
+    ).join(
+        QuizAttempt, ProctoringEvent.attempt_id == QuizAttempt.id
+    ).join(
+        User, QuizAttempt.participant_id == User.id
+    ).join(
+        Quiz, QuizAttempt.quiz_id == Quiz.id
+    ).filter(
+        Quiz.creator_id == current_user.id
+    ).order_by(
+        ProctoringEvent.timestamp.desc()
+    ).limit(100).all()
+    
+    return render_template('live_monitoring.html', 
+                         active_quizzes=active_quizzes,
+                         recent_violations=recent_violations)
+
 @app.route('/admin/manage-flags')
 @login_required
 def admin_manage_flags():

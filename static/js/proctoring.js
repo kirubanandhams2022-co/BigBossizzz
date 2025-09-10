@@ -1789,13 +1789,8 @@ class ProctoringManager {
             attemptId: this.attemptId
         };
 
-        // Send via WebSocket for real-time notifications
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
-                type: 'violation_alert',
-                data: notification
-            }));
-        }
+        // Note: WebSocket implementation would require Flask-SocketIO
+        // For now, we rely on the HTTP API for notifications
 
         // Also send via HTTP API as backup
         fetch('/api/proctoring/notify-violation', {
