@@ -215,3 +215,78 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = LoadingManager;
 }
+
+// ===== ENHANCED LOADING SCREEN FOR LIGHT THEME =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Add light theme class to body
+    document.body.classList.add('light-theme');
+    
+    // Enhanced typing animation for loading screen
+    const typedTextElement = document.querySelector('.typed-text');
+    if (typedTextElement) {
+        const texts = [
+            'Initializing security protocols...',
+            'Loading proctoring modules...',
+            'Connecting to database...',
+            'Setting up user interface...',
+            'Ready to secure your exams!'
+        ];
+        
+        let textIndex = 0;
+        let charIndex = 0;
+        
+        function typeText() {
+            if (charIndex < texts[textIndex].length) {
+                typedTextElement.textContent += texts[textIndex].charAt(charIndex);
+                charIndex++;
+                setTimeout(typeText, 50);
+            } else {
+                setTimeout(() => {
+                    typedTextElement.textContent = '';
+                    charIndex = 0;
+                    textIndex = (textIndex + 1) % texts.length;
+                    typeText();
+                }, 1000);
+            }
+        }
+        
+        typeText();
+    }
+    
+    // Hide initial loading screen after content loads
+    setTimeout(() => {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('loading-hidden');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }
+    }, 3000);
+    
+    // Enhanced UI interactions
+    document.documentElement.style.scrollBehavior = 'smooth';
+    
+    // Enhanced form validation and feedback
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                    field.classList.add('is-valid');
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+            }
+        });
+    });
+});
