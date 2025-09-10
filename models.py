@@ -4,6 +4,52 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 
+# New Course Management System
+class Course(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    max_participants = db.Column(db.Integer, default=100)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Relationships
+    host_assignments = db.relationship('HostCourseAssignment', backref='course', lazy=True, cascade='all, delete-orphan')
+    participant_enrollments = db.relationship('ParticipantEnrollment', backref='course', lazy=True, cascade='all, delete-orphan')
+    quizzes = db.relationship('Quiz', backref='course', lazy=True)
+    
+    def __repr__(self):
+        return f'<Course {self.code}: {self.name}>'
+
+class HostCourseAssignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    host_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    assigned_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    host = db.relationship('User', foreign_keys=[host_id], backref='host_course_assignments')
+    assigned_by_user = db.relationship('User', foreign_keys=[assigned_by])
+    
+    def __repr__(self):
+        return f'<HostAssignment {self.host_id}->{self.course_id}>'
+
+class ParticipantEnrollment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    participant_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    enrolled_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    participant = db.relationship('User', foreign_keys=[participant_id], backref='course_enrollments')
+    enrolled_by_user = db.relationship('User', foreign_keys=[enrolled_by])
+    
+    def __repr__(self):
+        return f'<Enrollment {self.participant_id}->{self.course_id}>'
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -54,6 +100,7 @@ class Quiz(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=True)  # Add course relationship
     time_limit = db.Column(db.Integer, default=60)  # in minutes
     is_active = db.Column(db.Boolean, default=True)
     proctoring_enabled = db.Column(db.Boolean, default=True)
@@ -167,6 +214,11 @@ class ProctoringEvent(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     details = db.Column(db.Text)  # Additional event details
     severity = db.Column(db.String(20), default='low')  # 'low', 'medium', 'high'
+    description = db.Column(db.Text)  # Add description field
+    metadata = db.Column(db.Text)  # Add metadata field for JSON data
+    
+    # Add the missing relationship
+    attempt = db.relationship('QuizAttempt', backref='proctoring_events', lazy=True)
     
     def __repr__(self):
         return f'<ProctoringEvent {self.event_type}>'
