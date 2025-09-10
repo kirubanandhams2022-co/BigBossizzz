@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Quizzes - BigBossizzz{% endblock %}
+
+{% block extra_head %}
+<style>
+.quiz-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+    color: white;
+    padding: 2rem 1rem 1rem;
+    margin: -1rem -15px 0;
+    position: relative;
+}
+
+.search-container {
+    background: white;
+    border-radius: 50px;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+}
+
+.search-input {
+    border: none;
+    outline: none;
+    flex: 1;
+    font-size: 1rem;
+    background: transparent;
+}
+
+.filter-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.filter-tab {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.filter-tab.active {
+    background: #6366f1;
+    color: white;
+}
+
+.filter-tab:not(.active) {
+    color: #64748b;
+    background: transparent;
+}
+
+.quiz-item {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.quiz-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.quiz-status {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.status-failed {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.quiz-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.quiz-description {
+    color: #64748b;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.quiz-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.quiz-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.quiz-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #6366f1;
+    margin-left: auto;
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 1rem;
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+@media (max-width: 768px) {
+    .container { padding-bottom: 5rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Quiz Header -->
+<div class="quiz-header">
+    <div class="d-flex align-items-center mb-3">
+        <a href="{{ url_for('participant_dashboard') }}" class="text-white me-3">
+            <i class="fas fa-arrow-left" style="font-size: 1.2rem;"></i>
+        </a>
+        <h2 class="mb-0">Quizzes</h2>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="search-container">
+        <i class="fas fa-search text-muted me-2"></i>
+        <input type="text" class="search-input" placeholder="Search quizzes..." id="searchInput" onkeyup="filterQuizzes()">
+    </div>
+    
+    <!-- Filter Tabs -->
+    <div class="filter-tabs">
+        <a href="#" class="filter-tab active" data-filter="all" onclick="setActiveFilter(this, 'all')">All</a>
+        <a href="#" class="filter-tab" data-filter="pending" onclick="setActiveFilter(this, 'pending')">Pending</a>
+        <a href="#" class="filter-tab" data-filter="completed" onclick="setActiveFilter(this, 'completed')">Completed</a>
+        <a href="#" class="filter-tab" data-filter="failed" onclick="setActiveFilter(this, 'failed')">Failed</a>
+    </div>
+</div>
+
+<!-- Quiz List -->
+<div class="mt-4" id="quizList">
+    <!-- Sample Pending Quiz -->
+    <div class="quiz-item" data-status="pending" data-title="mathematics quiz">
+        <div class="quiz-status status-pending">
+            <i class="fas fa-clock me-1"></i> PENDING
+        </div>
+        <h3 class="quiz-title">Mathematics Quiz</h3>
+        <p class="quiz-description">Test your math skills</p>
+        <div class="quiz-meta">
+            <div class="quiz-meta-item">
+                <i class="fas fa-clock"></i>
+                <span>30 min</span>
+            </div>
+            <div class="quiz-meta-item">
+                <i class="fas fa-calendar"></i>
+                <span>Dec 25, 2024</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sample Completed Quiz -->
+    <div class="quiz-item" data-status="completed" data-title="science quiz">
+        <div class="quiz-status status-completed">
+            <i class="fas fa-check-circle me-1"></i> COMPLETED
+        </div>
+        <div class="d-flex justify-content-between align-items-start">
+            <div style="flex: 1;">
+                <h3 class="quiz-title">Science Quiz</h3>
+                <p class="quiz-description">Physics and Chemistry</p>
+                <div class="quiz-meta">
+                    <div class="quiz-meta-item">
+                        <i class="fas fa-clock"></i>
+                        <span>45 min</span>
+                    </div>
+                    <div class="quiz-meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>Dec 20, 2024</span>
+                    </div>
+                </div>
+            </div>
+            <div class="quiz-score">85/100</div>
+        </div>
+    </div>
+    
+    <!-- Display available quizzes if any -->
+    {% if available_quizzes %}
+        {% for quiz in available_quizzes %}
+        <div class="quiz-item" data-status="pending" data-title="{{ quiz.title|lower }}">
+            <div class="quiz-status status-pending">
+                <i class="fas fa-clock me-1"></i> PENDING
+            </div>
+            <h3 class="quiz-title">{{ quiz.title }}</h3>
+            <p class="quiz-description">{{ quiz.description or 'Test your knowledge' }}</p>
+            <div class="quiz-meta">
+                <div class="quiz-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span>{{ quiz.time_limit }} min</span>
+                </div>
+                <div class="quiz-meta-item">
+                    <i class="fas fa-question-circle"></i>
+                    <span>{{ quiz.questions|length }} questions</span>
+                </div>
+                {% if quiz.proctoring_enabled %}
+                <div class="quiz-meta-item">
+                    <span class="badge" style="background: #ef4444; color: white; font-size: 0.7rem;">Proctored</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+    
+    <!-- User attempts -->
+    {% if my_attempts %}
+        {% for attempt in my_attempts %}
+            {% if attempt.status == 'completed' %}
+            <div class="quiz-item" data-status="completed" data-title="{{ attempt.quiz.title|lower }}">
+                <div class="quiz-status status-completed">
+                    <i class="fas fa-check-circle me-1"></i> COMPLETED
+                </div>
+                <div class="d-flex justify-content-between align-items-start">
+                    <div style="flex: 1;">
+                        <h3 class="quiz-title">{{ attempt.quiz.title }}</h3>
+                        <p class="quiz-description">{{ attempt.quiz.description or 'Completed quiz' }}</p>
+                        <div class="quiz-meta">
+                            <div class="quiz-meta-item">
+                                <i class="fas fa-calendar"></i>
+                                <span>{{ attempt.completed_at.strftime('%b %d, %Y') if attempt.completed_at else 'N/A' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quiz-score">{{ attempt.score|round(0)|int if attempt.score else 0 }}/100</div>
+                </div>
+            </div>
+            {% elif attempt.status == 'failed' %}
+            <div class="quiz-item" data-status="failed" data-title="{{ attempt.quiz.title|lower }}">
+                <div class="quiz-status status-failed">
+                    <i class="fas fa-times-circle me-1"></i> FAILED
+                </div>
+                <h3 class="quiz-title">{{ attempt.quiz.title }}</h3>
+                <p class="quiz-description">{{ attempt.quiz.description or 'Failed attempt' }}</p>
+                <div class="quiz-meta">
+                    <div class="quiz-meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>{{ attempt.started_at.strftime('%b %d, %Y') if attempt.started_at else 'N/A' }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</div>
+
+<!-- Bottom Navigation -->
+<div class="bottom-nav d-md-none">
+    <div class="row text-center">
+        <div class="col-3">
+            <a href="{{ url_for('participant_dashboard') }}" class="text-decoration-none text-muted">
+                <i class="fas fa-home" style="font-size: 1.5rem;"></i>
+                <div style="font-size: 0.75rem;">Dashboard</div>
+            </a>
+        </div>
+        <div class="col-3">
+            <a href="{{ url_for('quiz_listing') }}" class="text-decoration-none">
+                <i class="fas fa-chart-bar" style="color: #6366f1; font-size: 1.5rem;"></i>
+                <div style="color: #6366f1; font-size: 0.75rem; font-weight: 600;">Statistics</div>
+            </a>
+        </div>
+        <div class="col-3">
+            <a href="{{ url_for('profile') }}" class="text-decoration-none text-muted">
+                <i class="fas fa-user" style="font-size: 1.5rem;"></i>
+                <div style="font-size: 0.75rem;">Profile</div>
+            </a>
+        </div>
+        <div class="col-3">
+            <a href="#" class="text-decoration-none text-muted">
+                <i class="fas fa-cog" style="font-size: 1.5rem;"></i>
+                <div style="font-size: 0.75rem;">Settings</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function setActiveFilter(element, filter) {
+    // Remove active class from all tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Add active class to clicked tab
+    element.classList.add('active');
+    
+    // Filter quizzes
+    filterQuizzesByStatus(filter);
+}
+
+function filterQuizzesByStatus(status) {
+    const quizItems = document.querySelectorAll('.quiz-item');
+    
+    quizItems.forEach(item => {
+        const itemStatus = item.getAttribute('data-status');
+        
+        if (status === 'all' || itemStatus === status) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+function filterQuizzes() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const quizItems = document.querySelectorAll('.quiz-item');
+    const activeFilter = document.querySelector('.filter-tab.active').getAttribute('data-filter');
+    
+    quizItems.forEach(item => {
+        const title = item.getAttribute('data-title');
+        const status = item.getAttribute('data-status');
+        
+        const matchesSearch = title.includes(searchTerm);
+        const matchesFilter = activeFilter === 'all' || status === activeFilter;
+        
+        if (matchesSearch && matchesFilter) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+</script>
+
+{% endblock %}
