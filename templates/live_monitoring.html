@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Violation Monitoring - BigBossizzz</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #1e40af;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --success-color: #28a745;
+            --dark-bg: #1a1a1a;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .violation-card {
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .violation-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+        
+        .severity-high {
+            border-left-color: var(--danger-color);
+            background: linear-gradient(135deg, #ffeaea, #ffebee);
+        }
+        
+        .severity-medium {
+            border-left-color: var(--warning-color);
+            background: linear-gradient(135deg, #fffbf0, #fff8e1);
+        }
+        
+        .severity-low {
+            border-left-color: var(--success-color);
+            background: linear-gradient(135deg, #f0fdf4, #f7fff7);
+        }
+        
+        .live-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: var(--success-color);
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
+        .stats-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .violation-type-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .alert-sound {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="stats-card p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">
+                                <span class="live-indicator"></span>
+                                Live Violation Monitoring
+                            </h2>
+                            <p class="text-muted mb-0">Real-time proctoring alerts and violations</p>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <button class="btn btn-outline-primary me-2" onclick="toggleSound()">
+                                <i class="fas fa-volume-up" id="soundIcon"></i> Alerts
+                            </button>
+                            <button class="btn btn-primary" onclick="refreshData()">
+                                <i class="fas fa-sync" id="refreshIcon"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats Row -->
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="mb-1 text-danger" id="highViolations">0</h3>
+                                <small class="text-muted">High Severity</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="mb-1 text-warning" id="mediumViolations">0</h3>
+                                <small class="text-muted">Medium Severity</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="mb-1 text-success" id="lowViolations">0</h3>
+                                <small class="text-muted">Low Severity</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="mb-1 text-info" id="activeStudents">{{ active_quizzes|length }}</h3>
+                                <small class="text-muted">Active Quizzes</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Violations Feed -->
+        <div class="row">
+            <div class="col-12">
+                <div class="stats-card p-4">
+                    <h4 class="mb-3">
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                        Live Violations Feed
+                    </h4>
+                    
+                    <div id="violationsContainer">
+                        {% for event, attempt, student, quiz in recent_violations %}
+                        <div class="violation-card severity-{{ event.severity }} p-3" data-violation-id="{{ event.id }}">
+                            <div class="d-flex align-items-start">
+                                <div class="violation-type-icon bg-{{ 'danger' if event.severity == 'high' else 'warning' if event.severity == 'medium' else 'success' }} text-white">
+                                    {% if event.event_type == 'multiple_faces' %}
+                                        <i class="fas fa-users"></i>
+                                    {% elif event.event_type == 'tab_switch' %}
+                                        <i class="fas fa-window-restore"></i>
+                                    {% elif event.event_type == 'camera_blocked' %}
+                                        <i class="fas fa-video-slash"></i>
+                                    {% elif event.event_type == 'copy_attempt' %}
+                                        <i class="fas fa-copy"></i>
+                                    {% elif event.event_type == 'screenshot_attempt' %}
+                                        <i class="fas fa-camera"></i>
+                                    {% else %}
+                                        <i class="fas fa-exclamation"></i>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0 fw-bold">{{ student.username }}</h6>
+                                        <small class="text-muted">{{ event.timestamp.strftime('%H:%M:%S') }}</small>
+                                    </div>
+                                    
+                                    <p class="mb-1 text-dark">{{ event.details }}</p>
+                                    
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">
+                                            <i class="fas fa-book"></i> {{ quiz.title }}
+                                        </small>
+                                        <span class="badge bg-{{ 'danger' if event.severity == 'high' else 'warning' if event.severity == 'medium' else 'success' }}">
+                                            {{ event.severity.upper() }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if not recent_violations %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-shield-alt fa-3x mb-3"></i>
+                            <h5>No violations detected</h5>
+                            <p>All students are following quiz protocols.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Audio for alerts -->
+    <audio id="alertSound" class="alert-sound">
+        <source src="data:audio/wav;base64,UklGRvIBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoFAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBCJ+1e7OeDUHN4zH8+dNGQs=" type="audio/wav">
+    </audio>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let soundEnabled = true;
+        let lastCheck = new Date().toISOString();
+        
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            icon.className = soundEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute';
+        }
+        
+        function refreshData() {
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('fa-spin');
+            
+            // Use the existing monitoring API endpoint instead of WebSocket
+            fetch('/api/monitoring/live-data')
+                .then(response => response.json())
+                .then(data => {
+                    updateParticipantData(data.participants);
+                    lastCheck = new Date().toISOString();
+                })
+                .catch(error => {
+                    console.error('Error refreshing data:', error);
+                })
+                .finally(() => {
+                    icon.classList.remove('fa-spin');
+                });
+        }
+        
+        function updateParticipantData(participants) {
+            // Update active students count
+            document.getElementById('activeStudents').textContent = participants.length;
+            
+            // For now, just update the stats - full integration would require more backend changes
+            updateStats();
+        }
+        
+        function updateViolations(newViolations) {
+            const container = document.getElementById('violationsContainer');
+            
+            if (newViolations.length > 0) {
+                newViolations.forEach(violation => {
+                    // Check if violation already exists
+                    if (!document.querySelector(`[data-violation-id="${violation.id}"]`)) {
+                        const violationCard = createViolationCard(violation);
+                        container.insertAdjacentHTML('afterbegin', violationCard);
+                        
+                        // Play sound alert for high severity
+                        if (violation.severity === 'high' && soundEnabled) {
+                            document.getElementById('alertSound').play().catch(e => {});
+                        }
+                    }
+                });
+                
+                // Keep only latest 50 violations
+                const cards = container.querySelectorAll('.violation-card');
+                if (cards.length > 50) {
+                    for (let i = 50; i < cards.length; i++) {
+                        cards[i].remove();
+                    }
+                }
+            }
+        }
+        
+        function createViolationCard(violation) {
+            const severityClass = `severity-${violation.severity}`;
+            const badgeClass = violation.severity === 'high' ? 'danger' : violation.severity === 'medium' ? 'warning' : 'success';
+            const iconClass = violation.severity === 'high' ? 'danger' : violation.severity === 'medium' ? 'warning' : 'success';
+            
+            let icon = 'fas fa-exclamation';
+            if (violation.event_type.includes('multiple_faces')) icon = 'fas fa-users';
+            else if (violation.event_type.includes('tab_switch')) icon = 'fas fa-window-restore';
+            else if (violation.event_type.includes('camera')) icon = 'fas fa-video-slash';
+            else if (violation.event_type.includes('copy')) icon = 'fas fa-copy';
+            else if (violation.event_type.includes('screenshot')) icon = 'fas fa-camera';
+            
+            const timestamp = new Date(violation.timestamp).toLocaleTimeString();
+            
+            return `
+                <div class="violation-card ${severityClass} p-3" data-violation-id="${violation.id}">
+                    <div class="d-flex align-items-start">
+                        <div class="violation-type-icon bg-${iconClass} text-white">
+                            <i class="${icon}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="mb-0 fw-bold">${violation.student_name}</h6>
+                                <small class="text-muted">${timestamp}</small>
+                            </div>
+                            <p class="mb-1 text-dark">${violation.details}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="fas fa-book"></i> ${violation.quiz_title}
+                                </small>
+                                <span class="badge bg-${badgeClass}">
+                                    ${violation.severity.toUpperCase()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function updateStats() {
+            const violations = document.querySelectorAll('.violation-card');
+            let highCount = 0, mediumCount = 0, lowCount = 0;
+            
+            violations.forEach(card => {
+                if (card.classList.contains('severity-high')) highCount++;
+                else if (card.classList.contains('severity-medium')) mediumCount++;
+                else if (card.classList.contains('severity-low')) lowCount++;
+            });
+            
+            document.getElementById('highViolations').textContent = highCount;
+            document.getElementById('mediumViolations').textContent = mediumCount;
+            document.getElementById('lowViolations').textContent = lowCount;
+        }
+        
+        // Auto-refresh every 5 seconds
+        setInterval(refreshData, 5000);
+        
+        // Initialize stats
+        updateStats();
+    </script>
+</body>
+</html>
