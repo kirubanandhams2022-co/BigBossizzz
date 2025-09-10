@@ -226,6 +226,9 @@
 .navbar-brand {
     font-weight: 600;
     font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .navbar-brand i {
@@ -447,4 +450,301 @@ footer {
 body.light-theme {
     background-color: #f8f9fa !important;
     color: #212529 !important;
+}
+
+/* Robotic theme for icons throughout the app */
+.fas.fa-robot {
+    color: #0066cc;
+    text-shadow: 0 0 8px rgba(0, 102, 204, 0.4);
+}
+
+.fas.fa-eye {
+    color: #00ff41;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+.text-primary {
+    color: #0066cc !important;
+}
+
+/* ===== RESPONSIVE DESIGN ENHANCEMENTS ===== */
+/* Mobile First Approach */
+@media (max-width: 576px) {
+    .security-monitoring {
+        width: 280px;
+        height: 200px;
+    }
+    
+    .monitoring-zone {
+        border-radius: 15px;
+    }
+    
+    .person-silhouette i {
+        font-size: 2rem;
+    }
+    
+    .radar-sweep {
+        width: 120px;
+        height: 120px;
+        margin: -60px 0 0 -60px;
+    }
+    
+    .radar-sweep::before {
+        height: 60px;
+        margin-top: -60px;
+    }
+    
+    .robotic-eye-scanner {
+        width: 40px;
+        height: 40px;
+        top: -20px;
+        right: -20px;
+    }
+    
+    .eye-outer {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .eye-iris {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .eye-pupil {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .ring-1 { width: 35px; height: 35px; }
+    .ring-2 { width: 50px; height: 50px; }
+    .ring-3 { width: 65px; height: 65px; }
+    
+    .status-indicators {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .indicator {
+        font-size: 0.7rem;
+        padding: 3px 8px;
+    }
+    
+    .security-messages {
+        font-size: 12px;
+        padding: 10px;
+        max-width: 280px;
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    .robotic-eye-icon {
+        font-size: 1em;
+    }
+    
+    .progress {
+        width: 250px !important;
+    }
+    
+    /* Enhanced Card Responsiveness */
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .admin-card {
+        margin-bottom: 1rem;
+    }
+    
+    .course-card {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Form Responsiveness */
+    .form-control {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .btn {
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+    
+    /* Modal Responsiveness */
+    .modal-dialog {
+        margin: 1rem 0.5rem;
+    }
+    
+    .modal-lg {
+        max-width: calc(100vw - 1rem);
+    }
+    
+    /* Quiz Interface Responsiveness */
+    .quiz-container {
+        padding: 0 0.5rem;
+    }
+    
+    .question-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .camera-preview {
+        width: 120px;
+        height: 90px;
+        bottom: 10px;
+        right: 10px;
+    }
+    
+    .proctoring-indicator {
+        position: static;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    
+    /* Dashboard Responsiveness */
+    .dashboard-stat-card {
+        margin-bottom: 1rem;
+    }
+    
+    .row.mb-4 .col-md-3 {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+    .security-monitoring {
+        width: 350px;
+        height: 250px;
+    }
+    
+    .radar-sweep {
+        width: 160px;
+        height: 160px;
+        margin: -80px 0 0 -80px;
+    }
+    
+    .radar-sweep::before {
+        height: 80px;
+        margin-top: -80px;
+    }
+    
+    .status-indicators {
+        gap: 12px;
+    }
+    
+    .security-messages {
+        max-width: 320px;
+    }
+    
+    /* Table Responsiveness */
+    .table-responsive {
+        border: none;
+    }
+    
+    .table {
+        font-size: 0.875rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.25rem;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 992px) {
+    .security-monitoring {
+        width: 380px;
+        height: 280px;
+    }
+    
+    /* Navigation Responsiveness */
+    .navbar-nav {
+        text-align: center;
+    }
+    
+    .navbar-nav .nav-link {
+        padding: 0.75rem 1rem;
+    }
+}
+
+@media (min-width: 1200px) {
+    .security-monitoring {
+        width: 450px;
+        height: 350px;
+    }
+    
+    .radar-sweep {
+        width: 240px;
+        height: 240px;
+        margin: -120px 0 0 -120px;
+    }
+    
+    .radar-sweep::before {
+        height: 120px;
+        margin-top: -120px;
+    }
+    
+    .robotic-eye-scanner {
+        width: 80px;
+        height: 80px;
+        top: -40px;
+        right: -40px;
+    }
+    
+    .eye-outer {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .eye-iris {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .eye-pupil {
+        width: 10px;
+        height: 10px;
+    }
+    
+    .ring-1 { width: 60px; height: 60px; }
+    .ring-2 { width: 85px; height: 85px; }
+    .ring-3 { width: 110px; height: 110px; }
+}
+
+/* Footer Responsiveness */
+@media (max-width: 768px) {
+    footer .row {
+        text-align: center;
+    }
+    
+    footer .col-md-6:last-child {
+        margin-top: 1rem;
+    }
+}
+
+/* Container responsiveness */
+@media (max-width: 576px) {
+    .container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+}
+
+/* Enhanced hover effects for mobile */
+@media (hover: none) {
+    .card:hover,
+    .course-card:hover,
+    .question-card:hover {
+        transform: none;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
 }

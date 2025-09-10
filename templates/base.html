@@ -17,22 +17,51 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <!-- Loading Screen -->
+    <!-- Security Monitoring Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
-            <div class="computer-graphic">
-                <i class="fas fa-desktop fa-4x text-primary mb-3"></i>
-                <div class="code-animation">
-                    <div class="typing-text">
-                        <span class="typed-text"></span>
-                        <span class="cursor">&nbsp;</span>
+            <div class="security-monitoring">
+                <div class="monitoring-zone">
+                    <div class="person-silhouette">
+                        <i class="fas fa-user fa-3x"></i>
+                    </div>
+                    <div class="scanning-grid"></div>
+                    <div class="radar-sweep"></div>
+                    <div class="robotic-eye-scanner">
+                        <div class="eye-outer">
+                            <div class="eye-iris">
+                                <div class="eye-pupil"></div>
+                            </div>
+                        </div>
+                        <div class="tech-rings">
+                            <div class="ring ring-1"></div>
+                            <div class="ring ring-2"></div>
+                            <div class="ring ring-3"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="security-status">
+                    <div class="status-indicators">
+                        <span class="indicator active">🔴 MONITORING</span>
+                        <span class="indicator">🟡 ANALYZING</span>
+                        <span class="indicator">🟢 SECURE</span>
                     </div>
                 </div>
             </div>
-            <h3 class="mt-4 text-primary">BigBossizzz</h3>
-            <p class="text-muted">Loading your proctoring platform...</p>
-            <div class="progress" style="width: 200px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 100%"></div>
+            <h3 class="mt-4 text-light">
+                <i class="fas fa-robot text-info me-2"></i>
+                <span class="robotic-eye-icon">👁</span>
+                <strong>BigBossizzz</strong>
+            </h3>
+            <p class="text-light-emphasis">🛡️ Initializing Security Monitoring...</p>
+            <div class="progress" style="width: 300px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%; background: linear-gradient(90deg, #00ff41, #0066cc);"></div>
+            </div>
+            <div class="security-messages mt-3">
+                <div class="typing-text">
+                    <span class="typed-text"></span>
+                    <span class="cursor">█</span>
+                </div>
             </div>
         </div>
     </div>
@@ -41,7 +70,9 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-desktop text-primary"></i> BigBossizzz
+                <i class="fas fa-robot text-primary me-2"></i>
+                <span class="robotic-eye-icon">👁</span>
+                <strong>BigBossizzz</strong>
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
