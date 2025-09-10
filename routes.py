@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, DeviceLog, SecurityAlert
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from datetime import datetime, timedelta
@@ -2929,6 +2929,231 @@ def admin_delete_quiz(quiz_id):
     
     flash(f'Quiz "{quiz.title}" has been permanently deleted.', 'success')
     return redirect(url_for('admin_quiz_management'))
+
+# ===== COURSE MANAGEMENT SYSTEM =====
+@app.route('/admin/course-management')
+@login_required
+def admin_course_management():
+    """Admin course management system"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    courses = Course.query.order_by(Course.created_at.desc()).all()
+    hosts = User.query.filter_by(role='host').all()
+    participants = User.query.filter_by(role='participant').all()
+    
+    # Get course statistics
+    course_stats = {}
+    for course in courses:
+        stats = {
+            'total_hosts': len(course.host_assignments),
+            'total_participants': len(course.participant_enrollments),
+            'total_quizzes': len(course.quizzes),
+            'active_quizzes': len([q for q in course.quizzes if q.is_active])
+        }
+        course_stats[course.id] = stats
+    
+    return render_template('admin_course_management.html', 
+                         courses=courses, 
+                         hosts=hosts, 
+                         participants=participants,
+                         course_stats=course_stats)
+
+@app.route('/admin/create-course', methods=['POST'])
+@login_required
+def admin_create_course():
+    """Create new course"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    name = request.form.get('name')
+    code = request.form.get('code')
+    description = request.form.get('description')
+    max_participants = request.form.get('max_participants', 100, type=int)
+    
+    # Validation
+    if not all([name, code]):
+        flash('Course name and code are required.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    if Course.query.filter_by(code=code).first():
+        flash('Course code already exists.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    # Create course
+    course = Course()
+    course.name = name
+    course.code = code.upper()
+    course.description = description
+    course.max_participants = max_participants
+    
+    db.session.add(course)
+    db.session.commit()
+    
+    flash(f'Course "{name}" ({code}) created successfully.', 'success')
+    return redirect(url_for('admin_course_management'))
+
+@app.route('/admin/course/<int:course_id>/assign-host', methods=['POST'])
+@login_required
+def admin_assign_host_to_course(course_id):
+    """Assign host to course"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    host_id = request.form.get('host_id', type=int)
+    
+    if not host_id:
+        flash('Please select a host to assign.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    host = User.query.get_or_404(host_id)
+    if host.role != 'host':
+        flash('Selected user is not a host.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    # Check if already assigned
+    existing = HostCourseAssignment.query.filter_by(host_id=host_id, course_id=course_id).first()
+    if existing:
+        flash(f'Host {host.username} is already assigned to course {course.name}.', 'warning')
+        return redirect(url_for('admin_course_management'))
+    
+    # Create assignment
+    assignment = HostCourseAssignment()
+    assignment.host_id = host_id
+    assignment.course_id = course_id
+    assignment.assigned_by = current_user.id
+    
+    db.session.add(assignment)
+    db.session.commit()
+    
+    flash(f'Host {host.username} assigned to course {course.name} successfully.', 'success')
+    return redirect(url_for('admin_course_management'))
+
+@app.route('/admin/course/<int:course_id>/enroll-participant', methods=['POST'])
+@login_required
+def admin_enroll_participant_in_course(course_id):
+    """Enroll participant in course"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    participant_id = request.form.get('participant_id', type=int)
+    
+    if not participant_id:
+        flash('Please select a participant to enroll.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    participant = User.query.get_or_404(participant_id)
+    if participant.role != 'participant':
+        flash('Selected user is not a participant.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    # Check participant limit
+    current_enrollments = len(course.participant_enrollments)
+    if current_enrollments >= course.max_participants:
+        flash(f'Course {course.name} has reached maximum participant limit ({course.max_participants}).', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    # Check if already enrolled
+    existing = ParticipantEnrollment.query.filter_by(participant_id=participant_id, course_id=course_id).first()
+    if existing:
+        flash(f'Participant {participant.username} is already enrolled in course {course.name}.', 'warning')
+        return redirect(url_for('admin_course_management'))
+    
+    # Create enrollment
+    enrollment = ParticipantEnrollment()
+    enrollment.participant_id = participant_id
+    enrollment.course_id = course_id
+    enrollment.enrolled_by = current_user.id
+    
+    db.session.add(enrollment)
+    db.session.commit()
+    
+    flash(f'Participant {participant.username} enrolled in course {course.name} successfully.', 'success')
+    return redirect(url_for('admin_course_management'))
+
+@app.route('/admin/course/<int:course_id>/remove-host/<int:host_id>', methods=['POST'])
+@login_required
+def admin_remove_host_from_course(course_id, host_id):
+    """Remove host from course"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    assignment = HostCourseAssignment.query.filter_by(host_id=host_id, course_id=course_id).first_or_404()
+    host_name = assignment.host.username
+    course_name = assignment.course.name
+    
+    db.session.delete(assignment)
+    db.session.commit()
+    
+    flash(f'Host {host_name} removed from course {course_name}.', 'success')
+    return redirect(url_for('admin_course_management'))
+
+@app.route('/admin/course/<int:course_id>/remove-participant/<int:participant_id>', methods=['POST'])
+@login_required
+def admin_remove_participant_from_course(course_id, participant_id):
+    """Remove participant from course"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    enrollment = ParticipantEnrollment.query.filter_by(participant_id=participant_id, course_id=course_id).first_or_404()
+    participant_name = enrollment.participant.username
+    course_name = enrollment.course.name
+    
+    db.session.delete(enrollment)
+    db.session.commit()
+    
+    flash(f'Participant {participant_name} removed from course {course_name}.', 'success')
+    return redirect(url_for('admin_course_management'))
+
+@app.route('/admin/course/<int:course_id>/toggle-status', methods=['POST'])
+@login_required
+def admin_toggle_course_status(course_id):
+    """Toggle course active status"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    course.is_active = not course.is_active
+    db.session.commit()
+    
+    status = 'activated' if course.is_active else 'deactivated'
+    flash(f'Course "{course.name}" has been {status}.', 'success')
+    return redirect(url_for('admin_course_management'))
+
+@app.route('/admin/course/<int:course_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_course(course_id):
+    """Delete course and all related data"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    course_name = course.name
+    
+    # Delete all related data
+    HostCourseAssignment.query.filter_by(course_id=course_id).delete()
+    ParticipantEnrollment.query.filter_by(course_id=course_id).delete()
+    
+    # Remove course association from quizzes (don't delete quizzes)
+    quizzes = Quiz.query.filter_by(course_id=course_id).all()
+    for quiz in quizzes:
+        quiz.course_id = None
+    
+    db.session.delete(course)
+    db.session.commit()
+    
+    flash(f'Course "{course_name}" has been permanently deleted.', 'success')
+    return redirect(url_for('admin_course_management'))
 
 @app.route('/api/quiz/<int:quiz_id>/stats')
 @login_required
