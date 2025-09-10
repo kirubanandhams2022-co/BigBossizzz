@@ -74,7 +74,7 @@
                                 </a>
                                 {% if violations > 0 %}
                                 <button type="button" class="btn btn-outline-warning" 
-                                        onclick="showViolations({{ attempt.id }}, '{{ attempt.user.username }}')">
+                                        onclick="showViolations({{ attempt.id }}, '{{ attempt.participant.username }}')">
                                     <i class="fas fa-exclamation-triangle"></i> Violations
                                 </button>
                                 {% endif %}
