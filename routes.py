@@ -1588,14 +1588,12 @@ def admin_create_user():
         return redirect(url_for('admin_users'))
     
     # Create user
-    user = User(
-        username=username,
-        email=email,
-        role=role
-    )
+    user = User()
+    user.username = username
+    user.email = email
+    user.role = role
     user.set_password(password)
     user.is_verified = True  # Admin-created users are pre-verified
-    user.is_active = True
     
     db.session.add(user)
     db.session.commit()
