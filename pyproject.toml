@@ -22,4 +22,7 @@ dependencies = [
     "pypdf2>=3.0.1",
     "python-docx>=1.2.0",
     "pandas>=2.3.2",
+    "flask-socketio>=5.5.1",
+    "eventlet>=0.40.3",
+    "docx>=0.2.4",
 ]
