@@ -513,37 +513,185 @@ class ProctoringManager {
     }
     
     detectFaces(imageData) {
-        // Simple face detection using pixel analysis
-        // In a real implementation, you would use a proper face detection library
-        
+        // Enhanced biometric-style face detection with multi-person detection
         const data = imageData.data;
-        let skinPixels = 0;
-        let totalPixels = data.length / 4;
+        const width = 640;
+        const height = 480;
         
-        // Simplified skin color detection
+        // Check if camera is blocked first
+        if (this.isCameraBlocked(data)) {
+            this.logViolation('camera_blocked', 'Camera appears to be blocked or covered', 'high');
+            return 0;
+        }
+        
+        // Detect face regions using enhanced algorithm
+        const faceRegions = this.detectFaceRegions(data, width, height);
+        const faceCount = faceRegions.length;
+        
+        // Enhanced lighting check
+        const avgBrightness = this.calculateAverageBrightness(data);
+        if (avgBrightness < 25) {
+            this.logViolation('poor_lighting', 'Environment too dark for proper face detection', 'medium');
+        }
+        
+        return faceCount;
+    }
+    
+    detectFaceRegions(data, width, height) {
+        const faces = [];
+        const blockSize = 40; // Larger blocks for better accuracy
+        
+        for (let y = 0; y < height - blockSize; y += 20) {
+            for (let x = 0; x < width - blockSize; x += 20) {
+                const faceScore = this.calculateFaceScore(data, x, y, blockSize, width);
+                
+                if (faceScore > 0.4) {
+                    // Check if this region overlaps with existing faces
+                    const overlaps = faces.some(face => 
+                        Math.abs(face.x - x) < blockSize && Math.abs(face.y - y) < blockSize
+                    );
+                    
+                    if (!overlaps) {
+                        faces.push({ x, y, score: faceScore, width: blockSize, height: blockSize });
+                    }
+                }
+            }
+        }
+        
+        // Filter out weak detections and merge nearby regions
+        return this.refineFaceDetections(faces);
+    }
+    
+    calculateFaceScore(data, startX, startY, blockSize, width) {
+        let skinPixels = 0;
+        let totalPixels = 0;
+        let edgePixels = 0;
+        
+        for (let y = startY; y < startY + blockSize; y++) {
+            for (let x = startX; x < startX + blockSize; x++) {
+                if (y >= 0 && y < 480 && x >= 0 && x < width) {
+                    const i = (y * width + x) * 4;
+                    if (i < data.length - 3) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        
+                        totalPixels++;
+                        
+                        // Enhanced skin tone detection
+                        if (this.isEnhancedSkinTone(r, g, b)) {
+                            skinPixels++;
+                        }
+                        
+                        // Edge detection for facial features
+                        if (this.isEdgePixel(data, x, y, width)) {
+                            edgePixels++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (totalPixels === 0) return 0;
+        
+        const skinRatio = skinPixels / totalPixels;
+        const edgeRatio = edgePixels / totalPixels;
+        
+        // Combined score considering skin tone and facial features
+        return (skinRatio * 0.6) + (edgeRatio * 0.4);
+    }
+    
+    isEnhancedSkinTone(r, g, b) {
+        // More sophisticated skin tone detection
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        
+        return r > 95 && g > 40 && b > 20 && 
+               max - min > 15 && 
+               Math.abs(r - g) > 15 && 
+               r > g && r > b &&
+               r < 255 && g < 200 && b < 170 &&
+               (r + g + b) > 200; // Ensure sufficient brightness
+    }
+    
+    isEdgePixel(data, x, y, width) {
+        const i = (y * width + x) * 4;
+        const rightI = (y * width + x + 1) * 4;
+        const downI = ((y + 1) * width + x) * 4;
+        
+        if (rightI >= data.length || downI >= data.length) return false;
+        
+        const grayCenter = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const grayRight = (data[rightI] + data[rightI + 1] + data[rightI + 2]) / 3;
+        const grayDown = (data[downI] + data[downI + 1] + data[downI + 2]) / 3;
+        
+        return Math.abs(grayCenter - grayRight) > 25 || Math.abs(grayCenter - grayDown) > 25;
+    }
+    
+    refineFaceDetections(faces) {
+        // Sort by score and filter out weak detections
+        faces.sort((a, b) => b.score - a.score);
+        
+        if (faces.length <= 1) return faces;
+        
+        // Remove overlapping detections (keep the stronger ones)
+        const refined = [];
+        for (let i = 0; i < faces.length; i++) {
+            const current = faces[i];
+            let isOverlapped = false;
+            
+            for (let j = 0; j < refined.length; j++) {
+                const existing = refined[j];
+                const distance = Math.sqrt(
+                    Math.pow(current.x - existing.x, 2) + 
+                    Math.pow(current.y - existing.y, 2)
+                );
+                
+                if (distance < 60) { // Faces closer than 60 pixels are considered same person
+                    isOverlapped = true;
+                    break;
+                }
+            }
+            
+            if (!isOverlapped && current.score > 0.5) {
+                refined.push(current);
+            }
+        }
+        
+        return refined;
+    }
+    
+    isCameraBlocked(data) {
+        let darkPixels = 0;
+        const totalPixels = data.length / 4;
+        
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
+            const brightness = (r + g + b) / 3;
             
-            // Basic skin color detection
-            if (r > 95 && g > 40 && b > 20 && 
-                Math.max(r, g, b) - Math.min(r, g, b) > 15 && 
-                Math.abs(r - g) > 15 && r > g && r > b) {
-                skinPixels++;
+            if (brightness < 15) {
+                darkPixels++;
             }
         }
         
-        const skinRatio = skinPixels / totalPixels;
+        // If more than 85% of pixels are very dark, camera is likely blocked
+        return (darkPixels / totalPixels) > 0.85;
+    }
+    
+    calculateAverageBrightness(data) {
+        let totalBrightness = 0;
+        const totalPixels = data.length / 4;
         
-        // Estimate face count based on skin ratio
-        if (skinRatio > 0.02 && skinRatio < 0.15) {
-            return 1; // One face detected
-        } else if (skinRatio > 0.15) {
-            return Math.floor(skinRatio / 0.08); // Multiple faces
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            totalBrightness += (r + g + b) / 3;
         }
         
-        return 0; // No face detected
+        return totalPixels > 0 ? totalBrightness / totalPixels : 0;
     }
     
     checkFaceViolations(faceCount) {
@@ -599,6 +747,7 @@ class ProctoringManager {
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     this.logViolation('tab_switch', 'User switched away from quiz tab', 'high');
+                    this.notifyHostAdmin('Student switched away from quiz tab', 'high');
                 }
             });
         }
@@ -607,6 +756,7 @@ class ProctoringManager {
         if (this.config.windowBlurDetection) {
             window.addEventListener('blur', () => {
                 this.logViolation('window_blur', 'Quiz window lost focus', 'medium');
+                this.notifyHostAdmin('Student left quiz window', 'medium');
             });
         }
 
@@ -698,11 +848,18 @@ class ProctoringManager {
                         e.preventDefault();
                         e.stopPropagation();
                         this.logViolation('blocked_shortcut', `Blocked shortcut: ${combo.key}`, 'medium');
+                        this.notifyHostAdmin(`Student attempted blocked shortcut: ${combo.key}`, 'medium');
                         return false;
                     }
                 }
             });
         }
+
+        // Enhanced screenshot detection
+        this.setupScreenshotDetection();
+        
+        // Enhanced browser focus monitoring
+        this.setupBrowserFocusMonitoring();
 
         // Enhanced screenshot detection and prevention
         if (this.config.screenshotDetection) {
@@ -1619,6 +1776,92 @@ class ProctoringManager {
             console.error('Identity verification failed:', error);
             return false; // Fail safe
         }
+    }
+
+    // ===== REAL-TIME NOTIFICATION SYSTEM =====
+    notifyHostAdmin(message, severity = 'medium') {
+        // Send immediate notification to hosts and admins
+        const notification = {
+            message,
+            severity,
+            student: this.getStudentInfo(),
+            timestamp: new Date().toISOString(),
+            attemptId: this.attemptId
+        };
+
+        // Send via WebSocket for real-time notifications
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'violation_alert',
+                data: notification
+            }));
+        }
+
+        // Also send via HTTP API as backup
+        fetch('/api/proctoring/notify-violation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(notification)
+        }).catch(err => console.error('Failed to send violation notification:', err));
+    }
+
+    getStudentInfo() {
+        // Get student identification info for notifications
+        return {
+            id: window.currentUserId || 'unknown',
+            name: window.currentUserName || 'Unknown Student',
+            email: window.currentUserEmail || 'unknown@example.com'
+        };
+    }
+
+    setupScreenshotDetection() {
+        // Enhanced screenshot detection beyond just PrintScreen key
+        
+        // Detect print screen attempts
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'PrintScreen') {
+                this.logViolation('screenshot_attempt', 'Screenshot attempt detected (PrintScreen)', 'high');
+                this.notifyHostAdmin('Student attempted to take screenshot', 'high');
+            }
+        });
+
+        // Monitor clipboard for screenshot pastes
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData?.items;
+            if (items) {
+                for (let item of items) {
+                    if (item.type.indexOf('image') !== -1) {
+                        this.logViolation('image_paste', 'Image pasted from clipboard (possible screenshot)', 'high');
+                        this.notifyHostAdmin('Student pasted image from clipboard', 'high');
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    setupBrowserFocusMonitoring() {
+        // Enhanced focus monitoring with multiple detection methods
+        let focusLostTime = 0;
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                focusLostTime = Date.now();
+            } else if (focusLostTime > 0) {
+                const timeAway = Date.now() - focusLostTime;
+                if (timeAway > 3000) { // More than 3 seconds away
+                    this.logViolation('extended_focus_loss', 
+                        `Student was away for ${Math.round(timeAway/1000)} seconds`, 'high');
+                    this.notifyHostAdmin(`Student was away from quiz for ${Math.round(timeAway/1000)} seconds`, 'high');
+                }
+                focusLostTime = 0;
+            }
+        });
+
+        // Mouse leave detection (student left quiz area)
+        document.addEventListener('mouseleave', () => {
+            this.logViolation('mouse_left_window', 'Mouse cursor left the quiz window', 'low');
+        });
     }
 
     hideVerificationModal() {

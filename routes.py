@@ -2072,6 +2072,85 @@ def verify_identity():
         return jsonify({'verified': False, 'error': f'Verification failed: {str(e)}'})
 
 
+@app.route('/api/proctoring/notify-violation', methods=['POST'])
+@login_required
+def notify_violation():
+    """API endpoint for real-time violation notifications to hosts and admins"""
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'})
+        
+        # Extract notification details
+        message = data.get('message', 'Unknown violation')
+        severity = data.get('severity', 'medium')
+        attempt_id = data.get('attemptId')
+        student_info = data.get('student', {})
+        
+        if not attempt_id:
+            return jsonify({'success': False, 'error': 'Attempt ID required'})
+        
+        # Get the quiz attempt and related quiz/host info
+        attempt = QuizAttempt.query.get(attempt_id)
+        if not attempt:
+            return jsonify({'success': False, 'error': 'Invalid attempt ID'})
+        
+        quiz = attempt.quiz
+        host = quiz.creator
+        
+        # Create violation notification record (for tracking)
+        violation_notification = ProctoringEvent(
+            attempt_id=attempt_id,
+            event_type='notification_sent',
+            details=f"Real-time notification: {message}",
+            severity=severity,
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(violation_notification)
+        
+        # Send email notification to host if high severity
+        if severity == 'high':
+            try:
+                subject = f"🚨 URGENT: Quiz Violation Alert - {student_info.get('name', 'Student')}"
+                body = f"""
+                URGENT VIOLATION ALERT
+                
+                Student: {student_info.get('name', 'Unknown')} ({student_info.get('email', 'N/A')})
+                Quiz: {quiz.title}
+                Violation: {message}
+                Severity: {severity.upper()}
+                Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+                
+                Please check the live monitoring dashboard immediately.
+                
+                Quiz URL: {request.url_root}host/live-monitoring
+                """
+                
+                msg = Message(
+                    subject=subject,
+                    recipients=[host.email],
+                    body=body
+                )
+                
+                mail.send(msg)
+                
+            except Exception as email_error:
+                logging.error(f"Failed to send violation email: {email_error}")
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Violation notification processed successfully',
+            'notification_sent': True
+        })
+        
+    except Exception as e:
+        logging.error(f"Error processing violation notification: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'})
+
+
 import os
 import csv
 import io
