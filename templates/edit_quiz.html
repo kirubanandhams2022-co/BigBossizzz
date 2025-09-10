@@ -11,6 +11,18 @@
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
+.question-type-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+.question-type-card:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+}
+.step-content {
+    min-height: 300px;
+}
 </style>
 {% endblock %}
 
@@ -72,7 +84,7 @@
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary w-100">
+                    <button type="submit" class="btn btn-primary w-100" id="updateQuizBtn">
                         <i class="fas fa-save"></i> Update Quiz
                     </button>
                 </form>
@@ -111,6 +123,9 @@
                 <h5><i class="fas fa-question-circle"></i> Questions ({{ quiz.questions|length }})</h5>
                 <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addQuestionModal">
                     <i class="fas fa-plus"></i> Add Question
+                </button>
+                <button class="btn btn-info btn-sm ms-2" onclick="autoSaveProgress()">
+                    <i class="fas fa-cloud-upload-alt"></i> Auto-Save
                 </button>
             </div>
             <div class="card-body">
@@ -250,6 +265,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/quiz-creation.js') }}"></script>
 <script>
 function toggleOptions() {
     const questionType = document.getElementById('questionType').value;

@@ -34,8 +34,8 @@
                 <tbody>
                     {% for attempt in attempts %}
                     <tr>
-                        <td><strong>{{ attempt.user.username }}</strong></td>
-                        <td>{{ attempt.user.email }}</td>
+                        <td><strong>{{ attempt.participant.username }}</strong></td>
+                        <td>{{ attempt.participant.email }}</td>
                         <td>{{ attempt.quiz.title }}</td>
                         <td>
                             {% if attempt.score is not none %}
