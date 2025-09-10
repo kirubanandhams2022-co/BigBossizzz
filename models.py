@@ -215,7 +215,6 @@ class ProctoringEvent(db.Model):
     details = db.Column(db.Text)  # Additional event details
     severity = db.Column(db.String(20), default='low')  # 'low', 'medium', 'high'
     description = db.Column(db.Text)  # Add description field
-    metadata = db.Column(db.Text)  # Add metadata field for JSON data
     
     # Add the missing relationship
     attempt = db.relationship('QuizAttempt', backref='proctoring_events', lazy=True)
