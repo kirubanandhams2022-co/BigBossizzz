@@ -9,6 +9,12 @@
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
             <i class="fas fa-user-plus"></i> Create User
         </button>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#bulkCreateModal">
+            <i class="fas fa-users"></i> Bulk Create
+        </button>
+        <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
+            <i class="fas fa-file-excel"></i> Excel Upload
+        </button>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left"></i> Dashboard
         </a>
@@ -250,6 +256,113 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Reset Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Create Users Modal -->
+<div class="modal fade" id="bulkCreateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-users"></i> Bulk Create Users</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_bulk_create_users') }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Format:</strong> Enter one user per line in this format:<br>
+                        <code>username,email,password,role</code><br>
+                        <small>Password and role are optional. If not provided, auto-generated password and default role will be used.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Default Role for Users</label>
+                        <select name="default_role" class="form-select">
+                            <option value="participant">Participant</option>
+                            <option value="host">Host</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">User Data</label>
+                        <textarea name="users_data" class="form-control" rows="10" placeholder="student1,student1@example.com,password123,participant
+student2,student2@example.com,,participant
+teacher1,teacher1@example.com,teacherpass,host
+admin1,admin1@example.com,adminpass,admin" required></textarea>
+                        <small class="text-muted">Example: student1,student1@example.com,password123,participant</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Users</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Excel Upload Modal -->
+<div class="modal fade" id="excelUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-file-excel"></i> Upload Excel File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_upload_users_excel') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Excel Format:</strong> Your Excel file should have columns:<br>
+                        <strong>Required:</strong> <code>username</code>, <code>email</code><br>
+                        <strong>Optional:</strong> <code>password</code>, <code>role</code>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Excel File</label>
+                        <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xls" required>
+                        <small class="text-muted">Supported formats: .xlsx, .xls</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Excel Template Example:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>username</th>
+                                        <th>email</th>
+                                        <th>password</th>
+                                        <th>role</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>student1</td>
+                                        <td>student1@example.com</td>
+                                        <td>password123</td>
+                                        <td>participant</td>
+                                    </tr>
+                                    <tr>
+                                        <td>teacher1</td>
+                                        <td>teacher1@example.com</td>
+                                        <td></td>
+                                        <td>host</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <small class="text-muted">Empty password cells will get auto-generated passwords</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info">Upload & Create Users</button>
                 </div>
             </form>
         </div>

@@ -1665,6 +1665,165 @@ def admin_create_user():
     flash(f'User {username} created successfully with role {role}.', 'success')
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/bulk-create-users', methods=['POST'])
+@login_required
+def admin_bulk_create_users():
+    """Create multiple users at once"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    users_data = request.form.get('users_data', '').strip()
+    default_role = request.form.get('default_role', 'participant')
+    
+    if not users_data:
+        flash('Please provide user data.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Parse user data (format: username,email,password per line)
+    lines = [line.strip() for line in users_data.split('\n') if line.strip()]
+    created_count = 0
+    errors = []
+    
+    for i, line in enumerate(lines, 1):
+        try:
+            parts = [part.strip() for part in line.split(',')]
+            if len(parts) < 2:
+                errors.append(f"Line {i}: Invalid format. Expected: username,email,password (or username,email for auto-generated password)")
+                continue
+            
+            username = parts[0]
+            email = parts[1]
+            password = parts[2] if len(parts) >= 3 else f"BigBoss{__import__('random').randrange(1000, 9999)}"
+            role = parts[3] if len(parts) >= 4 else default_role
+            
+            # Validation
+            if not username or not email:
+                errors.append(f"Line {i}: Username and email are required")
+                continue
+            
+            if User.query.filter_by(email=email).first():
+                errors.append(f"Line {i}: Email {email} already exists")
+                continue
+            
+            if User.query.filter_by(username=username).first():
+                errors.append(f"Line {i}: Username {username} already exists")
+                continue
+            
+            if role not in ['admin', 'host', 'participant']:
+                errors.append(f"Line {i}: Invalid role {role}")
+                continue
+            
+            # Create user
+            user = User()
+            user.username = username
+            user.email = email
+            user.role = role
+            user.set_password(password)
+            user.is_verified = True
+            
+            db.session.add(user)
+            created_count += 1
+            
+        except Exception as e:
+            errors.append(f"Line {i}: Error processing - {str(e)}")
+    
+    try:
+        db.session.commit()
+        if created_count > 0:
+            flash(f'Successfully created {created_count} users.', 'success')
+        if errors:
+            flash(f'Errors encountered: {"; ".join(errors[:5])}{"..." if len(errors) > 5 else ""}', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Database error: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/upload-users-excel', methods=['POST'])
+@login_required
+def admin_upload_users_excel():
+    """Upload users from Excel file"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if 'excel_file' not in request.files:
+        flash('No file selected.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    file = request.files['excel_file']
+    if file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        flash('Please upload an Excel file (.xlsx or .xls).', 'error')
+        return redirect(url_for('admin_users'))
+    
+    try:
+        # Read Excel file
+        import pandas as pd
+        df = pd.read_excel(file)
+        
+        # Expected columns: username, email, password (optional), role (optional)
+        required_columns = ['username', 'email']
+        if not all(col in df.columns for col in required_columns):
+            flash(f'Excel file must contain columns: {", ".join(required_columns)}. Optional: password, role', 'error')
+            return redirect(url_for('admin_users'))
+        
+        created_count = 0
+        errors = []
+        
+        for index, row in df.iterrows():
+            try:
+                username = str(row['username']).strip()
+                email = str(row['email']).strip()
+                password = str(row.get('password', f'BigBoss{__import__("random").randrange(1000, 9999)}')).strip()
+                role = str(row.get('role', 'participant')).strip().lower()
+                
+                # Validation
+                if not username or not email or username == 'nan' or email == 'nan':
+                    errors.append(f"Row {index + 2}: Username and email are required")
+                    continue
+                
+                if User.query.filter_by(email=email).first():
+                    errors.append(f"Row {index + 2}: Email {email} already exists")
+                    continue
+                
+                if User.query.filter_by(username=username).first():
+                    errors.append(f"Row {index + 2}: Username {username} already exists")
+                    continue
+                
+                if role not in ['admin', 'host', 'participant']:
+                    role = 'participant'  # Default to participant if invalid
+                
+                # Create user
+                user = User()
+                user.username = username
+                user.email = email
+                user.role = role
+                user.set_password(password)
+                user.is_verified = True
+                
+                db.session.add(user)
+                created_count += 1
+                
+            except Exception as e:
+                errors.append(f"Row {index + 2}: Error - {str(e)}")
+        
+        db.session.commit()
+        
+        if created_count > 0:
+            flash(f'Successfully created {created_count} users from Excel file.', 'success')
+        if errors:
+            flash(f'Errors: {"; ".join(errors[:3])}{"..." if len(errors) > 3 else ""}', 'warning')
+            
+    except Exception as e:
+        flash(f'Error reading Excel file: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users'))
+
 @app.route('/host/participants')
 @login_required
 def host_participants():

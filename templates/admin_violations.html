@@ -112,7 +112,7 @@
                 <div class="col-md-3">
                     <div class="card bg-secondary text-white">
                         <div class="card-body text-center">
-                            <h4>{{ violations|selectattr('attempt.status', 'equalto', 'terminated')|list|length }}</h4>
+                            <h4>{{ violations|selectattr('attempt_status', 'equalto', 'terminated')|list|length }}</h4>
                             <small>Terminated Quizzes</small>
                         </div>
                     </div>
