@@ -34,11 +34,15 @@ class BrevoEmailService:
         if not self.api_key:
             raise ValueError("❌ CRITICAL: BREVO_API_KEY not set. Email system cannot function!")
         
-        # Handle sender email - allow academic testing with fallback
+        # Handle sender email - strict for production, fallback for development  
         if not self.sender_email:
-            # For academic testing, use fallback with clear warning
-            logging.warning("⚠️ ACADEMIC TESTING: Using fallback sender. For production, set BREVO_SENDER_EMAIL!")
-            self.sender_email = "noreply@bigbossizzz.com"  # Academic development fallback
+            is_production = os.environ.get('FLASK_ENV') == 'production'
+            if is_production:
+                logging.error("❌ PRODUCTION: BREVO_SENDER_EMAIL required! Please configure verified domain.")
+                self.sender_email = "noreply@bigbossizzz.com"  # Will likely bounce in production
+            else:
+                logging.warning("⚠️ DEVELOPMENT: Using fallback sender. Set BREVO_SENDER_EMAIL for production!")
+                self.sender_email = "noreply@bigbossizzz.com"  # Development fallback
     
     def send_email(self, 
                    to_email: str, 
