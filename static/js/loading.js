@@ -30,7 +30,8 @@ class LoadingManager {
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             z-index: 10000;
             display: none;
             align-items: center;
@@ -38,41 +39,36 @@ class LoadingManager {
         `;
         
         this.overlay.innerHTML = `
-            <div style="text-align: center; color: #fff;">
-                <div style="position: relative; margin: 0 auto 2rem; width: 120px; height: 120px;">
-                    <div class="tech-eye-container" style="
+            <div style="text-align: center; color: #333;">
+                <div style="position: relative; margin: 0 auto 2rem; width: 80px; height: 80px;">
+                    <div class="professional-spinner" style="
                         position: relative;
-                        width: 120px;
-                        height: 120px;
+                        width: 80px;
+                        height: 80px;
                         border-radius: 50%;
-                        overflow: hidden;
-                        animation: techEyePulse 2s ease-in-out infinite;
-                        box-shadow: 0 0 30px rgba(103, 102, 241, 0.8);
-                    ">
-                        <img src="/static/images/tech-eye-loading.jpg" style="
-                            width: 100%;
-                            height: 100%;
-                            object-fit: cover;
-                            animation: techEyeRotate 3s linear infinite;
-                        " alt="Tech Eye">
-                        <div style="
-                            position: absolute;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            background: linear-gradient(45deg, transparent 30%, rgba(103, 102, 241, 0.3) 50%, transparent 70%);
-                            animation: techEyeScan 2s ease-in-out infinite;
-                        "></div>
-                    </div>
+                        border: 4px solid #f0f0f0;
+                        border-top: 4px solid #4f46e5;
+                        animation: professionalSpin 1s linear infinite;
+                    "></div>
+                    <div style="
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 24px;
+                        height: 24px;
+                        background: #4f46e5;
+                        border-radius: 50%;
+                        opacity: 0.8;
+                    "></div>
                 </div>
                 
-                <div style="font-size: 1.3rem; margin-bottom: 1rem; animation: loadingFade 2s ease-in-out infinite; font-weight: 600;">
-                    🤖 BigBossizzz
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #1f2937; font-weight: 600;">
+                    Assessment Platform
                 </div>
                 
-                <div style="font-size: 0.95rem; color: #a0a0a0; margin-bottom: 1.5rem; animation: techTypeWriter 3s ease-in-out infinite;">
-                    <span class="loading-text">Initializing AI surveillance systems...</span>
+                <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 1.5rem;">
+                    <span class="loading-text">Loading your workspace...</span>
                 </div>
                 
                 <div style="width: 240px; height: 4px; background: rgba(103, 102, 241, 0.2); border-radius: 3px; margin: 0 auto; overflow: hidden;">

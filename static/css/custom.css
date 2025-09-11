@@ -205,6 +205,18 @@
     to { transform: rotate(360deg); }
 }
 
+/* Professional loading animations */
+@keyframes professionalSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes professionalProgress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+    100% { transform: translateX(300%); }
+}
+
 /* Alert enhancements */
 .alert-info {
     border-left: 4px solid var(--custom-info);

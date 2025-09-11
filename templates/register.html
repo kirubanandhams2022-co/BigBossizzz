@@ -3,41 +3,59 @@
 {% block title %}Register - BigBossizzz{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-        <div class="card">
-            <div class="card-header text-center">
-                <h3><i class="fas fa-user-plus"></i> Create Account</h3>
-            </div>
-            <div class="card-body">
+<div class="row justify-content-center min-vh-100 align-items-center">
+    <div class="col-md-8 col-lg-6">
+        <!-- Professional Register Card -->
+        <div class="card shadow-lg border-0 rounded-4">
+            <div class="card-body p-5">
+                <!-- Brand Header -->
+                <div class="text-center mb-5">
+                    <div class="mb-3">
+                        <i class="fas fa-user-plus fa-3x text-primary"></i>
+                    </div>
+                    <h2 class="fw-bold text-dark mb-2">Create Account</h2>
+                    <p class="text-muted">Join our assessment platform today</p>
+                </div>
                 <form method="POST">
                     {{ form.hidden_tag() }}
                     
-                    <div class="mb-3">
-                        {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
-                        {% for error in form.username.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
-                        {% endfor %}
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            {{ form.username.label(class="form-label fw-semibold text-dark") }}
+                            {{ form.username(class="form-control form-control-lg rounded-3" + (" is-invalid" if form.username.errors else "")) }}
+                            {% for error in form.username.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            {{ form.email.label(class="form-label fw-semibold text-dark") }}
+                            {{ form.email(class="form-control form-control-lg rounded-3" + (" is-invalid" if form.email.errors else "")) }}
+                            {% for error in form.email.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
                     </div>
                     
-                    <div class="mb-3">
-                        {{ form.email.label(class="form-label") }}
-                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
-                        {% for error in form.email.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        {{ form.role.label(class="form-label") }}
-                        {{ form.role(class="form-select" + (" is-invalid" if form.role.errors else "")) }}
+                    <div class="mb-4">
+                        {{ form.role.label(class="form-label fw-semibold text-dark") }}
+                        {{ form.role(class="form-select form-select-lg rounded-3" + (" is-invalid" if form.role.errors else "")) }}
                         {% for error in form.role.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
-                        <div class="form-text">
-                            <strong>Host:</strong> Create and manage quizzes<br>
-                            <strong>Participant:</strong> Take quizzes and view results
+                        <div class="bg-light p-3 rounded-3 mt-2">
+                            <div class="row">
+                                <div class="col-6">
+                                    <i class="fas fa-chalkboard-teacher text-primary me-2"></i>
+                                    <strong>Host:</strong><br>
+                                    <small class="text-muted">Create and manage quizzes</small>
+                                </div>
+                                <div class="col-6">
+                                    <i class="fas fa-user-graduate text-success me-2"></i>
+                                    <strong>Participant:</strong><br>
+                                    <small class="text-muted">Take quizzes and view results</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -67,18 +85,20 @@
                         {% endfor %}
                     </div>
                     
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-user-plus"></i> Create Account
+                    <div class="d-grid mb-4">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-3 py-3">
+                            <i class="fas fa-user-plus me-2"></i> Create Account
                         </button>
                     </div>
                 </form>
-            </div>
-            <div class="card-footer text-center">
-                <p class="mb-0">
-                    Already have an account? 
-                    <a href="{{ url_for('login') }}">Login here</a>
-                </p>
+                
+                <!-- Login Link -->
+                <div class="text-center">
+                    <p class="mb-0 text-muted">
+                        Already have an account? 
+                        <a href="{{ url_for('login') }}" class="text-decoration-none fw-semibold">Sign in here</a>
+                    </p>
+                </div>
             </div>
         </div>
         
