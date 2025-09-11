@@ -45,6 +45,15 @@ class EnhancedProctoringSystem {
         this.isFullscreenLocked = false;
         this.preventStart = false;
         
+        // Strong Security Enforcement
+        this.enforcementActive = false;
+        this.blockingActive = false;
+        this.blockedEvents = [];
+        this.keyboardBlocker = null;
+        this.screenshotAttempts = 0;
+        this.minimizeAttempts = 0;
+        this.lastFocusTime = Date.now();
+        
         // Security configuration - Balanced for better user experience
         this.config = {
             maxLookAwayTime: 10000,       // 10 seconds (as requested)
@@ -74,6 +83,9 @@ class EnhancedProctoringSystem {
     preventCheating() {
         // Enhanced cheating prevention setup
         console.log('🔒 Setting up enhanced cheating prevention');
+        
+        // Activate strong security enforcement
+        this.activateStrongEnforcement();
         
         // Disable text selection
         document.body.style.userSelect = 'none';
@@ -947,6 +959,9 @@ class EnhancedProctoringSystem {
         console.log('🚫 Stopping all monitoring systems');
         this.isActive = false;
         
+        // Deactivate strong enforcement
+        this.deactivateStrongEnforcement();
+        
         // Stop video monitoring
         if (this.faceDetectionInterval) {
             clearInterval(this.faceDetectionInterval);
@@ -1596,6 +1611,390 @@ class EnhancedProctoringSystem {
         console.error(message);
         // REMOVED: No alert popups, only console logging
         this.showSingleWarning(message);
+    }
+    
+    // ============== STRONG SECURITY ENFORCEMENT ==============
+    
+    activateStrongEnforcement() {
+        console.log('🔐 Activating aggressive security enforcement');
+        this.enforcementActive = true;
+        
+        // Force immediate fullscreen and lock it
+        this.enforceAggressiveFullscreen();
+        
+        // Block all tab switching attempts
+        this.blockTabSwitching();
+        
+        // Block screenshot attempts
+        this.blockScreenshots();
+        
+        // Detect and prevent window minimization
+        this.preventWindowMinimization();
+        
+        // Block background app access
+        this.blockBackgroundApps();
+        
+        // Enhanced keyboard blocking
+        this.enhancedKeyboardBlocking();
+        
+        // Continuous focus monitoring
+        this.startAggressiveFocusMonitoring();
+        
+        console.log('✅ Aggressive security enforcement activated');
+    }
+    
+    deactivateStrongEnforcement() {
+        if (!this.enforcementActive) return;
+        
+        console.log('🔓 Deactivating security enforcement');
+        this.enforcementActive = false;
+        this.blockingActive = false;
+        
+        // Remove event listeners
+        this.blockedEvents.forEach(({ element, event, handler }) => {
+            element.removeEventListener(event, handler);
+        });
+        this.blockedEvents = [];
+        
+        // Remove keyboard blocker
+        if (this.keyboardBlocker) {
+            document.removeEventListener('keydown', this.keyboardBlocker);
+            this.keyboardBlocker = null;
+        }
+        
+        // Exit fullscreen
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+        
+        console.log('✅ Security enforcement deactivated');
+    }
+    
+    enforceAggressiveFullscreen() {
+        // Force fullscreen immediately and lock it
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.warn('Failed to enter fullscreen:', err);
+                this.recordViolation('fullscreen_failed', 'high', 'Failed to enter fullscreen mode');
+            });
+        }
+        
+        // Continuously monitor and re-enforce fullscreen
+        const fullscreenEnforcer = () => {
+            if (this.enforcementActive && !document.fullscreenElement) {
+                console.warn('🚨 Fullscreen exit detected - re-enforcing');
+                document.documentElement.requestFullscreen().catch(() => {
+                    this.recordViolation('fullscreen_violation', 'critical', 'Repeatedly exited fullscreen mode');
+                });
+            }
+        };
+        
+        // Check every 100ms for fullscreen violations
+        setInterval(fullscreenEnforcer, 100);
+        
+        // Block escape key
+        const escapeBlocker = (e) => {
+            if (e.key === 'Escape' && this.enforcementActive) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.recordViolation('escape_blocked', 'medium', 'Attempted to exit fullscreen with Escape key');
+                return false;
+            }
+        };
+        
+        document.addEventListener('keydown', escapeBlocker);
+        this.blockedEvents.push({ element: document, event: 'keydown', handler: escapeBlocker });
+    }
+    
+    blockTabSwitching() {
+        // Aggressive tab switch prevention
+        const blockTabSwitch = (e) => {
+            if (!this.enforcementActive) return;
+            
+            // Block Alt+Tab, Ctrl+Tab, Windows key, etc.
+            if (e.altKey || e.metaKey || e.key === 'Tab') {
+                e.preventDefault();
+                e.stopPropagation();
+                this.tabSwitchCount++;
+                this.recordViolation('tab_switch_blocked', 'high', 'Attempted to switch tabs/applications');
+                this.showSingleWarning('⚠️ Tab switching is blocked during the quiz!');
+                return false;
+            }
+        };
+        
+        // Enhanced visibility change detection
+        const visibilityHandler = () => {
+            if (document.hidden && this.enforcementActive) {
+                this.tabSwitchCount++;
+                this.recordViolation('tab_switch_detected', 'critical', `Tab switched away (${this.tabSwitchCount} times)`);
+                
+                // Immediately try to regain focus
+                window.focus();
+                
+                if (this.tabSwitchCount >= 2) {
+                    this.showCriticalWarning('🚨 QUIZ TERMINATION WARNING: Return to quiz immediately!');
+                }
+                
+                if (this.tabSwitchCount >= 3) {
+                    this.terminateQuiz();
+                }
+            }
+        };
+        
+        // Focus loss detection
+        const focusHandler = () => {
+            if (this.enforcementActive) {
+                this.lastFocusTime = Date.now();
+                // Try to regain focus immediately
+                setTimeout(() => window.focus(), 10);
+            }
+        };
+        
+        document.addEventListener('keydown', blockTabSwitch);
+        document.addEventListener('visibilitychange', visibilityHandler);
+        window.addEventListener('blur', focusHandler);
+        
+        this.blockedEvents.push(
+            { element: document, event: 'keydown', handler: blockTabSwitch },
+            { element: document, event: 'visibilitychange', handler: visibilityHandler },
+            { element: window, event: 'blur', handler: focusHandler }
+        );
+    }
+    
+    blockScreenshots() {
+        const screenshotBlocker = (e) => {
+            if (!this.enforcementActive) return;
+            
+            // Block Print Screen, Windows+S, etc.
+            const screenshotKeys = [
+                'PrintScreen',
+                'F12', // Dev tools
+                'F10', // Context menu
+                'F11'  // Fullscreen toggle
+            ];
+            
+            if (screenshotKeys.includes(e.key) || 
+                (e.metaKey && e.key === 's') || // Windows+S
+                (e.altKey && e.key === 'PrintScreen') || // Alt+PrintScreen
+                (e.ctrlKey && e.shiftKey && e.key === 'S')) { // Ctrl+Shift+S
+                
+                e.preventDefault();
+                e.stopPropagation();
+                this.screenshotAttempts++;
+                
+                this.recordViolation('screenshot_blocked', 'high', `Screenshot attempt blocked (${this.screenshotAttempts} times)`);
+                this.showSingleWarning('⚠️ Screenshots are strictly prohibited!');
+                
+                if (this.screenshotAttempts >= 3) {
+                    this.recordViolation('multiple_screenshot_attempts', 'critical', 'Multiple screenshot attempts detected');
+                    this.showCriticalWarning('🚨 Multiple screenshot attempts detected! Quiz may be terminated.');
+                }
+                
+                return false;
+            }
+        };
+        
+        // Block context menu (right-click)
+        const contextBlocker = (e) => {
+            if (this.enforcementActive) {
+                e.preventDefault();
+                this.recordViolation('context_menu_blocked', 'low', 'Right-click menu blocked');
+                return false;
+            }
+        };
+        
+        document.addEventListener('keydown', screenshotBlocker);
+        document.addEventListener('contextmenu', contextBlocker);
+        
+        this.blockedEvents.push(
+            { element: document, event: 'keydown', handler: screenshotBlocker },
+            { element: document, event: 'contextmenu', handler: contextBlocker }
+        );
+    }
+    
+    preventWindowMinimization() {
+        // Detect minimize attempts through window state changes
+        const minimizeDetector = () => {
+            if (this.enforcementActive && 
+                (window.outerHeight <= 100 || window.outerWidth <= 100 || 
+                 document.visibilityState === 'hidden')) {
+                
+                this.minimizeAttempts++;
+                this.recordViolation('window_minimize', 'high', `Window minimization detected (${this.minimizeAttempts} times)`);
+                
+                // Try to restore window
+                window.focus();
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+                
+                if (this.minimizeAttempts >= 2) {
+                    this.showCriticalWarning('🚨 Window minimization detected! Keep quiz window active.');
+                }
+            }
+        };
+        
+        // Monitor window state every 200ms
+        setInterval(minimizeDetector, 200);
+        
+        // Block minimize shortcuts
+        const minimizeBlocker = (e) => {
+            if (!this.enforcementActive) return;
+            
+            // Block Windows+D (show desktop), Windows+M (minimize all)
+            if (e.metaKey && (e.key === 'd' || e.key === 'm')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.recordViolation('minimize_shortcut_blocked', 'medium', 'Minimize shortcut blocked');
+                return false;
+            }
+        };
+        
+        document.addEventListener('keydown', minimizeBlocker);
+        this.blockedEvents.push({ element: document, event: 'keydown', handler: minimizeBlocker });
+    }
+    
+    blockBackgroundApps() {
+        // Enhanced background app detection
+        const appSwitchBlocker = (e) => {
+            if (!this.enforcementActive) return;
+            
+            // Block common app switching shortcuts
+            const blockedCombos = [
+                { alt: true, key: 'Tab' },        // Alt+Tab
+                { ctrl: true, alt: true, key: 'Tab' }, // Ctrl+Alt+Tab
+                { meta: true, key: 'Tab' },       // Cmd+Tab (Mac)
+                { ctrl: true, shift: true, key: 'Escape' }, // Task Manager
+                { ctrl: true, alt: true, key: 'Delete' }, // Ctrl+Alt+Del
+                { meta: true, key: ' ' },         // Windows key + Space
+                { meta: true, key: 'r' },         // Windows + R (Run)
+            ];
+            
+            for (const combo of blockedCombos) {
+                if (this.matchesKeyCombo(e, combo)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.recordViolation('app_switch_blocked', 'high', `Blocked app switching: ${this.getKeyCombo(e)}`);
+                    this.showSingleWarning('⚠️ Application switching is blocked during the quiz!');
+                    return false;
+                }
+            }
+        };
+        
+        document.addEventListener('keydown', appSwitchBlocker);
+        this.blockedEvents.push({ element: document, event: 'keydown', handler: appSwitchBlocker });
+    }
+    
+    enhancedKeyboardBlocking() {
+        this.keyboardBlocker = (e) => {
+            if (!this.enforcementActive) return;
+            
+            // Comprehensive keyboard shortcut blocking
+            const strictlyBlocked = [
+                // Developer tools
+                { ctrl: true, shift: true, key: 'I' },
+                { ctrl: true, shift: true, key: 'J' },
+                { ctrl: true, shift: true, key: 'C' },
+                { ctrl: true, key: 'U' },
+                { key: 'F12' },
+                
+                // Navigation and browsing
+                { ctrl: true, key: 'T' },         // New tab
+                { ctrl: true, key: 'N' },         // New window
+                { ctrl: true, key: 'W' },         // Close tab
+                { ctrl: true, shift: true, key: 'T' }, // Reopen tab
+                { ctrl: true, key: 'H' },         // History
+                { ctrl: true, key: 'L' },         // Address bar
+                { ctrl: true, key: 'K' },         // Search
+                { ctrl: true, key: 'D' },         // Bookmark
+                
+                // Copy/paste/printing
+                { ctrl: true, key: 'A' },         // Select all
+                { ctrl: true, key: 'C' },         // Copy
+                { ctrl: true, key: 'V' },         // Paste
+                { ctrl: true, key: 'X' },         // Cut
+                { ctrl: true, key: 'P' },         // Print
+                { ctrl: true, key: 'S' },         // Save
+                
+                // Zoom and refresh
+                { ctrl: true, key: '0' },         // Reset zoom
+                { ctrl: true, key: '+' },         // Zoom in
+                { ctrl: true, key: '-' },         // Zoom out
+                { ctrl: true, key: 'R' },         // Refresh
+                { key: 'F5' },                    // Refresh
+                
+                // Function keys
+                { key: 'F1' }, { key: 'F2' }, { key: 'F3' }, 
+                { key: 'F4' }, { key: 'F6' }, { key: 'F7' }, 
+                { key: 'F8' }, { key: 'F9' }, { key: 'F10' }, 
+                { key: 'F11' }
+            ];
+            
+            for (const combo of strictlyBlocked) {
+                if (this.matchesKeyCombo(e, combo)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.recordViolation('keyboard_shortcut_blocked', 'medium', `Blocked: ${this.getKeyCombo(e)}`);
+                    return false;
+                }
+            }
+        };
+        
+        document.addEventListener('keydown', this.keyboardBlocker);
+    }
+    
+    startAggressiveFocusMonitoring() {
+        // Continuous focus monitoring
+        setInterval(() => {
+            if (this.enforcementActive) {
+                const timeSinceLastFocus = Date.now() - this.lastFocusTime;
+                
+                // If window has been out of focus for more than 2 seconds
+                if (timeSinceLastFocus > 2000 && document.hidden) {
+                    this.recordViolation('prolonged_focus_loss', 'high', 'Window out of focus for extended period');
+                    
+                    // Try to regain focus
+                    window.focus();
+                    
+                    // Show warning if focus lost too long
+                    if (timeSinceLastFocus > 5000) {
+                        this.showCriticalWarning('🚨 Return focus to quiz window immediately!');
+                    }
+                }
+            }
+        }, 1000);
+        
+        // Update focus time on any user interaction
+        const updateFocus = () => {
+            if (this.enforcementActive) {
+                this.lastFocusTime = Date.now();
+            }
+        };
+        
+        ['mousedown', 'keydown', 'focus', 'click'].forEach(event => {
+            document.addEventListener(event, updateFocus);
+            this.blockedEvents.push({ element: document, event, handler: updateFocus });
+        });
+    }
+    
+    matchesKeyCombo(event, combo) {
+        return (
+            (combo.ctrl === undefined || event.ctrlKey === combo.ctrl) &&
+            (combo.alt === undefined || event.altKey === combo.alt) &&
+            (combo.shift === undefined || event.shiftKey === combo.shift) &&
+            (combo.meta === undefined || event.metaKey === combo.meta) &&
+            (combo.key === undefined || event.key.toLowerCase() === combo.key.toLowerCase())
+        );
+    }
+    
+    getKeyCombo(event) {
+        const parts = [];
+        if (event.ctrlKey) parts.push('Ctrl');
+        if (event.altKey) parts.push('Alt');
+        if (event.shiftKey) parts.push('Shift');
+        if (event.metaKey) parts.push('Meta');
+        if (event.key) parts.push(event.key);
+        return parts.join('+');
     }
 }
 
