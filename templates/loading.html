@@ -55,49 +55,47 @@
             z-index: 10;
         }
 
-        .running-container {
+        .stylish-loader {
             position: relative;
             margin: 0 auto 2rem;
-            width: 400px;
-            height: 100px;
-            overflow: hidden;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .runner {
+        .loader-circle {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: elegant-spin 1s linear infinite;
+        }
+
+        .loader-pulse {
             position: absolute;
-            left: -50px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 2rem;
-            animation: runAcross 3s linear infinite;
-            z-index: 3;
+            width: 80px;
+            height: 80px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: elegant-pulse 2s ease-in-out infinite;
         }
 
-        .chasers {
-            position: absolute;
-            left: -200px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 1.5rem;
-            animation: chase 3s linear infinite;
-            z-index: 2;
+        @keyframes elegant-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        @keyframes runAcross {
-            0% {
-                left: -50px;
+        @keyframes elegant-pulse {
+            0%, 100% { 
+                transform: scale(1);
+                opacity: 0.3;
             }
-            100% {
-                left: 400px;
-            }
-        }
-
-        @keyframes chase {
-            0% {
-                left: -200px;
-            }
-            100% {
-                left: 350px;
+            50% { 
+                transform: scale(1.1);
+                opacity: 0.7;
             }
         }
 
@@ -205,9 +203,9 @@
             <i class="fas fa-eye"></i> BigBossizzz
         </div>
         
-        <div class="running-container">
-            <div class="runner">🏃‍♂️</div>
-            <div class="chasers">👥👥👥</div>
+        <div class="stylish-loader">
+            <div class="loader-circle"></div>
+            <div class="loader-pulse"></div>
         </div>
         
         <div class="loading-text">
