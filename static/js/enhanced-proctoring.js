@@ -23,7 +23,7 @@ class EnhancedProctoringSystem {
         this.cameraHiddenCount = 0;
         this.warningShown = false;  // Prevent repeated warnings
         
-        // Audio Environment Analysis
+        // Enhanced Audio Environment Analysis with Speech Detection
         this.audioStream = null;
         this.audioContext = null;
         this.analyser = null;
@@ -32,11 +32,16 @@ class EnhancedProctoringSystem {
         this.baselineNoiseLevel = null;
         this.voiceDetectionCount = 0;
         this.suspiciousSoundCount = 0;
+        this.conversationDetected = false;
+        this.sustainedSpeechCount = 0;
         this.environmentAnalysis = {
             isQuiet: true,
             hasConversation: false,
             noiseLevelHistory: [],
-            lastVoiceActivity: 0
+            lastVoiceActivity: 0,
+            speechSegments: [],
+            conversationStartTime: null,
+            baselineCalibrated: false
         };
         
         // Tab/App monitoring
@@ -73,9 +78,10 @@ class EnhancedProctoringSystem {
         this.criticalViolations = 0;
         this.isTerminated = false;
         
-        // Mobile/Desktop detection
-        this.isMobile = /Mobi|Android/i.test(navigator.userAgent);
-        this.isTablet = /Tablet|iPad/i.test(navigator.userAgent);
+        // Enhanced Mobile/Desktop detection with blocking
+        this.isMobile = this.detectMobileDevice();
+        this.isTablet = this.detectTabletDevice();
+        this.deviceInfo = this.getDeviceInfo();
         
         this.init();
     }
@@ -165,15 +171,14 @@ class EnhancedProctoringSystem {
             }
         });
         
-        // Disable page refresh attempts (silent prevention)
-        window.addEventListener('beforeunload', (e) => {
-            if (this.isActive && !this.isTerminated) {
-                // Only prevent accidental refresh, don't record violation
-                e.preventDefault();
-                e.returnValue = '';
-                return '';
-            }
-        });
+        // Smart page refresh prevention (no auto-reload)
+        this.preventAutoRefresh();
+        
+        // Mobile device blocking
+        if (this.isMobile || this.isTablet) {
+            this.blockMobileAccess();
+            return;
+        }
     }
     
     checkLinearMovement(points) {
@@ -941,18 +946,55 @@ class EnhancedProctoringSystem {
         document.body.appendChild(terminationScreen);
     }
     
-    sendViolationToServer(violation) {
-        // Send violation to server for logging
-        fetch('/api/proctoring/violation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.getCSRFToken()
-            },
-            body: JSON.stringify(violation)
-        }).catch(error => {
+    async sendViolationToServer(violation) {
+        // Enhanced violation server communication with immediate malpractice handling
+        try {
+            const violationData = {
+                attemptId: this.attemptId,
+                type: violation.type,
+                severity: violation.severity,
+                description: violation.description,
+                timestamp: new Date().toISOString(),
+                details: {
+                    ...violation.details,
+                    userAgent: navigator.userAgent,
+                    isMobile: this.isMobile,
+                    isTablet: this.isTablet
+                }
+            };
+
+            const response = await fetch('/api/proctoring/violation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCSRFToken()
+                },
+                body: JSON.stringify(violationData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            // Handle immediate malpractice termination
+            if (result.should_terminate || this.shouldTriggerImmediateMalpractice(violation)) {
+                await this.handleImmediateMalpractice(violation, result);
+            }
+
+            return result;
+        } catch (error) {
             console.error('Failed to send violation to server:', error);
-        });
+            
+            // Store violation locally if server fails (for recovery)
+            this.storeViolationLocally(violation);
+            
+            // Still trigger immediate malpractice for critical violations
+            if (this.shouldTriggerImmediateMalpractice(violation)) {
+                await this.handleImmediateMalpractice(violation, null);
+            }
+        }
     }
     
     stopMonitoring() {
@@ -1589,6 +1631,696 @@ class EnhancedProctoringSystem {
     getCSRFToken() {
         const token = document.querySelector('meta[name="csrf-token"]');
         return token ? token.getAttribute('content') : '';
+    }
+
+    // ============== MOBILE DETECTION & BLOCKING ==============
+    
+    detectMobileDevice() {
+        // Comprehensive mobile detection
+        const userAgent = navigator.userAgent.toLowerCase();
+        const mobileKeywords = ['mobile', 'android', 'iphone', 'ipod', 'blackberry', 'windows phone'];
+        
+        // Check user agent
+        const isMobileUA = mobileKeywords.some(keyword => userAgent.includes(keyword));
+        
+        // Check touch capabilities
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        
+        // Check screen size
+        const smallScreen = window.screen.width <= 768 || window.screen.height <= 768;
+        
+        // Check CSS media queries
+        const isMobileMedia = window.matchMedia('(pointer: coarse)').matches;
+        
+        return isMobileUA || (hasTouch && smallScreen) || isMobileMedia;
+    }
+
+    detectTabletDevice() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        const tabletKeywords = ['tablet', 'ipad'];
+        
+        const isTabletUA = tabletKeywords.some(keyword => userAgent.includes(keyword));
+        const largeTouch = 'ontouchstart' in window && window.screen.width > 768;
+        
+        return isTabletUA || largeTouch;
+    }
+
+    getDeviceInfo() {
+        return {
+            userAgent: navigator.userAgent,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            maxTouchPoints: navigator.maxTouchPoints || 0,
+            orientation: screen.orientation?.type || 'unknown',
+            pixelRatio: window.devicePixelRatio || 1
+        };
+    }
+
+    blockMobileAccess() {
+        console.error('🚫 Mobile device detected - Quiz access blocked');
+        
+        // Create blocking overlay
+        const blockingOverlay = document.createElement('div');
+        blockingOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #dc3545, #6f1319);
+            color: white;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        `;
+        
+        blockingOverlay.innerHTML = `
+            <div style="max-width: 400px; padding: 20px;">
+                <h1>📱 Mobile Access Blocked</h1>
+                <h3>Quiz access restricted to desktop computers only</h3>
+                <p>For security and proctoring requirements, this quiz must be taken on a desktop or laptop computer.</p>
+                <p><strong>Device detected:</strong> ${this.isMobile ? 'Mobile Phone' : 'Tablet'}</p>
+                <hr style="margin: 20px 0; opacity: 0.3;">
+                <p style="font-size: 14px;">Please use a desktop computer and try again.</p>
+                <p style="font-size: 12px; opacity: 0.7;">This restriction ensures exam integrity and proper proctoring.</p>
+            </div>
+        `;
+        
+        document.body.appendChild(blockingOverlay);
+        
+        // Record device violation
+        this.recordViolation('mobile_device_blocked', 'critical', 
+            `Mobile device access blocked: ${this.deviceInfo.userAgent}`);
+        
+        // Prevent any further initialization
+        this.preventStart = true;
+        return;
+    }
+
+    // ============== AUTO-REFRESH PREVENTION ==============
+    
+    preventAutoRefresh() {
+        // Add reload-loop protection
+        const reloadAttempts = parseInt(sessionStorage.getItem('quiz_reload_attempts') || '0');
+        
+        if (reloadAttempts >= 3) {
+            console.error('🚫 Multiple reload attempts detected - blocking further reloads');
+            this.showCriticalError('Too many page reload attempts detected. Please contact your instructor.');
+            return;
+        }
+        
+        // Increment reload counter
+        sessionStorage.setItem('quiz_reload_attempts', (reloadAttempts + 1).toString());
+        
+        // Smart beforeunload handling
+        window.addEventListener('beforeunload', (e) => {
+            if (this.isActive && !this.isTerminated) {
+                // Record the attempt but don't auto-refresh
+                this.recordViolation('page_unload_attempt', 'medium', 'User attempted to leave quiz page');
+                
+                // Show warning but allow user choice
+                const message = 'Are you sure you want to leave the quiz? This may be recorded as a violation.';
+                e.returnValue = message;
+                return message;
+            }
+        });
+        
+        // Clear reload counter on successful quiz completion
+        window.addEventListener('quiz:completed', () => {
+            sessionStorage.removeItem('quiz_reload_attempts');
+        });
+    }
+
+    // ============== IMMEDIATE MALPRACTICE HANDLING ==============
+    
+    shouldTriggerImmediateMalpractice(violation) {
+        // Define immediate malpractice triggers
+        const criticalViolations = [
+            'mobile_device_blocked',
+            'multiple_people_detected',
+            'camera_disabled',
+            'sustained_conversation',
+            'cheating_software_detected',
+            'identity_verification_failed'
+        ];
+        
+        // Immediate triggers
+        if (criticalViolations.includes(violation.type)) {
+            return true;
+        }
+        
+        // Count-based triggers
+        const highSeverityCount = this.violationLog.filter(v => v.severity === 'high' || v.severity === 'critical').length;
+        const tabSwitchCount = this.violationLog.filter(v => v.type.includes('tab_switch')).length;
+        const lookAwayCount = this.violationLog.filter(v => v.type.includes('look_away')).length;
+        
+        return (
+            highSeverityCount >= 2 ||          // 2 high/critical violations
+            tabSwitchCount >= 3 ||             // 3 tab switches
+            lookAwayCount >= 5 ||              // 5 look-away instances
+            this.violationLog.length >= 8      // 8 total violations
+        );
+    }
+
+    async handleImmediateMalpractice(violation, serverResponse) {
+        console.error('🚨 IMMEDIATE MALPRACTICE DETECTED:', violation);
+        
+        this.isTerminated = true;
+        this.criticalViolations++;
+        
+        // Mark user as malpractice immediately
+        try {
+            await this.markAsMalpractice(violation);
+            await this.notifyHostAndParticipants(violation);
+        } catch (error) {
+            console.error('Failed to send immediate malpractice notifications:', error);
+        }
+        
+        // Show immediate termination screen
+        this.showMalpracticeTerminationScreen(violation);
+        
+        // Auto-submit quiz if possible
+        setTimeout(() => {
+            this.forceQuizSubmission();
+        }, 3000);
+    }
+
+    async markAsMalpractice(violation) {
+        const malpracticeData = {
+            attemptId: this.attemptId,
+            quizId: this.quizId,
+            violation: violation,
+            timestamp: new Date().toISOString(),
+            action: 'immediate_termination',
+            severity: 'critical'
+        };
+
+        await fetch('/api/proctoring/mark-malpractice', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(malpracticeData)
+        });
+    }
+
+    async notifyHostAndParticipants(violation) {
+        // Notify host immediately
+        const hostNotification = {
+            type: 'immediate_malpractice',
+            attemptId: this.attemptId,
+            quizId: this.quizId,
+            violation: violation,
+            message: `🚨 IMMEDIATE MALPRACTICE: ${violation.description}`,
+            severity: 'critical',
+            student: {
+                name: document.querySelector('[data-username]')?.dataset.username || 'Unknown',
+                email: document.querySelector('[data-email]')?.dataset.email || 'Unknown'
+            }
+        };
+
+        await fetch('/api/proctoring/notify-violation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(hostNotification)
+        });
+
+        // Notify other participants if required
+        const participantNotification = {
+            type: 'malpractice_alert',
+            quizId: this.quizId,
+            message: '⚠️ A participant has been terminated for malpractice during this quiz session.'
+        };
+
+        await fetch('/api/proctoring/notify-participants', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(participantNotification)
+        });
+    }
+
+    showMalpracticeTerminationScreen(violation) {
+        const terminationScreen = document.createElement('div');
+        terminationScreen.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #dc3545, #6f1319);
+            color: white;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        `;
+        
+        terminationScreen.innerHTML = `
+            <div style="max-width: 500px; padding: 30px;">
+                <h1>🚨 MALPRACTICE DETECTED</h1>
+                <h2>Quiz Terminated Immediately</h2>
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3>Violation: ${violation.description}</h3>
+                    <p><strong>Severity:</strong> ${violation.severity.toUpperCase()}</p>
+                    <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                <p><strong>Actions Taken:</strong></p>
+                <ul style="text-align: left; margin: 20px 0;">
+                    <li>✅ Host notified immediately</li>
+                    <li>✅ Incident logged in system</li>
+                    <li>✅ Quiz attempt marked as malpractice</li>
+                    <li>✅ Academic integrity office alerted</li>
+                </ul>
+                <p style="color: #ffcccc;"><strong>This incident will be reviewed by your instructor and academic integrity committee.</strong></p>
+                <p>Redirecting to dashboard in <span id="countdown">10</span> seconds...</p>
+            </div>
+        `;
+        
+        document.body.appendChild(terminationScreen);
+        
+        // Countdown timer
+        let seconds = 10;
+        const countdownElement = terminationScreen.querySelector('#countdown');
+        const timer = setInterval(() => {
+            seconds--;
+            countdownElement.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                window.location.href = '/dashboard';
+            }
+        }, 1000);
+    }
+
+    forceQuizSubmission() {
+        // Force submit the quiz with malpractice flag
+        const submitData = {
+            action: 'force_submit',
+            reason: 'malpractice_detected',
+            timestamp: new Date().toISOString()
+        };
+
+        fetch('/api/quiz/force-submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCSRFToken()
+            },
+            body: JSON.stringify(submitData)
+        }).catch(error => {
+            console.error('Failed to force submit quiz:', error);
+        });
+    }
+
+    storeViolationLocally(violation) {
+        // Store violation locally for recovery if server fails
+        const localViolations = JSON.parse(localStorage.getItem('quiz_violations') || '[]');
+        localViolations.push({
+            ...violation,
+            timestamp: new Date().toISOString(),
+            attemptId: this.attemptId,
+            stored_locally: true
+        });
+        localStorage.setItem('quiz_violations', JSON.stringify(localViolations));
+    }
+
+    // ============== ENHANCED BACKGROUND NOISE & SPEECH DETECTION ==============
+    
+    async setupEnhancedAudioMonitoring() {
+        console.log('🎤 Setting up enhanced audio monitoring with speech detection');
+        
+        try {
+            // Request enhanced audio permissions
+            this.audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,      // Disable to detect background voices
+                    noiseSuppression: false,      // Disable to catch all sounds
+                    autoGainControl: false,       // Disable to get raw levels
+                    sampleRate: 44100,           // High quality for speech analysis
+                    channelCount: 1              // Mono for processing efficiency
+                }
+            });
+
+            // Create enhanced audio context for analysis
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 44100
+            });
+
+            const source = this.audioContext.createMediaStreamSource(this.audioStream);
+            this.analyser = this.audioContext.createAnalyser();
+            
+            // Enhanced analyzer settings for speech detection
+            this.analyser.fftSize = 2048;
+            this.analyser.smoothingTimeConstant = 0.3;
+            this.analyser.minDecibels = -90;
+            this.analyser.maxDecibels = -10;
+            
+            source.connect(this.analyser);
+
+            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            this.audioMonitoringActive = true;
+
+            // Calibrate baseline environment for 8 seconds
+            await this.calibrateEnvironmentBaseline();
+            
+            // Start continuous enhanced audio analysis
+            this.startEnhancedAudioAnalysis();
+            
+            console.log('✅ Enhanced audio monitoring with speech detection activated');
+            this.showAudioMonitoringIndicator();
+
+        } catch (error) {
+            console.error('Enhanced audio monitoring setup failed:', error);
+            this.handleAudioSetupFailure(error);
+        }
+    }
+
+    async calibrateEnvironmentBaseline() {
+        console.log('📊 Calibrating environment baseline for speech detection...');
+        
+        const calibrationSamples = [];
+        const calibrationDuration = 8000; // 8 seconds
+        const sampleInterval = 100; // Sample every 100ms
+        
+        return new Promise((resolve) => {
+            const startTime = Date.now();
+            
+            const calibrationInterval = setInterval(() => {
+                if (!this.audioMonitoringActive) {
+                    clearInterval(calibrationInterval);
+                    resolve();
+                    return;
+                }
+                
+                this.analyser.getByteFrequencyData(this.dataArray);
+                
+                // Calculate multiple audio metrics for baseline
+                const rms = this.calculateRMS(this.dataArray);
+                const spectralCentroid = this.calculateSpectralCentroid(this.dataArray);
+                const spectralRolloff = this.calculateSpectralRolloff(this.dataArray);
+                
+                calibrationSamples.push({
+                    rms,
+                    spectralCentroid,
+                    spectralRolloff,
+                    timestamp: Date.now()
+                });
+                
+                if (Date.now() - startTime >= calibrationDuration) {
+                    clearInterval(calibrationInterval);
+                    
+                    // Calculate baseline metrics
+                    this.baselineNoiseLevel = this.calculateBaselineMetrics(calibrationSamples);
+                    this.environmentAnalysis.baselineCalibrated = true;
+                    
+                    console.log('✅ Environment baseline calibrated:', this.baselineNoiseLevel);
+                    resolve();
+                }
+            }, sampleInterval);
+        });
+    }
+
+    calculateBaselineMetrics(samples) {
+        const rmsValues = samples.map(s => s.rms);
+        const centroidValues = samples.map(s => s.spectralCentroid);
+        const rolloffValues = samples.map(s => s.spectralRolloff);
+        
+        return {
+            avgRMS: rmsValues.reduce((a, b) => a + b, 0) / rmsValues.length,
+            maxRMS: Math.max(...rmsValues),
+            avgSpectralCentroid: centroidValues.reduce((a, b) => a + b, 0) / centroidValues.length,
+            avgSpectralRolloff: rolloffValues.reduce((a, b) => a + b, 0) / rolloffValues.length,
+            variabilityRMS: this.calculateVariance(rmsValues)
+        };
+    }
+
+    calculateVariance(values) {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        return values.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / values.length;
+    }
+
+    startEnhancedAudioAnalysis() {
+        const analysisInterval = 250; // Analyze every 250ms for speech detection
+        
+        this.audioAnalysisInterval = setInterval(() => {
+            if (!this.audioMonitoringActive || !this.environmentAnalysis.baselineCalibrated) return;
+            
+            this.analyser.getByteFrequencyData(this.dataArray);
+            
+            // Calculate current audio metrics
+            const currentMetrics = {
+                rms: this.calculateRMS(this.dataArray),
+                spectralCentroid: this.calculateSpectralCentroid(this.dataArray),
+                spectralRolloff: this.calculateSpectralRolloff(this.dataArray),
+                timestamp: Date.now()
+            };
+            
+            // Analyze for speech patterns
+            this.analyzeForSpeechPatterns(currentMetrics);
+            
+            // Check for conversation detection
+            this.checkForConversation(currentMetrics);
+            
+            // Update environment analysis
+            this.updateEnvironmentAnalysis(currentMetrics);
+            
+        }, analysisInterval);
+    }
+
+    calculateRMS(dataArray) {
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i] * dataArray[i];
+        }
+        return Math.sqrt(sum / dataArray.length);
+    }
+
+    calculateSpectralCentroid(dataArray) {
+        let numerator = 0;
+        let denominator = 0;
+        
+        for (let i = 0; i < dataArray.length; i++) {
+            numerator += i * dataArray[i];
+            denominator += dataArray[i];
+        }
+        
+        return denominator > 0 ? numerator / denominator : 0;
+    }
+
+    calculateSpectralRolloff(dataArray) {
+        const totalEnergy = dataArray.reduce((sum, val) => sum + val, 0);
+        const threshold = totalEnergy * 0.85; // 85% energy threshold
+        
+        let cumulativeEnergy = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+            cumulativeEnergy += dataArray[i];
+            if (cumulativeEnergy >= threshold) {
+                return i;
+            }
+        }
+        return dataArray.length - 1;
+    }
+
+    analyzeForSpeechPatterns(currentMetrics) {
+        if (!this.baselineNoiseLevel) return;
+        
+        const baseline = this.baselineNoiseLevel;
+        
+        // Speech detection criteria
+        const rmsThreshold = baseline.avgRMS + (baseline.variabilityRMS * 2.5);
+        const centroidThreshold = baseline.avgSpectralCentroid * 1.3; // Human speech increases centroid
+        
+        const isSpeechLikely = 
+            currentMetrics.rms > rmsThreshold &&
+            currentMetrics.spectralCentroid > centroidThreshold &&
+            currentMetrics.spectralRolloff > baseline.avgSpectralRolloff * 1.2;
+        
+        if (isSpeechLikely) {
+            this.detectSpeechActivity(currentMetrics);
+        } else {
+            this.resetSpeechDetection();
+        }
+    }
+
+    detectSpeechActivity(metrics) {
+        const now = Date.now();
+        
+        // Add to speech segments
+        this.environmentAnalysis.speechSegments.push({
+            timestamp: now,
+            rms: metrics.rms,
+            spectralCentroid: metrics.spectralCentroid,
+            confidence: this.calculateSpeechConfidence(metrics)
+        });
+        
+        // Keep only recent speech segments (last 10 seconds)
+        this.environmentAnalysis.speechSegments = this.environmentAnalysis.speechSegments
+            .filter(segment => now - segment.timestamp < 10000);
+        
+        this.voiceDetectionCount++;
+        this.environmentAnalysis.lastVoiceActivity = now;
+        
+        // Check for sustained speech (potential conversation)
+        const recentSpeech = this.environmentAnalysis.speechSegments
+            .filter(segment => now - segment.timestamp < 3000); // Last 3 seconds
+        
+        if (recentSpeech.length >= 8) { // 8 detections in 3 seconds = sustained speech
+            this.sustainedSpeechCount++;
+            
+            if (this.sustainedSpeechCount >= 3) { // 3 sustained periods = conversation
+                this.handleConversationDetection();
+            }
+            
+            console.log('🔄 Sustained speech pattern detected');
+            this.recordViolation('sustained_speech', 'medium', 
+                `Sustained speech detected (${recentSpeech.length} segments in 3s)`);
+        }
+        
+        // Log regular voice activity
+        if (this.voiceDetectionCount % 5 === 0) {
+            console.log(`ℹ️ Voice activity detected (${this.voiceDetectionCount} times)`);
+            this.recordViolation('voice_activity', 'low', 
+                `Voice activity detected (count: ${this.voiceDetectionCount})`);
+        }
+    }
+
+    calculateSpeechConfidence(metrics) {
+        if (!this.baselineNoiseLevel) return 0;
+        
+        const baseline = this.baselineNoiseLevel;
+        
+        // Calculate confidence based on how much the signal deviates from baseline
+        const rmsScore = Math.min((metrics.rms / (baseline.avgRMS + baseline.variabilityRMS)) - 1, 1);
+        const centroidScore = Math.min((metrics.spectralCentroid / baseline.avgSpectralCentroid) - 1, 1);
+        const rolloffScore = Math.min((metrics.spectralRolloff / baseline.avgSpectralRolloff) - 1, 1);
+        
+        return (rmsScore + centroidScore + rolloffScore) / 3;
+    }
+
+    handleConversationDetection() {
+        if (this.conversationDetected) return; // Already detected
+        
+        this.conversationDetected = true;
+        this.environmentAnalysis.hasConversation = true;
+        this.environmentAnalysis.conversationStartTime = Date.now();
+        
+        console.error('🚨 CONVERSATION DETECTED - Potential malpractice');
+        
+        // Record as critical violation for immediate malpractice handling
+        this.recordViolation('sustained_conversation', 'critical', 
+            'Sustained conversation detected - multiple speech patterns identified');
+        
+        // Show immediate warning
+        this.showCriticalWarning('⚠️ CONVERSATION DETECTED: Sustained speech patterns indicate possible conversation during the quiz');
+    }
+
+    resetSpeechDetection() {
+        // Reset speech detection if no activity for 2 seconds
+        const now = Date.now();
+        if (now - this.environmentAnalysis.lastVoiceActivity > 2000) {
+            this.sustainedSpeechCount = 0;
+        }
+    }
+
+    checkForConversation(currentMetrics) {
+        // Additional conversation detection logic
+        const recentSegments = this.environmentAnalysis.speechSegments
+            .filter(segment => Date.now() - segment.timestamp < 5000);
+        
+        if (recentSegments.length >= 15) { // Many speech segments in 5 seconds
+            const avgConfidence = recentSegments.reduce((sum, seg) => sum + seg.confidence, 0) / recentSegments.length;
+            
+            if (avgConfidence > 0.6) { // High confidence speech
+                this.handleConversationDetection();
+            }
+        }
+    }
+
+    updateEnvironmentAnalysis(currentMetrics) {
+        // Update noise level history
+        this.environmentAnalysis.noiseLevelHistory.push({
+            level: currentMetrics.rms,
+            timestamp: Date.now()
+        });
+        
+        // Keep only recent history (last 30 seconds)
+        this.environmentAnalysis.noiseLevelHistory = this.environmentAnalysis.noiseLevelHistory
+            .filter(entry => Date.now() - entry.timestamp < 30000);
+        
+        // Update quiet status
+        const recentLevels = this.environmentAnalysis.noiseLevelHistory.slice(-10);
+        const avgRecentLevel = recentLevels.reduce((sum, entry) => sum + entry.level, 0) / recentLevels.length;
+        
+        this.environmentAnalysis.isQuiet = avgRecentLevel <= (this.baselineNoiseLevel?.avgRMS * 1.5 || 20);
+    }
+
+    showAudioMonitoringIndicator() {
+        const indicator = document.createElement('div');
+        indicator.id = 'enhanced-audio-indicator';
+        indicator.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 140px;
+            height: 50px;
+            background: rgba(40, 167, 69, 0.9);
+            color: white;
+            border-radius: 8px;
+            padding: 8px;
+            z-index: 1001;
+            font-size: 11px;
+            text-align: center;
+            border: 2px solid #28a745;
+        `;
+        
+        indicator.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                <div>
+                    <div>🎤 ENHANCED AUDIO</div>
+                    <div style="font-size: 9px; margin-top: 2px;">Speech Detection Active</div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(indicator);
+        
+        // Update indicator based on audio activity
+        setInterval(() => {
+            if (this.conversationDetected) {
+                indicator.style.background = 'rgba(220, 53, 69, 0.9)';
+                indicator.style.borderColor = '#dc3545';
+                indicator.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                        <div>
+                            <div>🚨 CONVERSATION</div>
+                            <div style="font-size: 9px; margin-top: 2px;">Multiple Voices</div>
+                        </div>
+                    </div>
+                `;
+            } else if (this.voiceDetectionCount > 0) {
+                indicator.style.background = 'rgba(255, 193, 7, 0.9)';
+                indicator.style.borderColor = '#ffc107';
+                indicator.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                        <div>
+                            <div>🔊 VOICE DETECTED</div>
+                            <div style="font-size: 9px; margin-top: 2px;">Count: ${this.voiceDetectionCount}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }, 1000);
     }
     
     showNotification(message, type = 'info') {
