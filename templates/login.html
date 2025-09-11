@@ -22,29 +22,37 @@ function togglePassword(inputId, button) {
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
+<div class="row justify-content-center min-vh-100 align-items-center">
     <div class="col-md-6 col-lg-4">
-        <div class="card">
-            <div class="card-header text-center">
-                <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
-            </div>
-            <div class="card-body">
+        <!-- Professional Login Card -->
+        <div class="card shadow-lg border-0 rounded-4">
+            <div class="card-body p-5">
+                <!-- Brand Header -->
+                <div class="text-center mb-5">
+                    <div class="mb-3">
+                        <i class="fas fa-graduation-cap fa-3x text-primary"></i>
+                    </div>
+                    <h2 class="fw-bold text-dark mb-2">Welcome Back</h2>
+                    <p class="text-muted">Sign in to your account to continue</p>
+                </div>
+                
+                <!-- Login Form -->
                 <form method="POST">
                     {{ form.hidden_tag() }}
                     
-                    <div class="mb-3">
-                        {{ form.email.label(class="form-label") }}
-                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                    <div class="mb-4">
+                        {{ form.email.label(class="form-label fw-semibold text-dark") }}
+                        {{ form.email(class="form-control form-control-lg rounded-3" + (" is-invalid" if form.email.errors else "")) }}
                         {% for error in form.email.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
                     </div>
                     
                     <div class="mb-4">
-                        {{ form.password.label(class="form-label") }}
+                        {{ form.password.label(class="form-label fw-semibold text-dark") }}
                         <div class="input-group">
-                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), id="password-input") }}
-                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password-input', this)">
+                            {{ form.password(class="form-control form-control-lg rounded-start-3" + (" is-invalid" if form.password.errors else ""), id="password-input") }}
+                            <button class="btn btn-outline-secondary rounded-end-3" type="button" onclick="togglePassword('password-input', this)">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
@@ -53,36 +61,56 @@ function togglePassword(inputId, button) {
                         {% endfor %}
                     </div>
                     
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-sign-in-alt"></i> Login
+                    <div class="d-grid mb-4">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-3 py-3">
+                            <i class="fas fa-sign-in-alt me-2"></i> Sign In
                         </button>
                     </div>
                 </form>
-            </div>
-            <div class="card-footer text-center">
-                <p class="mb-2">
-                    <strong>Want to try the platform?</strong><br>
-                    <a href="{{ url_for('default_accounts') }}" class="btn btn-success btn-sm">
-                        <i class="fas fa-rocket"></i> Use Demo Accounts
+                
+                <!-- Divider -->
+                <div class="text-center mb-4">
+                    <small class="text-muted">or</small>
+                </div>
+                
+                <!-- Demo Access -->
+                <div class="text-center mb-4">
+                    <p class="mb-3 text-muted">Want to explore the platform?</p>
+                    <a href="{{ url_for('default_accounts') }}" class="btn btn-outline-success rounded-3">
+                        <i class="fas fa-rocket me-2"></i> Try Demo Accounts
                     </a>
-                </p>
-                <p class="mb-0">
-                    Don't have an account? 
-                    <a href="{{ url_for('register') }}">Register here</a>
-                </p>
+                </div>
+                
+                <!-- Register Link -->
+                <div class="text-center">
+                    <p class="mb-0 text-muted">
+                        Don't have an account? 
+                        <a href="{{ url_for('register') }}" class="text-decoration-none fw-semibold">Create one here</a>
+                    </p>
+                </div>
             </div>
         </div>
         
-        <div class="alert alert-info mt-3">
-            <i class="fas fa-envelope"></i>
-            <strong>First time logging in?</strong><br>
-            Please verify your email address first. Check your inbox for the verification link and follow the instructions to receive your login credentials.
-            <br><br>
-            <strong>Didn't receive the email?</strong>
-            <a href="{{ url_for('request_verification') }}" class="btn btn-sm btn-outline-primary mt-2">
-                <i class="fas fa-redo"></i> Resend Verification Email
-            </a>
+        <!-- Information Cards -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 bg-light">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <i class="fas fa-info-circle text-primary fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-semibold mb-2">First time logging in?</h6>
+                                <p class="mb-3 text-muted small">Please verify your email address first. Check your inbox for the verification link and follow the instructions to receive your login credentials.</p>
+                                <a href="{{ url_for('request_verification') }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-envelope me-1"></i> Resend Verification
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- Show resend verification option if user tried to login but not verified -->
