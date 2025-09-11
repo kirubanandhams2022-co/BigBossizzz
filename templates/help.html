@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Help & Documentation - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar Navigation -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-book"></i> Help Topics</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <a href="#getting-started" class="list-group-item list-group-item-action">
+                            <i class="fas fa-play-circle text-primary"></i> Getting Started
+                        </a>
+                        <a href="#host-guide" class="list-group-item list-group-item-action">
+                            <i class="fas fa-user-tie text-success"></i> Host Guide
+                        </a>
+                        <a href="#participant-guide" class="list-group-item list-group-item-action">
+                            <i class="fas fa-user-graduate text-info"></i> Participant Guide
+                        </a>
+                        <a href="#proctoring-features" class="list-group-item list-group-item-action">
+                            <i class="fas fa-shield-alt text-warning"></i> Proctoring Features
+                        </a>
+                        <a href="#troubleshooting" class="list-group-item list-group-item-action">
+                            <i class="fas fa-wrench text-danger"></i> Troubleshooting
+                        </a>
+                        <a href="#system-requirements" class="list-group-item list-group-item-action">
+                            <i class="fas fa-desktop text-secondary"></i> System Requirements
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9">
+            <!-- Header -->
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h1><i class="fas fa-eye text-primary"></i> BigBossizzz Help Center</h1>
+                    <p class="lead">Complete guide to using our advanced proctoring platform</p>
+                </div>
+            </div>
+
+            <!-- Getting Started -->
+            <div class="card mb-4" id="getting-started">
+                <div class="card-header">
+                    <h3><i class="fas fa-play-circle text-primary"></i> Getting Started</h3>
+                </div>
+                <div class="card-body">
+                    <h5>Welcome to BigBossizzz</h5>
+                    <p>BigBossizzz is a comprehensive online proctoring and assessment platform designed for secure, monitored examinations. Our platform uses advanced AI-powered monitoring to ensure exam integrity.</p>
+                    
+                    <h6>User Roles</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-shield fa-2x text-danger mb-2"></i>
+                                    <h6>Administrator</h6>
+                                    <small>System management and user oversight</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-tie fa-2x text-success mb-2"></i>
+                                    <h6>Host</h6>
+                                    <small>Create and manage quizzes</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-graduate fa-2x text-info mb-2"></i>
+                                    <h6>Participant</h6>
+                                    <small>Take monitored quizzes</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Host Guide -->
+            <div class="card mb-4" id="host-guide">
+                <div class="card-header">
+                    <h3><i class="fas fa-user-tie text-success"></i> Complete Host Guide</h3>
+                </div>
+                <div class="card-body">
+                    <h5>Step-by-Step Host Instructions</h5>
+                    
+                    <div class="accordion" id="hostGuideAccordion">
+                        <!-- Quiz Creation -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#quizCreation">
+                                    <i class="fas fa-plus-circle text-primary me-2"></i> Creating Your First Quiz
+                                </button>
+                            </h2>
+                            <div id="quizCreation" class="accordion-collapse collapse show">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li><strong>Access Quiz Creation:</strong> Click "Create Quiz" in your dashboard</li>
+                                        <li><strong>Quiz Details:</strong>
+                                            <ul>
+                                                <li>Enter a descriptive title</li>
+                                                <li>Add clear instructions for participants</li>
+                                                <li>Set time limit (recommended: 1-3 minutes per question)</li>
+                                                <li>Choose proctoring security level</li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>Adding Questions:</strong>
+                                            <ul>
+                                                <li>Multiple Choice: Best for objective assessment</li>
+                                                <li>True/False: Quick evaluation questions</li>
+                                                <li>Text Answer: For detailed responses</li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>Proctoring Settings:</strong>
+                                            <ul>
+                                                <li>Enable camera monitoring</li>
+                                                <li>Set violation thresholds</li>
+                                                <li>Configure background noise detection</li>
+                                                <li>Enable mobile device blocking</li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>Publishing:</strong> Activate quiz when ready for participants</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Managing Participants -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#managingParticipants">
+                                    <i class="fas fa-users text-info me-2"></i> Managing Participants
+                                </button>
+                            </h2>
+                            <div id="managingParticipants" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <h6>Adding Participants</h6>
+                                    <ul>
+                                        <li>Bulk upload via CSV file</li>
+                                        <li>Manual individual registration</li>
+                                        <li>Email invitation system</li>
+                                    </ul>
+                                    
+                                    <h6>Monitoring During Quiz</h6>
+                                    <ul>
+                                        <li>Real-time participant status</li>
+                                        <li>Live violation alerts</li>
+                                        <li>Immediate intervention options</li>
+                                        <li>Screen sharing oversight</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Monitoring & Analytics -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#monitoring">
+                                    <i class="fas fa-chart-line text-warning me-2"></i> Monitoring & Analytics
+                                </button>
+                            </h2>
+                            <div id="monitoring" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <h6>Real-Time Monitoring</h6>
+                                    <ul>
+                                        <li>Live participant dashboard</li>
+                                        <li>Instant violation notifications</li>
+                                        <li>Audio anomaly detection</li>
+                                        <li>Behavioral pattern analysis</li>
+                                    </ul>
+                                    
+                                    <h6>Post-Quiz Analytics</h6>
+                                    <ul>
+                                        <li>Detailed score reports</li>
+                                        <li>Violation summaries</li>
+                                        <li>Time analysis per question</li>
+                                        <li>Export options (PDF, Excel)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Participant Guide -->
+            <div class="card mb-4" id="participant-guide">
+                <div class="card-header">
+                    <h3><i class="fas fa-user-graduate text-info"></i> Participant Guide</h3>
+                </div>
+                <div class="card-body">
+                    <h5>How to Take a Monitored Quiz</h5>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Important:</strong> Use only desktop computers. Mobile devices are blocked for security.
+                    </div>
+                    
+                    <h6>Before Starting</h6>
+                    <ol>
+                        <li><strong>Verify Account:</strong> Check your email for account verification</li>
+                        <li><strong>Login:</strong> Use provided credentials</li>
+                        <li><strong>Test Equipment:</strong>
+                            <ul>
+                                <li>Ensure webcam is working</li>
+                                <li>Test microphone permissions</li>
+                                <li>Stable internet connection</li>
+                                <li>Updated browser (Chrome/Firefox recommended)</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <h6>During the Quiz</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-success">✅ Allowed Actions</h6>
+                            <ul>
+                                <li>Stay focused on quiz tab</li>
+                                <li>Look at your screen</li>
+                                <li>Take notes (if permitted)</li>
+                                <li>Ask for help via chat</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-danger">❌ Prohibited Actions</h6>
+                            <ul>
+                                <li>Switching browser tabs</li>
+                                <li>Using mobile devices</li>
+                                <li>Talking to others</li>
+                                <li>Looking away from screen</li>
+                                <li>Multiple people in frame</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proctoring Features -->
+            <div class="card mb-4" id="proctoring-features">
+                <div class="card-header">
+                    <h3><i class="fas fa-shield-alt text-warning"></i> Advanced Proctoring Features</h3>
+                </div>
+                <div class="card-body">
+                    <h5>AI-Powered Security Monitoring</h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-video text-primary"></i> Visual Monitoring</h6>
+                            <ul>
+                                <li>Real-time facial recognition</li>
+                                <li>Multiple person detection</li>
+                                <li>Eye-tracking analysis</li>
+                                <li>Suspicious movement alerts</li>
+                                <li>Screen recording prevention</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-microphone text-success"></i> Audio Monitoring</h6>
+                            <ul>
+                                <li>Background noise analysis</li>
+                                <li>Speech pattern detection</li>
+                                <li>Phone ring identification</li>
+                                <li>Conversation recognition</li>
+                                <li>Suspicious sound alerts</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <h6><i class="fas fa-desktop text-info"></i> Browser Security</h6>
+                    <ul>
+                        <li>Tab switching detection</li>
+                        <li>Window focus monitoring</li>
+                        <li>Copy/paste prevention</li>
+                        <li>Right-click blocking</li>
+                        <li>Developer tools detection</li>
+                    </ul>
+                    
+                    <h6><i class="fas fa-mobile-alt text-danger"></i> Device Policy</h6>
+                    <ul>
+                        <li>Mobile device blocking</li>
+                        <li>Tablet access prevention</li>
+                        <li>Desktop-only access</li>
+                        <li>Server-side enforcement</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="card mb-4" id="troubleshooting">
+                <div class="card-header">
+                    <h3><i class="fas fa-wrench text-danger"></i> Troubleshooting</h3>
+                </div>
+                <div class="card-body">
+                    <h5>Common Issues & Solutions</h5>
+                    
+                    <div class="accordion" id="troubleshootingAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cameraIssues">
+                                    Camera Not Working
+                                </button>
+                            </h2>
+                            <div id="cameraIssues" class="accordion-collapse collapse show">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li>Grant camera permission when prompted</li>
+                                        <li>Check if camera is used by another application</li>
+                                        <li>Refresh the page and try again</li>
+                                        <li>Use Chrome or Firefox browser</li>
+                                        <li>Check privacy settings in browser</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#mobileBlocked">
+                                    Mobile Device Blocked
+                                </button>
+                            </h2>
+                            <div id="mobileBlocked" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <p><strong>Solution:</strong> Use a desktop or laptop computer. Mobile devices and tablets are not permitted for security reasons.</p>
+                                    <p>If you're on desktop and still seeing this message:</p>
+                                    <ol>
+                                        <li>Clear browser cache and cookies</li>
+                                        <li>Use a different browser</li>
+                                        <li>Check if mobile emulation is enabled in browser</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#audioIssues">
+                                    Audio Monitoring Alerts
+                                </button>
+                            </h2>
+                            <div id="audioIssues" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <p>To prevent false alerts:</p>
+                                    <ul>
+                                        <li>Take quiz in a quiet room</li>
+                                        <li>Turn off phones and notifications</li>
+                                        <li>Avoid talking during the exam</li>
+                                        <li>Use headphones if needed (with host permission)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Requirements -->
+            <div class="card mb-4" id="system-requirements">
+                <div class="card-header">
+                    <h3><i class="fas fa-desktop text-secondary"></i> System Requirements</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-check-circle text-success"></i> Minimum Requirements</h6>
+                            <ul>
+                                <li><strong>Device:</strong> Desktop or Laptop only</li>
+                                <li><strong>Internet:</strong> Stable broadband connection</li>
+                                <li><strong>Browser:</strong> Chrome 90+, Firefox 88+</li>
+                                <li><strong>Camera:</strong> Working webcam</li>
+                                <li><strong>Microphone:</strong> Built-in or external mic</li>
+                                <li><strong>JavaScript:</strong> Must be enabled</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-times-circle text-danger"></i> Not Supported</h6>
+                            <ul>
+                                <li>Mobile phones</li>
+                                <li>Tablets and iPads</li>
+                                <li>Internet Explorer</li>
+                                <li>Safari (limited support)</li>
+                                <li>Incognito/Private browsing</li>
+                                <li>Virtual machines</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Recommended:</strong> Chrome browser on Windows/Mac desktop with 8GB+ RAM for optimal performance.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Support -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-life-ring text-primary"></i> Need More Help?</h3>
+                </div>
+                <div class="card-body text-center">
+                    <p>If you need additional assistance, please contact our support team:</p>
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-around">
+                                <div>
+                                    <i class="fas fa-envelope fa-2x text-primary"></i>
+                                    <p class="mt-2"><strong>Email Support</strong><br>support@bigbossizzz.com</p>
+                                </div>
+                                <div>
+                                    <i class="fas fa-clock fa-2x text-success"></i>
+                                    <p class="mt-2"><strong>Response Time</strong><br>Within 24 hours</p>
+                                </div>
+                                <div>
+                                    <i class="fas fa-shield-alt fa-2x text-warning"></i>
+                                    <p class="mt-2"><strong>Technical Issues</strong><br>Priority support available</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Smooth scrolling script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Smooth scrolling for sidebar links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+    
+    // Highlight active section in sidebar
+    window.addEventListener('scroll', function() {
+        const sections = document.querySelectorAll('[id]');
+        const navLinks = document.querySelectorAll('.list-group-item');
+        
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            if (pageYOffset >= sectionTop - 60) {
+                current = section.getAttribute('id');
+            }
+        });
+        
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === '#' + current) {
+                link.classList.add('active');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

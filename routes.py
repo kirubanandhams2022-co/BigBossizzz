@@ -3896,6 +3896,11 @@ def force_submit_quiz():
         logging.error(f"Failed to force submit quiz: {e}")
         return jsonify({'error': 'Failed to force submit quiz'}), 500
 
+@app.route('/help')
+def help_page():
+    """Comprehensive help and documentation page"""
+    return render_template('help.html')
+
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
