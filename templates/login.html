@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Login - BigBossizzz{% endblock %}
+{% block title %}Login - Assessment Platform{% endblock %}
 
 {% block extra_scripts %}
 <script>
@@ -37,7 +37,7 @@ function togglePassword(inputId, button) {
                 </div>
                 
                 <!-- Login Form -->
-                <form method="POST">
+                <form method="POST" data-no-loading class="simple-form">
                     {{ form.hidden_tag() }}
                     
                     <div class="mb-4">

@@ -1,6 +1,6 @@
 /**
- * BigBossizzz Loading System
- * Provides smooth loading animations with eye-based theme
+ * Assessment Platform Loading System
+ * Provides professional loading animations and user feedback
  */
 
 class LoadingManager {
@@ -128,7 +128,7 @@ class LoadingManager {
         this.isLoading = true;
         
         // Update message if provided
-        const messageElement = this.overlay.querySelector('div[style*="color: #6c757d"]');
+        const messageElement = this.overlay.querySelector('.loading-text');
         if (messageElement) {
             messageElement.textContent = message;
         }
@@ -156,31 +156,79 @@ class LoadingManager {
     attachFormListeners() {
         document.addEventListener('submit', (event) => {
             const form = event.target;
-            if (form.tagName === 'FORM' && !form.hasAttribute('data-no-loading')) {
-                this.show('Submitting form...');
+            
+            // Only show loading for specific forms that need it
+            const needsLoading = form.classList.contains('needs-loading') ||
+                               form.hasAttribute('data-loading') ||
+                               form.action?.includes('/quiz/') ||
+                               form.action?.includes('/create') ||
+                               form.action?.includes('/upload');
+            
+            // Skip if form explicitly doesn't need loading or doesn't need it
+            if (form.hasAttribute('data-no-loading') || !needsLoading) {
+                return;
+            }
+            
+            // Skip for simple forms like login, search, and navigation
+            if (form.classList.contains('search-form') || 
+                form.classList.contains('quick-action') ||
+                form.classList.contains('simple-form')) {
+                return;
+            }
+            
+            if (form.tagName === 'FORM') {
+                this.show('Processing your request...');
             }
         });
     }
 
     attachAjaxListeners() {
-        // Intercept fetch requests
+        // Intercept fetch requests only for specific endpoints
         const originalFetch = window.fetch;
         window.fetch = (...args) => {
-            this.show('Loading data...');
+            const url = args[0];
+            
+            // Only show loading for data-heavy or complex requests
+            const needsLoading = url?.includes('/api/') ||
+                               url?.includes('/upload') ||
+                               url?.includes('/quiz/') ||
+                               url?.includes('/create') ||
+                               url?.includes('/generate');
+            
+            if (needsLoading) {
+                this.show('Loading data...');
+            }
+            
             return originalFetch(...args).finally(() => {
-                setTimeout(() => this.hide(), 500);
+                if (needsLoading) {
+                    setTimeout(() => this.hide(), 500);
+                }
             });
         };
 
-        // Intercept XMLHttpRequest
+        // Intercept XMLHttpRequest with selective loading
         const originalOpen = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function(...args) {
-            this.addEventListener('loadstart', () => {
-                window.loadingManager?.show('Loading data...');
-            });
-            this.addEventListener('loadend', () => {
-                setTimeout(() => window.loadingManager?.hide(), 500);
-            });
+            const method = args[0];
+            const url = args[1];
+            
+            // Only show loading for specific XMLHttpRequests
+            const needsLoading = (method === 'POST' || method === 'PUT' || method === 'DELETE') &&
+                               (url?.includes('/api/') ||
+                                url?.includes('/upload') ||
+                                url?.includes('/quiz/') ||
+                                url?.includes('/create') ||
+                                url?.includes('/generate'));
+            
+            if (needsLoading) {
+                this.addEventListener('loadstart', () => {
+                    window.loadingManager?.show('Loading data...');
+                });
+                this.addEventListener('loadend', () => {
+                    setTimeout(() => window.loadingManager?.hide(), 500);
+                });
+            }
+            
             return originalOpen.apply(this, args);
         };
     }
