@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Violation Details - {{ violation_type.replace('_', ' ').title() }} - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-search text-primary"></i> Violation Timeline Details</h1>
+    <a href="{{ url_for('admin_violations') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Violations
+    </a>
+</div>
+
+<!-- User and Quiz Info -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user text-info"></i> User Information</h5>
+            </div>
+            <div class="card-body">
+                <h6>{{ user.username }}</h6>
+                <p class="text-muted mb-1">{{ user.email }}</p>
+                <small class="text-muted">Role: {{ user.role.title() }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clipboard-list text-success"></i> Quiz Information</h5>
+            </div>
+            <div class="card-body">
+                <h6>{{ quiz.title }}</h6>
+                <p class="text-muted mb-1">Created by: {{ quiz.creator.username }}</p>
+                <small class="text-muted">Time Limit: {{ quiz.time_limit }} minutes</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Violation Type Info -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="fas fa-exclamation-triangle text-warning"></i> Violation Type: {{ violation_type.replace('_', ' ').title() }}</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4 class="text-primary">{{ violations|length }}</h4>
+                    <small>Total Occurrences</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4 class="text-warning">{{ violations|selectattr('severity', 'equalto', 'high')|list|length }}</h4>
+                    <small>High Severity</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4 class="text-info">{{ violations[0].timestamp.strftime('%Y-%m-%d %H:%M:%S') if violations else 'N/A' }}</h4>
+                    <small>Most Recent</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Violation Timeline -->
+<div class="card">
+    <div class="card-header">
+        <h5><i class="fas fa-clock text-secondary"></i> Detailed Violation Timeline</h5>
+    </div>
+    <div class="card-body">
+        {% if violations %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Description</th>
+                        <th>Severity</th>
+                        <th>Additional Data</th>
+                        <th>Quiz Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for violation in violations %}
+                    <tr class="{% if violation.severity == 'high' %}table-danger{% elif violation.severity == 'medium' %}table-warning{% endif %}">
+                        <td>
+                            {{ violation.timestamp.strftime('%Y-%m-%d %H:%M:%S') if violation.timestamp else 'N/A' }}
+                            <br><small class="text-muted">{{ violation.timestamp.strftime('%A, %B %d') if violation.timestamp else '' }}</small>
+                        </td>
+                        <td>{{ violation.description }}</td>
+                        <td>
+                            {% if violation.severity == 'high' %}
+                                <span class="badge bg-danger">High Risk</span>
+                            {% elif violation.severity == 'medium' %}
+                                <span class="badge bg-warning text-dark">Medium Risk</span>
+                            {% elif violation.severity == 'critical' %}
+                                <span class="badge bg-dark">Critical</span>
+                            {% else %}
+                                <span class="badge bg-info">Low Risk</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if violation.additional_data %}
+                                <small class="text-muted">{{ violation.additional_data }}</small>
+                            {% else %}
+                                <small class="text-muted">No additional data</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if violation.attempt.status == 'terminated' %}
+                                <span class="badge bg-danger">Quiz Terminated</span>
+                            {% elif violation.attempt.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% else %}
+                                <span class="badge bg-primary">{{ violation.attempt.status.title() }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Timeline Visualization -->
+        <div class="mt-4">
+            <h6><i class="fas fa-chart-line"></i> Violation Frequency Over Time</h6>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Timeline Analysis:</strong> This shows {{ violations|length }} occurrences of {{ violation_type.replace('_', ' ').title() }} 
+                violations for {{ user.username }} during {{ quiz.title }}.
+                {% if violations|length > 5 %}
+                This indicates a pattern of suspicious behavior that may warrant further investigation.
+                {% endif %}
+            </div>
+        </div>
+        
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h5>No Detailed Violations Found</h5>
+            <p class="text-muted">No specific violation events were found for this combination.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recommended Actions -->
+{% if violations %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5><i class="fas fa-lightbulb text-warning"></i> Recommended Actions</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Immediate Actions</h6>
+                <ul>
+                    {% if violations|selectattr('severity', 'equalto', 'high')|list|length > 0 %}
+                    <li>Review quiz attempt for academic integrity</li>
+                    <li>Consider invalidating quiz results if necessary</li>
+                    {% endif %}
+                    {% if violations|length > 10 %}
+                    <li>Flag user for enhanced monitoring</li>
+                    {% endif %}
+                    <li>Contact user for explanation if appropriate</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Follow-up Actions</h6>
+                <ul>
+                    <li>Document violations in user's academic record</li>
+                    <li>Adjust proctoring settings for future quizzes</li>
+                    {% if violation_type == 'tab_switch' %}
+                    <li>Consider browser lockdown tools</li>
+                    {% elif violation_type == 'multiple_faces' %}
+                    <li>Require identity verification</li>
+                    {% elif violation_type == 'suspicious_sound' %}
+                    <li>Investigate environment setup</li>
+                    {% endif %}
+                    <li>Provide additional training on quiz policies</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -20,48 +20,62 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>Date/Time</th>
                         <th>User</th>
                         <th>Quiz</th>
                         <th>Violation Type</th>
+                        <th>Count</th>
+                        <th>Latest Occurrence</th>
                         <th>Description</th>
-                        <th>Severity</th>
+                        <th>Highest Severity</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for violation in violations %}
                     <tr class="{% if violation.severity == 'high' %}table-danger{% elif violation.severity == 'medium' %}table-warning{% endif %}">
-                        <td>{{ violation.timestamp.strftime('%Y-%m-%d %H:%M:%S') if violation.timestamp else 'N/A' }}</td>
                         <td>
-                            <strong>{{ violation.attempt.participant.username }}</strong>
-                            <br><small class="text-muted">{{ violation.attempt.participant.email }}</small>
+                            <strong>{{ violation.username }}</strong>
+                            <br><small class="text-muted">{{ violation.email }}</small>
                         </td>
                         <td>
-                            <strong>{{ violation.attempt.quiz.title }}</strong>
-                            <br><small class="text-muted">by {{ violation.attempt.quiz.creator.username }}</small>
+                            <strong>{{ violation.quiz_title }}</strong>
+                            <br><small class="text-muted">by {{ violation.creator_username }}</small>
                         </td>
                         <td>
-                            <span class="badge bg-secondary">{{ violation.event_type.replace('_', ' ').title() }}</span>
+                            <span class="badge bg-secondary">{{ violation.violation_type.replace('_', ' ').title() }}</span>
                         </td>
+                        <td>
+                            <span class="badge bg-primary">{{ violation.count }}</span>
+                            {% if violation.count > 1 %}<small class="text-muted">occurrences</small>{% endif %}
+                        </td>
+                        <td>{{ violation.latest_at.strftime('%Y-%m-%d %H:%M:%S') if violation.latest_at else 'N/A' }}</td>
                         <td>{{ violation.description }}</td>
                         <td>
                             {% if violation.severity == 'high' %}
                                 <span class="badge bg-danger">High Risk</span>
                             {% elif violation.severity == 'medium' %}
                                 <span class="badge bg-warning text-dark">Medium Risk</span>
+                            {% elif violation.severity == 'critical' %}
+                                <span class="badge bg-dark">Critical</span>
                             {% else %}
                                 <span class="badge bg-info">Low Risk</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if violation.attempt.status == 'terminated' %}
+                            {% if violation.attempt_status == 'terminated' %}
                                 <span class="badge bg-danger">Quiz Terminated</span>
-                            {% elif violation.attempt.status == 'completed' %}
+                            {% elif violation.attempt_status == 'completed' %}
                                 <span class="badge bg-success">Completed</span>
                             {% else %}
-                                <span class="badge bg-primary">{{ violation.attempt.status.title() }}</span>
+                                <span class="badge bg-primary">{{ violation.attempt_status.title() if violation.attempt_status else 'Unknown' }}</span>
                             {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin_violation_details', user_id=violation.user_id, quiz_id=violation.quiz_id, violation_type=violation.violation_type) }}" 
+                               class="btn btn-sm btn-outline-info" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -126,11 +140,11 @@
             <div class="col-md-6">
                 <h6>Most Common Violations</h6>
                 <div class="list-group">
-                    {% set violation_types = violations|groupby('event_type') %}
+                    {% set violation_types = violations|groupby('violation_type') %}
                     {% for type, group in violation_types %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         {{ type.replace('_', ' ').title() }}
-                        <span class="badge bg-primary rounded-pill">{{ group|list|length }}</span>
+                        <span class="badge bg-primary rounded-pill">{{ (group|list|sum(attribute='count')) if group|list else 0 }}</span>
                     </div>
                     {% endfor %}
                 </div>
@@ -138,11 +152,11 @@
             <div class="col-md-6">
                 <h6>Users with Most Violations</h6>
                 <div class="list-group">
-                    {% set user_violations = violations|groupby('attempt.participant.username') %}
+                    {% set user_violations = violations|groupby('username') %}
                     {% for username, group in user_violations %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         {{ username }}
-                        <span class="badge bg-warning rounded-pill">{{ group|list|length }}</span>
+                        <span class="badge bg-warning rounded-pill">{{ (group|list|sum(attribute='count')) if group|list else 0 }}</span>
                     </div>
                     {% endfor %}
                 </div>
