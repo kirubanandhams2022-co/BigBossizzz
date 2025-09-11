@@ -30,7 +30,7 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th>#</th>
                         <th>Username</th>
                         <th>Email</th>
                         <th>Role</th>
@@ -43,7 +43,7 @@
                 <tbody>
                     {% for user in users %}
                     <tr class="{% if not user.is_active %}table-secondary{% endif %}">
-                        <td>{{ user.id }}</td>
+                        <td><span class="badge bg-secondary">{{ loop.index }}</span></td>
                         <td>
                             <strong>{{ user.username }}</strong>
                             {% if user.id == current_user.id %}<span class="badge bg-info ms-1">You</span>{% endif %}
