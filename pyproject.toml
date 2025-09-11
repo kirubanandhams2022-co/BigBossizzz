@@ -25,4 +25,5 @@ dependencies = [
     "flask-socketio>=5.5.1",
     "eventlet>=0.40.3",
     "docx>=0.2.4",
+    "requests>=2.32.5",
 ]
