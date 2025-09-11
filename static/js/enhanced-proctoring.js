@@ -21,6 +21,7 @@ class EnhancedProctoringSystem {
         this.lookAwayCount = 0;
         this.multiplePeopleCount = 0;
         this.cameraHiddenCount = 0;
+        this.warningShown = false;  // Prevent repeated warnings
         
         // Tab/App monitoring
         this.tabSwitchCount = 0;
@@ -28,16 +29,16 @@ class EnhancedProctoringSystem {
         this.isFullscreenLocked = false;
         this.preventStart = false;
         
-        // Security configuration
+        // Security configuration - More forgiving for single user
         this.config = {
-            maxLookAwayTime: 3000,        // 3 seconds
-            maxMultiplePeople: 2,         // 2 detections
-            maxCameraHidden: 2,           // 2 detections
-            maxTabSwitches: 1,            // 1 switch = warning
-            terminateOnViolations: 3,     // 3 violations = terminate
+            maxLookAwayTime: 5000,        // 5 seconds (more forgiving)
+            maxMultiplePeople: 5,         // 5 detections (reduce false positives)
+            maxCameraHidden: 5,           // 5 detections (more forgiving) 
+            maxTabSwitches: 2,            // 2 switches = warning
+            terminateOnViolations: 5,     // 5 violations = terminate (more lenient)
             realTimeAnalysis: true,       // Live analysis only
             noImageStorage: true,         // Never store images
-            strictMode: true              // Enterprise mode
+            strictMode: false             // Less strict for better UX
         };
         
         // Violation tracking
@@ -51,6 +52,21 @@ class EnhancedProctoringSystem {
         this.isTablet = /Tablet|iPad/i.test(navigator.userAgent);
         
         this.init();
+    }
+    
+    preventCheating() {
+        // Basic cheating prevention setup
+        console.log('🔒 Setting up basic cheating prevention');
+        
+        // Disable text selection
+        document.body.style.userSelect = 'none';
+        document.body.style.webkitUserSelect = 'none';
+        document.body.style.mozUserSelect = 'none';
+        document.body.style.msUserSelect = 'none';
+        
+        // Disable drag and drop
+        document.addEventListener('dragstart', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => e.preventDefault());
     }
     
     async init() {
@@ -269,11 +285,10 @@ class EnhancedProctoringSystem {
         
         const skinToneRatio = skinTonePixels / (data.length / 4);
         
-        // Determine face count based on skin tone distribution
-        let detectedFaces = 0;
-        if (skinToneRatio > 0.02) detectedFaces = 1;  // Single person
-        if (skinToneRatio > 0.08) detectedFaces = 2;  // Multiple people
-        if (skinToneRatio < 0.005) detectedFaces = 0; // No face/camera covered
+        // Determine face count based on skin tone distribution (LESS SENSITIVE)
+        let detectedFaces = 1; // Default: assume single person present
+        if (skinToneRatio > 0.15) detectedFaces = 2;  // Multiple people (much higher threshold)
+        if (skinToneRatio < 0.001) detectedFaces = 0; // No face/camera covered (very low threshold)
         
         this.processFaceDetection(detectedFaces);
     }
@@ -284,23 +299,30 @@ class EnhancedProctoringSystem {
         if (faceCount === 0) {
             // No face detected or camera covered
             this.cameraHiddenCount++;
-            this.updateCameraStatus('⚠️ NO FACE', '#ffc107');
+            this.updateCameraStatus('⚠️ CHECK CAMERA', '#ffc107');
             
-            if (this.cameraHiddenCount > this.config.maxCameraHidden) {
-                this.recordViolation('camera_hidden', 'high', 'Camera covered or no face detected');
+            if (this.cameraHiddenCount > this.config.maxCameraHidden && !this.warningShown) {
+                this.warningShown = true;
+                this.showSingleWarning('⚠️ Please ensure your camera shows your face clearly');
+                // Reset counter to give user time to adjust
+                this.cameraHiddenCount = 0;
             }
         } else if (faceCount === 1) {
-            // Normal - single person
+            // Normal - single person (reset all counters)
             this.cameraHiddenCount = 0;
             this.multiplePeopleCount = 0;
+            this.warningShown = false; // Allow new warnings after normal detection
             this.updateCameraStatus('🔴 LIVE', '#28a745');
         } else if (faceCount >= 2) {
             // Multiple people detected
             this.multiplePeopleCount++;
-            this.updateCameraStatus('⚠️ MULTIPLE', '#dc3545');
+            this.updateCameraStatus('⚠️ MULTIPLE PEOPLE', '#dc3545');
             
-            if (this.multiplePeopleCount > this.config.maxMultiplePeople) {
-                this.recordViolation('multiple_people', 'critical', 'Multiple people detected in camera');
+            if (this.multiplePeopleCount > this.config.maxMultiplePeople && !this.warningShown) {
+                this.warningShown = true;
+                this.showSingleWarning('⚠️ Multiple people detected. Please ensure you are alone during the quiz.');
+                // Give user time to address the issue
+                this.multiplePeopleCount = 0;
             }
         }
         
@@ -634,12 +656,15 @@ class EnhancedProctoringSystem {
     }
     
     handleViolationResponse(violation) {
+        // Only show one warning per violation type
+        if (this.warningShown) return;
+        
         switch (violation.severity) {
             case 'critical':
-                this.showCriticalWarning(`🚨 CRITICAL VIOLATION: ${violation.description}`);
+                this.showCriticalWarning(`🚨 CRITICAL: ${violation.description}`);
                 break;
             case 'high':
-                this.showWarning(`⚠️ WARNING: ${violation.description}`);
+                this.showSingleWarning(`⚠️ WARNING: ${violation.description}`);
                 break;
             case 'medium':
                 this.showNotification(`⚠️ ${violation.description}`, 'warning');
@@ -648,6 +673,34 @@ class EnhancedProctoringSystem {
                 console.log(`ℹ️ ${violation.description}`);
                 break;
         }
+    }
+    
+    showSingleWarning(message) {
+        // Show warning only once until user corrects behavior
+        console.warn(message);
+        
+        // Create temporary warning toast
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: #ffc107;
+            color: #000;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-weight: bold;
+            max-width: 300px;
+            border: 2px solid #ff9800;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        // Remove toast after 5 seconds
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 5000);
     }
     
     shouldTerminateQuiz() {
