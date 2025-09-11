@@ -39,40 +39,24 @@ class LoadingManager {
         `;
         
         this.overlay.innerHTML = `
-            <div style="text-align: center; color: #333;">
-                <div style="position: relative; margin: 0 auto 2rem; width: 80px; height: 80px;">
+            <div style="text-align: center; color: #333; max-width: 320px; margin: 0 auto;">
+                <div style="margin: 0 auto 2rem; width: 60px; height: 60px;">
                     <div class="professional-spinner" style="
-                        position: relative;
-                        width: 80px;
-                        height: 80px;
+                        width: 60px;
+                        height: 60px;
                         border-radius: 50%;
-                        border: 4px solid #f0f0f0;
-                        border-top: 4px solid #4f46e5;
-                        animation: professionalSpin 1s linear infinite;
-                    "></div>
-                    <div style="
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 24px;
-                        height: 24px;
-                        background: #4f46e5;
-                        border-radius: 50%;
-                        opacity: 0.8;
+                        border: 3px solid #e5e7eb;
+                        border-top: 3px solid #374151;
+                        animation: professionalSpin 0.8s linear infinite;
                     "></div>
                 </div>
                 
-                <div style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #1f2937; font-weight: 600;">
-                    Assessment Platform
+                <div style="font-size: 1.1rem; margin-bottom: 0.75rem; color: #374151; font-weight: 500; letter-spacing: 0.025em;">
+                    <span class="loading-text">Loading...</span>
                 </div>
                 
-                <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 1.5rem;">
-                    <span class="loading-text">Loading your workspace...</span>
-                </div>
-                
-                <div style="width: 240px; height: 4px; background: rgba(103, 102, 241, 0.2); border-radius: 3px; margin: 0 auto; overflow: hidden;">
-                    <div style="height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7); border-radius: 3px; animation: techProgress 2.5s ease-in-out infinite;"></div>
+                <div style="width: 200px; height: 2px; background: #e5e7eb; border-radius: 1px; margin: 0 auto; overflow: hidden;">
+                    <div style="height: 100%; background: #374151; border-radius: 1px; animation: professionalProgress 1.5s ease-in-out infinite;"></div>
                 </div>
             </div>
         `;
@@ -80,40 +64,14 @@ class LoadingManager {
         // Add CSS animations
         const style = document.createElement('style');
         style.textContent = `
-            @keyframes techEyePulse {
-                0%, 100% { 
-                    transform: scale(1);
-                    box-shadow: 0 0 30px rgba(103, 102, 241, 0.8);
-                }
-                50% { 
-                    transform: scale(1.05);
-                    box-shadow: 0 0 40px rgba(103, 102, 241, 1);
-                }
+            @keyframes professionalSpin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
             }
             
-            @keyframes techEyeRotate {
-                0% { transform: rotate(0deg) scale(1.1); }
-                100% { transform: rotate(360deg) scale(1.1); }
-            }
-            
-            @keyframes techEyeScan {
-                0%, 100% { transform: translateX(-100%); }
-                50% { transform: translateX(100%); }
-            }
-            
-            @keyframes loadingFade {
-                0%, 100% { opacity: 0.8; }
-                50% { opacity: 1; }
-            }
-            
-            @keyframes techTypeWriter {
-                0%, 100% { opacity: 0.7; }
-                50% { opacity: 1; }
-            }
-            
-            @keyframes techProgress {
+            @keyframes professionalProgress {
                 0% { width: 0%; margin-left: 0%; }
-                50% { width: 70%; margin-left: 15%; }
+                50% { width: 60%; margin-left: 20%; }
                 100% { width: 0%; margin-left: 100%; }
             }
         `;
@@ -122,7 +80,7 @@ class LoadingManager {
         document.body.appendChild(this.overlay);
     }
 
-    show(message = 'Processing your request...') {
+    show(message = 'Loading...') {
         if (this.isLoading) return;
         
         this.isLoading = true;
@@ -177,7 +135,7 @@ class LoadingManager {
             }
             
             if (form.tagName === 'FORM') {
-                this.show('Processing your request...');
+                this.show('Processing...');
             }
         });
     }
@@ -196,7 +154,7 @@ class LoadingManager {
                                url?.includes('/generate');
             
             if (needsLoading) {
-                this.show('Loading data...');
+                this.show('Processing...');
             }
             
             return originalFetch(...args).finally(() => {
@@ -222,7 +180,7 @@ class LoadingManager {
             
             if (needsLoading) {
                 this.addEventListener('loadstart', () => {
-                    window.loadingManager?.show('Loading data...');
+                    window.loadingManager?.show('Processing...');
                 });
                 this.addEventListener('loadend', () => {
                     setTimeout(() => window.loadingManager?.hide(), 500);
@@ -241,7 +199,7 @@ class LoadingManager {
         }, delay);
     }
 
-    showForPromise(promise, message = 'Loading...') {
+    showForPromise(promise, message = 'Processing...') {
         this.show(message);
         return promise.finally(() => {
             setTimeout(() => this.hide(), 300);
@@ -259,46 +217,8 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = LoadingManager;
 }
 
-// ===== ENHANCED LOADING SCREEN FOR LIGHT THEME =====
+// ===== PROFESSIONAL LOADING ENHANCEMENTS =====
 document.addEventListener('DOMContentLoaded', function() {
-    // Add light theme class to body
-    document.body.classList.add('light-theme');
-    
-    // Enhanced typing animation for loading screen
-    const typedTextElement = document.querySelector('.typed-text');
-    if (typedTextElement) {
-        const texts = [
-            '🔍 Scanning participant identity...',
-            '🛡️ Initializing security protocols...',
-            '📡 Activating monitoring systems...',
-            '🤖 AI surveillance online...',
-            '🔬 Technology integration active...',
-            '🎯 Advanced recognition system ready...',
-            '⚡ Neural network analyzing...',
-            '✅ Tech-Eye monitoring engaged!'
-        ];
-        
-        let textIndex = 0;
-        let charIndex = 0;
-        
-        function typeText() {
-            if (charIndex < texts[textIndex].length) {
-                typedTextElement.textContent += texts[textIndex].charAt(charIndex);
-                charIndex++;
-                setTimeout(typeText, 50);
-            } else {
-                setTimeout(() => {
-                    typedTextElement.textContent = '';
-                    charIndex = 0;
-                    textIndex = (textIndex + 1) % texts.length;
-                    typeText();
-                }, 1000);
-            }
-        }
-        
-        typeText();
-    }
-    
     // Hide initial loading screen after content loads
     setTimeout(() => {
         const loadingScreen = document.getElementById('loading-screen');
@@ -308,12 +228,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadingScreen.style.display = 'none';
             }, 500);
         }
-    }, 3000);
+    }, 2000);
     
-    // Enhanced UI interactions
+    // Smooth scrolling for better UX
     document.documentElement.style.scrollBehavior = 'smooth';
     
-    // Enhanced form validation and feedback
+    // Enhanced form validation
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
