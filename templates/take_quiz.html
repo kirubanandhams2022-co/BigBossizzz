@@ -233,12 +233,102 @@
 <script src="{{ url_for('static', filename='js/enhanced-proctoring.js') }}"></script>
 <script src="{{ url_for('static', filename='js/proctoring.js') }}"></script>
 <script>
-// Initialize enhanced proctoring system
-const enhancedProctoring = new EnhancedProctoringSystem({{ attempt.id }}, {{ quiz.id }});
+// Enhanced Proctoring Integration
+let enhancedProctoring = null;
+let securityCheckPassed = false;
 
-// Initialize proctoring for this attempt (fallback)
+// Security Check Modal Logic
+document.addEventListener('DOMContentLoaded', function() {
+    const securityModal = new bootstrap.Modal(document.getElementById('securityCheckModal'));
+    const startButton = document.getElementById('start-secure-quiz');
+    const checkboxes = document.querySelectorAll('#securityCheckModal .form-check-input');
+    
+    // Show security check modal on page load if proctoring is enabled
+    {% if quiz.proctoring_enabled %}
+    securityModal.show();
+    {% endif %}
+    
+    // Enable start button only when all checks are completed
+    function updateStartButton() {
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        startButton.disabled = !allChecked;
+    }
+    
+    checkboxes.forEach(cb => cb.addEventListener('change', updateStartButton));
+    
+    // Start secure quiz process
+    startButton.addEventListener('click', async function() {
+        try {
+            // Initialize enhanced proctoring system
+            enhancedProctoring = new EnhancedProctoringSystem({{ attempt.id }}, {{ quiz.id }});
+            
+            // Start camera monitoring
+            await enhancedProctoring.startLiveCameraMonitoring();
+            
+            // Activate do not disturb mode
+            enhancedProctoring.activateDoNotDisturbMode();
+            
+            // Hide security modal
+            securityModal.hide();
+            
+            // Remove lockdown overlay and show quiz content
+            setTimeout(() => {
+                const lockdown = document.getElementById('proctoring-lockdown');
+                if (lockdown) {
+                    lockdown.querySelector('#lockdown-status').textContent = 'Quiz started - Security monitoring active';
+                    lockdown.style.display = 'none';
+                }
+                
+                // Start the quiz timer
+                startTimer();
+                securityCheckPassed = true;
+                
+                // Update proctoring status
+                const statusAlert = document.getElementById('proctoring-status-alert');
+                if (statusAlert) {
+                    statusAlert.className = 'alert alert-success';
+                    statusAlert.innerHTML = '<i class="fas fa-shield-check"></i> <strong>SECURITY ACTIVE</strong><br><small>Camera monitoring • Real-time analysis • No violations detected</small>';
+                }
+                
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Failed to start secure quiz:', error);
+            alert('Failed to start secure mode. Please check camera permissions and try again.');
+        }
+    });
+});
+
+// Initialize fallback proctoring (if available)
 if (typeof initializeProctoring === 'function') {
     initializeProctoring({{ attempt.id }});
+}
+
+// Override quiz submission to include enhanced proctoring data
+function submitQuiz() {
+    if (enhancedProctoring && enhancedProctoring.isActive) {
+        // Stop monitoring before submission
+        enhancedProctoring.stopMonitoring();
+    }
+    
+    // Submit the quiz form
+    document.getElementById('quizForm').submit();
+}
+
+// Global function for automatic submission (called by timer or violations)
+function submitQuizAutomatically(reason = 'time_expired') {
+    if (enhancedProctoring && enhancedProctoring.isActive) {
+        enhancedProctoring.stopMonitoring();
+    }
+    
+    // Add reason to form
+    const reasonInput = document.createElement('input');
+    reasonInput.type = 'hidden';
+    reasonInput.name = 'submission_reason';
+    reasonInput.value = reason;
+    document.getElementById('quizForm').appendChild(reasonInput);
+    
+    document.getElementById('quizForm').submit();
 }
 </script>
 {% endif %}
