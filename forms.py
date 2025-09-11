@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, PasswordField, TextAreaField, SelectField, IntegerField, BooleanField, FieldList, FormField
-from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange
+from wtforms import StringField, PasswordField, TextAreaField, SelectField, IntegerField, BooleanField, FieldList, FormField, DateField
+from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange, Optional, URL
 from wtforms.widgets import TextArea
 
 class RegistrationForm(FlaskForm):
