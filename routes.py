@@ -3031,7 +3031,7 @@ def get_quiz_questions(quiz_id):
 @app.route('/admin/violations')
 @login_required
 def admin_violations():
-    """Enhanced violations view with filtering like Moodle Proctoring Pro"""
+    """Enhanced violations view with consolidated entries per user per quiz"""
     if not current_user.is_admin():
         flash('Access denied.', 'error')
         return redirect(url_for('dashboard'))
@@ -3041,24 +3041,76 @@ def admin_violations():
     date_filter = request.args.get('date_range', '7')
     user_filter = request.args.get('user_id', '')
     
-    # Build query with filters
-    query = ProctoringEvent.query.options(
-        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.participant),
-        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz).joinedload(Quiz.creator)
-    )
+    # Build aggregated query to consolidate violations by user, quiz, and type
+    from sqlalchemy import func, case
+    
+    base_query = db.session.query(
+        User.id.label('user_id'),
+        User.username.label('username'),
+        User.email.label('email'),
+        Quiz.id.label('quiz_id'),
+        Quiz.title.label('quiz_title'),
+        Quiz.creator_id.label('creator_id'),
+        func.max(User.username).label('creator_username'),  # Will be corrected below
+        ProctoringEvent.event_type.label('violation_type'),
+        func.count(ProctoringEvent.id).label('count'),
+        func.max(ProctoringEvent.timestamp).label('latest_at'),
+        func.max(ProctoringEvent.description).label('description'),
+        func.max(case(
+            (ProctoringEvent.severity == 'low', 1),
+            (ProctoringEvent.severity == 'medium', 2), 
+            (ProctoringEvent.severity == 'high', 3),
+            (ProctoringEvent.severity == 'critical', 4),
+            else_=0
+        )).label('severity_rank'),
+        func.max(QuizAttempt.status).label('attempt_status')
+    ).join(QuizAttempt, ProctoringEvent.attempt_id == QuizAttempt.id) \
+     .join(User, QuizAttempt.participant_id == User.id) \
+     .join(Quiz, QuizAttempt.quiz_id == Quiz.id)
     
     # Apply filters
     if severity_filter != 'all':
-        query = query.filter(ProctoringEvent.severity == severity_filter)
+        base_query = base_query.filter(ProctoringEvent.severity == severity_filter)
     
     if date_filter != 'all':
         days_ago = datetime.utcnow() - timedelta(days=int(date_filter))
-        query = query.filter(ProctoringEvent.timestamp >= days_ago)
+        base_query = base_query.filter(ProctoringEvent.timestamp >= days_ago)
     
     if user_filter:
-        query = query.join(QuizAttempt).filter(QuizAttempt.participant_id == user_filter)
+        base_query = base_query.filter(User.id == user_filter)
     
-    violations = query.order_by(ProctoringEvent.timestamp.desc()).limit(500).all()
+    # Group by user, quiz, and violation type
+    aggregated_violations = base_query.group_by(
+        User.id, User.username, User.email,
+        Quiz.id, Quiz.title, Quiz.creator_id,
+        ProctoringEvent.event_type
+    ).order_by(func.max(ProctoringEvent.timestamp).desc()).limit(500).all()
+    
+    # Get creator usernames for the results
+    creator_usernames = {}
+    if aggregated_violations:
+        creator_ids = {v.creator_id for v in aggregated_violations}
+        creators = User.query.filter(User.id.in_(creator_ids)).all()
+        creator_usernames = {creator.id: creator.username for creator in creators}
+    
+    # Convert severity rank back to text and add creator username
+    violations = []
+    for v in aggregated_violations:
+        severity_map = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'}
+        violations.append({
+            'user_id': v.user_id,
+            'username': v.username,
+            'email': v.email,
+            'quiz_id': v.quiz_id,
+            'quiz_title': v.quiz_title,
+            'creator_username': creator_usernames.get(v.creator_id, 'Unknown'),
+            'violation_type': v.violation_type,
+            'count': v.count,
+            'latest_at': v.latest_at,
+            'description': v.description,
+            'severity': severity_map.get(v.severity_rank, 'low'),
+            'attempt_status': v.attempt_status
+        })
     
     # Get violation statistics
     total_violations = ProctoringEvent.query.count()
@@ -3085,6 +3137,32 @@ def admin_violations():
                              'date_range': date_filter,
                              'user_id': user_filter
                          })
+
+@app.route('/admin/violations/<int:user_id>/<int:quiz_id>/<violation_type>')
+@login_required
+def admin_violation_details(user_id, quiz_id, violation_type):
+    """Show detailed violation timeline for a specific user-quiz-type combination"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get the user and quiz for display
+    user = User.query.get_or_404(user_id)
+    quiz = Quiz.query.get_or_404(quiz_id)
+    
+    # Get all detailed violations for this combination
+    violations = ProctoringEvent.query.join(QuizAttempt) \
+        .filter(
+            QuizAttempt.participant_id == user_id,
+            QuizAttempt.quiz_id == quiz_id,
+            ProctoringEvent.event_type == violation_type
+        ).order_by(ProctoringEvent.timestamp.desc()).all()
+    
+    return render_template('admin_violation_details.html',
+                         user=user,
+                         quiz=quiz,
+                         violation_type=violation_type,
+                         violations=violations)
 
 @app.route('/admin/user/<int:user_id>/edit-credentials', methods=['POST'])
 @login_required
