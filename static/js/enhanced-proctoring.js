@@ -95,18 +95,20 @@ class EnhancedProctoringSystem {
             }
         }, 2000);
         
-        // Monitor for unusual mouse patterns (potential automation)
+        // DISABLED: Mouse movement monitoring (was causing too many false positives)
+        // Only log for debugging, no violations recorded
         let mouseEvents = [];
         document.addEventListener('mousemove', (e) => {
             if (this.isActive) {
                 mouseEvents.push({x: e.clientX, y: e.clientY, time: Date.now()});
-                if (mouseEvents.length > 10) mouseEvents.shift();
+                if (mouseEvents.length > 20) mouseEvents.shift(); // Keep more history
                 
-                // Check for perfectly straight lines (bot behavior)
-                if (mouseEvents.length >= 5) {
-                    const isLinear = this.checkLinearMovement(mouseEvents.slice(-5));
+                // Only check for extremely obvious bot patterns (much less sensitive)
+                if (mouseEvents.length >= 15) {
+                    const isLinear = this.checkLinearMovement(mouseEvents.slice(-10));
                     if (isLinear) {
-                        this.recordViolation('suspicious_mouse', 'medium', 'Suspicious mouse movement detected');
+                        // Just log, don't record violation
+                        console.log('ℹ️ Unusual mouse pattern detected (logged only)');
                     }
                 }
             }
@@ -135,13 +137,13 @@ class EnhancedProctoringSystem {
             }
         });
         
-        // Disable page refresh attempts
+        // Disable page refresh attempts (silent prevention)
         window.addEventListener('beforeunload', (e) => {
             if (this.isActive && !this.isTerminated) {
+                // Only prevent accidental refresh, don't record violation
                 e.preventDefault();
-                e.returnValue = 'Quiz in progress. Are you sure you want to leave?';
-                this.recordViolation('page_refresh_attempt', 'high', 'Attempted to refresh or leave page');
-                return 'Quiz in progress. Are you sure you want to leave?';
+                e.returnValue = '';
+                return '';
             }
         });
     }
@@ -349,10 +351,10 @@ class EnhancedProctoringSystem {
     startRealTimeAnalysis() {
         console.log('🔍 Starting real-time behavioral analysis');
         
-        // Real-time face detection (NO STORAGE)
+        // Real-time face detection (NO STORAGE) - Less frequent
         this.faceDetectionInterval = setInterval(() => {
             this.analyzeLiveFrame();
-        }, 1000); // Analyze every second
+        }, 3000); // Analyze every 3 seconds (reduced frequency)
         
         // Monitor camera stream status
         setInterval(() => {
@@ -548,11 +550,24 @@ class EnhancedProctoringSystem {
             }
         });
         
-        // Window focus detection
+        // REDUCED: Window focus detection (less sensitive)
+        let focusLossCount = 0;
         window.addEventListener('blur', () => {
             if (this.isActive) {
-                this.recordViolation('window_blur', 'medium', 'Window lost focus');
+                focusLossCount++;
+                // Only record if user loses focus multiple times quickly
+                if (focusLossCount > 3) {
+                    this.recordViolation('frequent_focus_loss', 'low', 'Frequent window focus changes');
+                    focusLossCount = 0; // Reset counter
+                }
             }
+        });
+        
+        // Reset focus loss count when user returns
+        window.addEventListener('focus', () => {
+            setTimeout(() => {
+                focusLossCount = Math.max(0, focusLossCount - 1);
+            }, 2000);
         });
         
         // Fullscreen exit detection
@@ -797,31 +812,34 @@ class EnhancedProctoringSystem {
     }
     
     showSingleWarning(message) {
-        // Show warning only once until user corrects behavior
+        // REDUCED: Only show warning for important issues, no spam
         console.warn(message);
         
-        // Create temporary warning toast
-        const toast = document.createElement('div');
-        toast.style.cssText = `
-            position: fixed;
-            top: 100px;
-            right: 20px;
-            background: #ffc107;
-            color: #000;
-            padding: 12px 20px;
-            border-radius: 8px;
-            z-index: 10000;
-            font-weight: bold;
-            max-width: 300px;
-            border: 2px solid #ff9800;
-        `;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        
-        // Remove toast after 5 seconds
-        setTimeout(() => {
-            if (toast.parentNode) toast.remove();
-        }, 5000);
+        // Only show visual warning for critical issues
+        if (message.includes('CRITICAL') || message.includes('multiple people')) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 100px;
+                right: 20px;
+                background: #ffc107;
+                color: #000;
+                padding: 8px 15px;
+                border-radius: 6px;
+                z-index: 10000;
+                font-weight: bold;
+                max-width: 250px;
+                border: 1px solid #ff9800;
+                font-size: 14px;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Remove toast after 3 seconds (shorter)
+            setTimeout(() => {
+                if (toast.parentNode) toast.remove();
+            }, 3000);
+        }
     }
     
     shouldTerminateQuiz() {
@@ -946,12 +964,14 @@ class EnhancedProctoringSystem {
     
     showCriticalWarning(message) {
         console.error(message);
-        alert(message); // For critical warnings, use alert to ensure user sees it
+        // REMOVED: No alert popups, only console logging
+        this.showSingleWarning(message);
     }
     
     showCriticalError(message) {
         console.error(message);
-        alert(message);
+        // REMOVED: No alert popups, only console logging
+        this.showSingleWarning(message);
     }
 }
 

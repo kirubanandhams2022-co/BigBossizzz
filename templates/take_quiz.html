@@ -293,7 +293,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
         } catch (error) {
             console.error('Failed to start secure quiz:', error);
-            alert('Failed to start secure mode. Please check camera permissions and try again.');
+            // REMOVED: alert popup replaced with toast
+            this.showSingleWarning('Failed to start secure mode. Please check camera permissions and try again.');
         }
     });
 });
@@ -344,23 +345,29 @@ function startTimer() {
         
         document.getElementById('timer').textContent = display;
         
-        // Warning when 5 minutes remaining
+        // Warning when 5 minutes remaining (no popup)
         if (timeRemaining === 300) {
             document.getElementById('timer').classList.add('time-warning', 'text-warning');
-            alert('Warning: 5 minutes remaining!');
+            console.warn('Warning: 5 minutes remaining!');
+            // Show subtle notification instead of alert
+            showQuietNotification('⏰ 5 minutes remaining', 'warning');
         }
         
-        // Critical warning when 1 minute remaining
+        // Critical warning when 1 minute remaining (no popup)
         if (timeRemaining === 60) {
             document.getElementById('timer').classList.add('text-danger');
-            alert('Critical: 1 minute remaining!');
+            console.warn('Critical: 1 minute remaining!');
+            showQuietNotification('🚨 1 minute remaining!', 'danger');
         }
         
-        // Auto-submit when time runs out
+        // Auto-submit when time runs out (no popup)
         if (timeRemaining <= 0) {
             clearInterval(timer);
-            alert('Time\'s up! Submitting quiz automatically.');
-            document.getElementById('quizForm').submit();
+            console.log('Time up! Auto-submitting quiz.');
+            showQuietNotification('⏰ Time up! Submitting quiz...', 'info');
+            setTimeout(() => {
+                document.getElementById('quizForm').submit();
+            }, 1000);
         }
     }, 1000);
 }
@@ -434,7 +441,8 @@ function submitQuiz() {
 
 function saveDraft() {
     // This would save the current answers as a draft
-    alert('Draft saved! You can continue later.');
+    console.log('Draft saved successfully');
+    showQuietNotification('💾 Draft saved!', 'success');
 }
 
 // Initialize on page load
@@ -451,5 +459,42 @@ window.addEventListener('beforeunload', function(e) {
     e.preventDefault();
     e.returnValue = 'Are you sure you want to leave? Your progress may be lost.';
 });
+
+// Quiet notification function (no interruptions)
+function showQuietNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    const colors = {
+        info: '#17a2b8',
+        success: '#28a745', 
+        warning: '#ffc107',
+        danger: '#dc3545'
+    };
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${colors[type]};
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        z-index: 9999;
+        font-size: 13px;
+        opacity: 0.9;
+        transition: opacity 0.3s;
+        text-align: center;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Fade out and remove
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            if (notification.parentNode) notification.remove();
+        }, 300);
+    }, 2000);
+}
 </script>
 {% endblock %}
