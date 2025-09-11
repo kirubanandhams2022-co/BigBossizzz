@@ -231,7 +231,6 @@
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
 {% if quiz.proctoring_enabled %}
 <script src="{{ url_for('static', filename='js/enhanced-proctoring.js') }}"></script>
-<script src="{{ url_for('static', filename='js/proctoring.js') }}"></script>
 <script>
 // Enhanced Proctoring Integration
 let enhancedProctoring = null;
@@ -299,10 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Initialize fallback proctoring (if available)
-if (typeof initializeProctoring === 'function') {
-    initializeProctoring({{ attempt.id }});
-}
+// Old proctoring system disabled - using enhanced system only
 
 // Override quiz submission to include enhanced proctoring data
 function submitQuiz() {
