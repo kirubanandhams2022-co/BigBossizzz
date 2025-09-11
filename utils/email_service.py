@@ -31,9 +31,9 @@ class FreeEmailService:
     def send_email(self, 
                    to_email: str, 
                    subject: str, 
-                   html_content: str = None,
-                   text_content: str = None,
-                   from_email: str = None,
+                   html_content: Optional[str] = None,
+                   text_content: Optional[str] = None,
+                   from_email: Optional[str] = None,
                    from_name: str = "BigBossizzz Academic Platform") -> bool:
         """
         Send email using Brevo's free API
