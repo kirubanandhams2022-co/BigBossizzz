@@ -19,6 +19,23 @@ from io import BytesIO
 from sqlalchemy import func, text
 from utils import get_time_greeting, get_greeting_icon
 
+# Add email health check endpoint
+@app.route('/admin/email-health')
+def admin_email_health():
+    """Email system health check for monitoring"""
+    try:
+        from email_service import brevo_service, test_email_service
+        is_healthy = test_email_service()
+        return jsonify({
+            'status': 'healthy' if is_healthy else 'unhealthy',
+            'service': 'Brevo (300/day FREE)',
+            'api_configured': bool(brevo_service.api_key),
+            'sender_configured': bool(brevo_service.sender_email),
+            'ready_for_production': is_healthy
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
 # Excel/Spreadsheet generation imports
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -84,6 +101,10 @@ def register():
         
         db.session.add(user)
         db.session.commit()
+        
+        # Generate verification token and commit it to database
+        user.generate_verification_token()
+        db.session.commit()  # Critical: Persist the verification token
         
         # Send verification email
         if send_verification_email(user):
