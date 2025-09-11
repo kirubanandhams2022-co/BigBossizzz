@@ -1613,329 +1613,332 @@ class EnhancedProctoringSystem {
         this.showSingleWarning(message);
     }
     
-    // ============== STRONG SECURITY ENFORCEMENT ==============
+    // ============== SMART SECURITY MONITORING ==============
     
     activateStrongEnforcement() {
-        console.log('🔐 Activating aggressive security enforcement');
+        console.log('🔐 Activating smart security monitoring');
         this.enforcementActive = true;
         
-        // Force immediate fullscreen and lock it
-        this.enforceAggressiveFullscreen();
-        
-        // Block all tab switching attempts
-        this.blockTabSwitching();
-        
-        // Block screenshot attempts
-        this.blockScreenshots();
-        
-        // Detect and prevent window minimization
-        this.preventWindowMinimization();
-        
-        // Block background app access
-        this.blockBackgroundApps();
-        
-        // Enhanced keyboard blocking
-        this.enhancedKeyboardBlocking();
-        
-        // Continuous focus monitoring
-        this.startAggressiveFocusMonitoring();
-        
-        console.log('✅ Aggressive security enforcement activated');
+        try {
+            // Request fullscreen with graceful fallback
+            this.requestFullscreenGracefully();
+            
+            // Monitor tab switching and focus changes
+            this.monitorTabSwitching();
+            
+            // Detect screenshot attempts (what's detectable)
+            this.detectScreenshotAttempts();
+            
+            // Monitor window state changes
+            this.monitorWindowState();
+            
+            // Monitor system shortcuts
+            this.monitorSystemShortcuts();
+            
+            // Essential keyboard monitoring (not blocking normal use)
+            this.setupEssentialKeyboardMonitoring();
+            
+            // Smart focus monitoring
+            this.startSmartFocusMonitoring();
+            
+            console.log('✅ Smart security monitoring activated');
+        } catch (error) {
+            console.error('Security monitoring setup failed:', error);
+            this.handleSecuritySetupFailure(error);
+        }
     }
     
     deactivateStrongEnforcement() {
         if (!this.enforcementActive) return;
         
-        console.log('🔓 Deactivating security enforcement');
+        console.log('🔓 Deactivating security monitoring');
         this.enforcementActive = false;
         this.blockingActive = false;
         
-        // Remove event listeners
-        this.blockedEvents.forEach(({ element, event, handler }) => {
-            element.removeEventListener(event, handler);
-        });
-        this.blockedEvents = [];
-        
-        // Remove keyboard blocker
-        if (this.keyboardBlocker) {
-            document.removeEventListener('keydown', this.keyboardBlocker);
-            this.keyboardBlocker = null;
+        try {
+            // Remove event listeners with error handling
+            this.blockedEvents.forEach(({ element, event, handler }) => {
+                try {
+                    element.removeEventListener(event, handler);
+                } catch (error) {
+                    console.warn('Failed to remove event listener:', error);
+                }
+            });
+            this.blockedEvents = [];
+            
+            // Remove keyboard monitor
+            if (this.keyboardBlocker) {
+                try {
+                    document.removeEventListener('keydown', this.keyboardBlocker);
+                    this.keyboardBlocker = null;
+                } catch (error) {
+                    console.warn('Failed to remove keyboard monitor:', error);
+                }
+            }
+            
+            // Exit fullscreen gracefully
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(error => {
+                    console.warn('Failed to exit fullscreen:', error);
+                });
+            }
+            
+            console.log('✅ Security monitoring deactivated');
+        } catch (error) {
+            console.error('Error during security monitoring deactivation:', error);
         }
-        
-        // Exit fullscreen
-        if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => {});
-        }
-        
-        console.log('✅ Security enforcement deactivated');
     }
     
-    enforceAggressiveFullscreen() {
-        // Force fullscreen immediately and lock it
+    requestFullscreenGracefully() {
+        // Request fullscreen with proper error handling
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
-                console.warn('Failed to enter fullscreen:', err);
-                this.recordViolation('fullscreen_failed', 'high', 'Failed to enter fullscreen mode');
+                console.warn('Fullscreen request failed:', err);
+                this.showSingleWarning('⚠️ Fullscreen mode recommended for enhanced security');
+                // Don't record as violation - user may have legitimate reasons
             });
         }
         
-        // Continuously monitor and re-enforce fullscreen
-        const fullscreenEnforcer = () => {
+        // Monitor fullscreen changes (detection only)
+        const fullscreenMonitor = () => {
             if (this.enforcementActive && !document.fullscreenElement) {
-                console.warn('🚨 Fullscreen exit detected - re-enforcing');
-                document.documentElement.requestFullscreen().catch(() => {
-                    this.recordViolation('fullscreen_violation', 'critical', 'Repeatedly exited fullscreen mode');
-                });
+                console.log('📊 Fullscreen exited - monitoring only');
+                this.recordViolation('fullscreen_exited', 'medium', 'Exited fullscreen mode');
+                // Don't try to force back - just detect and record
             }
         };
         
-        // Check every 100ms for fullscreen violations
-        setInterval(fullscreenEnforcer, 100);
+        document.addEventListener('fullscreenchange', fullscreenMonitor);
+        this.blockedEvents.push({ element: document, event: 'fullscreenchange', handler: fullscreenMonitor });
         
-        // Block escape key
-        const escapeBlocker = (e) => {
-            if (e.key === 'Escape' && this.enforcementActive) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.recordViolation('escape_blocked', 'medium', 'Attempted to exit fullscreen with Escape key');
-                return false;
+        // Monitor escape key usage (for awareness, not blocking)
+        const escapeMonitor = (e) => {
+            if (e.key === 'Escape' && this.enforcementActive && document.fullscreenElement) {
+                // Just record the attempt, don't block it
+                this.recordViolation('escape_pressed', 'low', 'Escape key pressed in fullscreen mode');
+                console.log('📊 Escape key usage detected');
             }
         };
         
-        document.addEventListener('keydown', escapeBlocker);
-        this.blockedEvents.push({ element: document, event: 'keydown', handler: escapeBlocker });
+        document.addEventListener('keydown', escapeMonitor);
+        this.blockedEvents.push({ element: document, event: 'keydown', handler: escapeMonitor });
     }
     
-    blockTabSwitching() {
-        // Aggressive tab switch prevention
-        const blockTabSwitch = (e) => {
+    monitorTabSwitching() {
+        // Monitor tab switching (detection, not blocking)
+        const tabSwitchMonitor = (e) => {
             if (!this.enforcementActive) return;
             
-            // Block Alt+Tab, Ctrl+Tab, Windows key, etc.
-            if (e.altKey || e.metaKey || e.key === 'Tab') {
-                e.preventDefault();
-                e.stopPropagation();
+            // Monitor certain key combinations (but don't block normal browser use)
+            if (e.altKey && e.key === 'Tab') {
                 this.tabSwitchCount++;
-                this.recordViolation('tab_switch_blocked', 'high', 'Attempted to switch tabs/applications');
-                this.showSingleWarning('⚠️ Tab switching is blocked during the quiz!');
-                return false;
+                this.recordViolation('alt_tab_detected', 'medium', 'Alt+Tab key combination detected');
+                console.log('📊 Alt+Tab detected');
+                // Don't prevent - OS handles this, we just detect
             }
         };
         
-        // Enhanced visibility change detection
+        // Smart visibility change detection
         const visibilityHandler = () => {
             if (document.hidden && this.enforcementActive) {
                 this.tabSwitchCount++;
-                this.recordViolation('tab_switch_detected', 'critical', `Tab switched away (${this.tabSwitchCount} times)`);
+                this.recordViolation('tab_switch_detected', 'high', `Tab/window switched away (${this.tabSwitchCount} times)`);
                 
-                // Immediately try to regain focus
-                window.focus();
-                
-                if (this.tabSwitchCount >= 2) {
-                    this.showCriticalWarning('🚨 QUIZ TERMINATION WARNING: Return to quiz immediately!');
-                }
-                
-                if (this.tabSwitchCount >= 3) {
-                    this.terminateQuiz();
+                // Show warning but don't try to force focus (can be annoying)
+                if (this.tabSwitchCount === 1) {
+                    this.showSingleWarning('⚠️ Please stay focused on the quiz window');
+                } else if (this.tabSwitchCount === 5) {
+                    this.showSingleWarning('⚠️ Multiple tab switches detected - please remain focused');
+                } else if (this.tabSwitchCount >= 10) {
+                    this.showCriticalWarning('⚠️ Excessive tab switching detected - quiz integrity at risk');
                 }
             }
         };
         
-        // Focus loss detection
+        // Focus monitoring (less aggressive)
         const focusHandler = () => {
             if (this.enforcementActive) {
                 this.lastFocusTime = Date.now();
-                // Try to regain focus immediately
-                setTimeout(() => window.focus(), 10);
+                // Don't automatically try to regain focus - let user control their browser
             }
         };
         
-        document.addEventListener('keydown', blockTabSwitch);
+        document.addEventListener('keydown', tabSwitchMonitor);
         document.addEventListener('visibilitychange', visibilityHandler);
         window.addEventListener('blur', focusHandler);
         
         this.blockedEvents.push(
-            { element: document, event: 'keydown', handler: blockTabSwitch },
+            { element: document, event: 'keydown', handler: tabSwitchMonitor },
             { element: document, event: 'visibilitychange', handler: visibilityHandler },
             { element: window, event: 'blur', handler: focusHandler }
         );
     }
     
-    blockScreenshots() {
-        const screenshotBlocker = (e) => {
+    detectScreenshotAttempts() {
+        const screenshotDetector = (e) => {
             if (!this.enforcementActive) return;
             
-            // Block Print Screen, Windows+S, etc.
-            const screenshotKeys = [
+            // Detect screenshot-related key presses (what we can reasonably detect)
+            const suspiciousKeys = [
                 'PrintScreen',
-                'F12', // Dev tools
-                'F10', // Context menu
-                'F11'  // Fullscreen toggle
+                'F12', // Dev tools (can interfere with screenshots)
             ];
             
-            if (screenshotKeys.includes(e.key) || 
-                (e.metaKey && e.key === 's') || // Windows+S
-                (e.altKey && e.key === 'PrintScreen') || // Alt+PrintScreen
-                (e.ctrlKey && e.shiftKey && e.key === 'S')) { // Ctrl+Shift+S
+            // Detect some browser-level screenshot shortcuts
+            if (suspiciousKeys.includes(e.key) || 
+                (e.ctrlKey && e.shiftKey && e.key === 'S')) { // Browser screenshot tools
                 
-                e.preventDefault();
-                e.stopPropagation();
                 this.screenshotAttempts++;
                 
-                this.recordViolation('screenshot_blocked', 'high', `Screenshot attempt blocked (${this.screenshotAttempts} times)`);
-                this.showSingleWarning('⚠️ Screenshots are strictly prohibited!');
+                this.recordViolation('screenshot_attempt_detected', 'medium', `Screenshot key detected: ${e.key}`);
+                console.log('📊 Screenshot-related key detected:', e.key);
                 
-                if (this.screenshotAttempts >= 3) {
-                    this.recordViolation('multiple_screenshot_attempts', 'critical', 'Multiple screenshot attempts detected');
-                    this.showCriticalWarning('🚨 Multiple screenshot attempts detected! Quiz may be terminated.');
+                if (this.screenshotAttempts === 1) {
+                    this.showSingleWarning('⚠️ Screenshot attempts are monitored and logged');
+                } else if (this.screenshotAttempts >= 5) {
+                    this.showSingleWarning('⚠️ Multiple screenshot attempts detected');
                 }
                 
-                return false;
+                // Note: We don't preventDefault() because browsers can't actually block OS-level screenshots
+                // We just detect and log for policy enforcement
             }
         };
         
-        // Block context menu (right-click)
-        const contextBlocker = (e) => {
+        // Monitor right-click (but allow it - just log for awareness)
+        const contextMonitor = (e) => {
             if (this.enforcementActive) {
-                e.preventDefault();
-                this.recordViolation('context_menu_blocked', 'low', 'Right-click menu blocked');
-                return false;
+                this.recordViolation('right_click_detected', 'low', 'Right-click menu accessed');
+                console.log('📊 Right-click detected');
+                // Don't block - just monitor
             }
         };
         
-        document.addEventListener('keydown', screenshotBlocker);
-        document.addEventListener('contextmenu', contextBlocker);
+        document.addEventListener('keydown', screenshotDetector);
+        document.addEventListener('contextmenu', contextMonitor);
         
         this.blockedEvents.push(
-            { element: document, event: 'keydown', handler: screenshotBlocker },
-            { element: document, event: 'contextmenu', handler: contextBlocker }
+            { element: document, event: 'keydown', handler: screenshotDetector },
+            { element: document, event: 'contextmenu', handler: contextMonitor }
         );
     }
     
-    preventWindowMinimization() {
-        // Detect minimize attempts through window state changes
-        const minimizeDetector = () => {
-            if (this.enforcementActive && 
-                (window.outerHeight <= 100 || window.outerWidth <= 100 || 
-                 document.visibilityState === 'hidden')) {
-                
-                this.minimizeAttempts++;
-                this.recordViolation('window_minimize', 'high', `Window minimization detected (${this.minimizeAttempts} times)`);
-                
-                // Try to restore window
-                window.focus();
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(() => {});
+    monitorWindowState() {
+        // Monitor window state changes (detection only)
+        const windowStateMonitor = () => {
+            if (this.enforcementActive) {
+                // Detect very small windows (might indicate minimization or hiding)
+                if (window.outerHeight <= 100 || window.outerWidth <= 100) {
+                    this.minimizeAttempts++;
+                    this.recordViolation('window_resized_small', 'medium', `Window resized very small (${this.minimizeAttempts} times)`);
+                    console.log('📊 Small window size detected');
                 }
                 
-                if (this.minimizeAttempts >= 2) {
-                    this.showCriticalWarning('🚨 Window minimization detected! Keep quiz window active.');
+                // Detect if window is hidden (visibility API)
+                if (document.visibilityState === 'hidden') {
+                    this.recordViolation('window_hidden', 'medium', 'Window became hidden');
+                    console.log('📊 Window hidden detected');
                 }
             }
         };
         
-        // Monitor window state every 200ms
-        setInterval(minimizeDetector, 200);
+        // Monitor window state periodically
+        setInterval(windowStateMonitor, 1000); // Less frequent monitoring
         
-        // Block minimize shortcuts
-        const minimizeBlocker = (e) => {
+        // Monitor minimize-related shortcuts (detect, not block)
+        const minimizeShortcutMonitor = (e) => {
             if (!this.enforcementActive) return;
             
-            // Block Windows+D (show desktop), Windows+M (minimize all)
+            // Monitor Windows+D (show desktop), Windows+M (minimize all)
             if (e.metaKey && (e.key === 'd' || e.key === 'm')) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.recordViolation('minimize_shortcut_blocked', 'medium', 'Minimize shortcut blocked');
-                return false;
+                this.recordViolation('minimize_shortcut_detected', 'low', `Minimize shortcut detected: ${this.getKeyCombo(e)}`);
+                console.log('📊 Minimize shortcut detected:', this.getKeyCombo(e));
+                // Don't block - just detect and log
             }
         };
         
-        document.addEventListener('keydown', minimizeBlocker);
-        this.blockedEvents.push({ element: document, event: 'keydown', handler: minimizeBlocker });
+        document.addEventListener('keydown', minimizeShortcutMonitor);
+        this.blockedEvents.push({ element: document, event: 'keydown', handler: minimizeShortcutMonitor });
     }
     
-    blockBackgroundApps() {
-        // Enhanced background app detection
-        const appSwitchBlocker = (e) => {
+    monitorSystemShortcuts() {
+        // Monitor system-level shortcuts (realistic detection)
+        const systemShortcutMonitor = (e) => {
             if (!this.enforcementActive) return;
             
-            // Block common app switching shortcuts
-            const blockedCombos = [
-                { alt: true, key: 'Tab' },        // Alt+Tab
-                { ctrl: true, alt: true, key: 'Tab' }, // Ctrl+Alt+Tab
-                { meta: true, key: 'Tab' },       // Cmd+Tab (Mac)
+            // Monitor common system shortcuts (we can detect the key press, but can't block OS handling)
+            const systemShortcuts = [
                 { ctrl: true, shift: true, key: 'Escape' }, // Task Manager
                 { ctrl: true, alt: true, key: 'Delete' }, // Ctrl+Alt+Del
-                { meta: true, key: ' ' },         // Windows key + Space
                 { meta: true, key: 'r' },         // Windows + R (Run)
+                { meta: true, key: 'l' },         // Windows + L (Lock)
             ];
             
-            for (const combo of blockedCombos) {
+            for (const combo of systemShortcuts) {
                 if (this.matchesKeyCombo(e, combo)) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.recordViolation('app_switch_blocked', 'high', `Blocked app switching: ${this.getKeyCombo(e)}`);
-                    this.showSingleWarning('⚠️ Application switching is blocked during the quiz!');
-                    return false;
+                    this.recordViolation('system_shortcut_detected', 'high', `System shortcut detected: ${this.getKeyCombo(e)}`);
+                    console.log('📊 System shortcut detected:', this.getKeyCombo(e));
+                    
+                    // Note: We can't actually block these at OS level, just detect and log
+                    this.showSingleWarning('⚠️ System shortcut detected and logged');
                 }
             }
         };
         
-        document.addEventListener('keydown', appSwitchBlocker);
-        this.blockedEvents.push({ element: document, event: 'keydown', handler: appSwitchBlocker });
+        document.addEventListener('keydown', systemShortcutMonitor);
+        this.blockedEvents.push({ element: document, event: 'keydown', handler: systemShortcutMonitor });
     }
     
-    enhancedKeyboardBlocking() {
+    setupEssentialKeyboardMonitoring() {
         this.keyboardBlocker = (e) => {
             if (!this.enforcementActive) return;
             
-            // Comprehensive keyboard shortcut blocking
-            const strictlyBlocked = [
-                // Developer tools
+            // Only block truly suspicious shortcuts that clearly indicate cheating attempts
+            const suspiciousShortcuts = [
+                // Developer tools (these can enable cheating)
                 { ctrl: true, shift: true, key: 'I' },
                 { ctrl: true, shift: true, key: 'J' },
                 { ctrl: true, shift: true, key: 'C' },
                 { ctrl: true, key: 'U' },
                 { key: 'F12' },
                 
-                // Navigation and browsing
+                // Navigation that clearly violates quiz rules
                 { ctrl: true, key: 'T' },         // New tab
                 { ctrl: true, key: 'N' },         // New window
                 { ctrl: true, key: 'W' },         // Close tab
                 { ctrl: true, shift: true, key: 'T' }, // Reopen tab
-                { ctrl: true, key: 'H' },         // History
-                { ctrl: true, key: 'L' },         // Address bar
-                { ctrl: true, key: 'K' },         // Search
-                { ctrl: true, key: 'D' },         // Bookmark
                 
-                // Copy/paste/printing
+                // Print (to prevent printing questions)
+                { ctrl: true, key: 'P' },
+            ];
+            
+            // Monitor but don't block normal usage shortcuts
+            const monitoredShortcuts = [
                 { ctrl: true, key: 'A' },         // Select all
                 { ctrl: true, key: 'C' },         // Copy
                 { ctrl: true, key: 'V' },         // Paste
                 { ctrl: true, key: 'X' },         // Cut
-                { ctrl: true, key: 'P' },         // Print
                 { ctrl: true, key: 'S' },         // Save
-                
-                // Zoom and refresh
-                { ctrl: true, key: '0' },         // Reset zoom
-                { ctrl: true, key: '+' },         // Zoom in
-                { ctrl: true, key: '-' },         // Zoom out
                 { ctrl: true, key: 'R' },         // Refresh
                 { key: 'F5' },                    // Refresh
-                
-                // Function keys
-                { key: 'F1' }, { key: 'F2' }, { key: 'F3' }, 
-                { key: 'F4' }, { key: 'F6' }, { key: 'F7' }, 
-                { key: 'F8' }, { key: 'F9' }, { key: 'F10' }, 
-                { key: 'F11' }
             ];
             
-            for (const combo of strictlyBlocked) {
+            // Block only the truly suspicious ones
+            for (const combo of suspiciousShortcuts) {
                 if (this.matchesKeyCombo(e, combo)) {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.recordViolation('keyboard_shortcut_blocked', 'medium', `Blocked: ${this.getKeyCombo(e)}`);
+                    this.recordViolation('suspicious_shortcut_blocked', 'high', `Blocked: ${this.getKeyCombo(e)}`);
+                    console.log('🚫 Blocked suspicious shortcut:', this.getKeyCombo(e));
                     return false;
+                }
+            }
+            
+            // Just monitor normal shortcuts (don't block them)
+            for (const combo of monitoredShortcuts) {
+                if (this.matchesKeyCombo(e, combo)) {
+                    this.recordViolation('shortcut_used', 'low', `Used: ${this.getKeyCombo(e)}`);
+                    console.log('📊 Monitored shortcut used:', this.getKeyCombo(e));
+                    // Don't prevent - just log for awareness
                 }
             }
         };
@@ -1943,38 +1946,49 @@ class EnhancedProctoringSystem {
         document.addEventListener('keydown', this.keyboardBlocker);
     }
     
-    startAggressiveFocusMonitoring() {
-        // Continuous focus monitoring
+    startSmartFocusMonitoring() {
+        // Smart focus monitoring (less aggressive)
         setInterval(() => {
             if (this.enforcementActive) {
                 const timeSinceLastFocus = Date.now() - this.lastFocusTime;
                 
-                // If window has been out of focus for more than 2 seconds
-                if (timeSinceLastFocus > 2000 && document.hidden) {
-                    this.recordViolation('prolonged_focus_loss', 'high', 'Window out of focus for extended period');
+                // More reasonable focus loss detection
+                if (timeSinceLastFocus > 30000 && document.hidden) { // 30 seconds instead of 2
+                    this.recordViolation('extended_focus_loss', 'medium', 'Window out of focus for extended period');
+                    console.log('📊 Extended focus loss detected');
                     
-                    // Try to regain focus
-                    window.focus();
+                    // Don't automatically try to regain focus - let user control their browser
                     
-                    // Show warning if focus lost too long
-                    if (timeSinceLastFocus > 5000) {
-                        this.showCriticalWarning('🚨 Return focus to quiz window immediately!');
+                    // Show gentle reminder instead of aggressive warning
+                    if (timeSinceLastFocus > 60000) { // 1 minute
+                        this.showSingleWarning('⚠️ Please return to the quiz window when ready');
                     }
                 }
             }
-        }, 1000);
+        }, 5000); // Check every 5 seconds instead of every second
         
-        // Update focus time on any user interaction
+        // Update focus time on user interaction
         const updateFocus = () => {
             if (this.enforcementActive) {
                 this.lastFocusTime = Date.now();
             }
         };
         
-        ['mousedown', 'keydown', 'focus', 'click'].forEach(event => {
+        // Monitor focus-related events
+        ['focus', 'click', 'keydown'].forEach(event => {
             document.addEventListener(event, updateFocus);
             this.blockedEvents.push({ element: document, event, handler: updateFocus });
         });
+        
+        // Monitor visibility changes
+        const visibilityFocusMonitor = () => {
+            if (this.enforcementActive && !document.hidden) {
+                this.lastFocusTime = Date.now(); // Reset timer when window becomes visible
+            }
+        };
+        
+        document.addEventListener('visibilitychange', visibilityFocusMonitor);
+        this.blockedEvents.push({ element: document, event: 'visibilitychange', handler: visibilityFocusMonitor });
     }
     
     matchesKeyCombo(event, combo) {
@@ -1995,6 +2009,30 @@ class EnhancedProctoringSystem {
         if (event.metaKey) parts.push('Meta');
         if (event.key) parts.push(event.key);
         return parts.join('+');
+    }
+    
+    handleSecuritySetupFailure(error) {
+        console.error('Security monitoring setup failed:', error);
+        
+        // Determine appropriate user feedback based on error type
+        let userMessage = '⚠️ Some security monitoring features could not be enabled.';
+        
+        if (error.message && error.message.includes('fullscreen')) {
+            userMessage = '⚠️ Fullscreen mode could not be activated. Please enable manually if needed.';
+        } else if (error.message && error.message.includes('permission')) {
+            userMessage = '⚠️ Some monitoring features require additional permissions.';
+        } else if (error.message && error.message.includes('not supported')) {
+            userMessage = '⚠️ Your browser has limited security monitoring support.';
+        }
+        
+        // Show user-friendly message
+        this.showSingleWarning(userMessage);
+        
+        // Record the failure for administrative review
+        this.recordViolation('security_setup_failed', 'medium', `Security setup error: ${error.message}`);
+        
+        // Continue with basic monitoring even if some features fail
+        console.log('Continuing with available security monitoring features...');
     }
 }
 
