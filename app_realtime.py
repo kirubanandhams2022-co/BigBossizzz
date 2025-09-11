@@ -12,7 +12,10 @@ from flask_login import LoginManager, current_user
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 from flask_mail import Mail, Message
 from sqlalchemy.orm import DeclarativeBase
-from werkzeug.middleware.proxy_fix import ProxyFix
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+except ImportError:
+    ProxyFix = None
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -26,7 +29,8 @@ mail = Mail()
 # Create the app with SocketIO support
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET")
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+if ProxyFix:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
@@ -56,7 +60,7 @@ socketio = SocketIO(app,
 # Login manager setup
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # type: ignore
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -103,8 +107,7 @@ def handle_violation_alert(data):
                 attempt_id=data.get('attemptId'),
                 event_type=data.get('violationType', 'unknown'),
                 details=data.get('message', 'Real-time violation detected'),
-                severity=data.get('severity', 'medium'),
-                timestamp=datetime.utcnow()
+                severity=data.get('severity', 'medium')
             )
             db.session.add(violation)
             db.session.commit()
@@ -116,7 +119,7 @@ def handle_violation_alert(data):
                 'severity': data.get('severity', 'medium'),
                 'timestamp': datetime.utcnow().isoformat(),
                 'attemptId': data.get('attemptId')
-            }, room='monitors')
+            }, to='monitors')
             
             # Send email for high severity violations
             if data.get('severity') == 'high':
