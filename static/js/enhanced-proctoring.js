@@ -944,55 +944,165 @@ class EnhancedProctoringSystem {
     }
     
     stopMonitoring() {
+        console.log('🚫 Stopping all monitoring systems');
         this.isActive = false;
         
+        // Stop video monitoring
         if (this.faceDetectionInterval) {
             clearInterval(this.faceDetectionInterval);
-        }
-        
-        if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(track => track.stop());
+            this.faceDetectionInterval = null;
         }
         
         // Stop audio monitoring
-        if (this.audioContext) {
-            this.audioContext.close();
-        }
         this.audioMonitoringActive = false;
+        if (this.audioAnalysisInterval) {
+            clearInterval(this.audioAnalysisInterval);
+            this.audioAnalysisInterval = null;
+        }
         
+        // Properly dispose of audio context
+        if (this.audioContext) {
+            try {
+                if (this.audioContext.state !== 'closed') {
+                    this.audioContext.close().then(() => {
+                        console.log('✅ Audio context closed successfully');
+                    }).catch(err => {
+                        console.warn('Audio context close warning:', err);
+                    });
+                }
+            } catch (error) {
+                console.warn('Failed to close audio context:', error);
+            }
+            this.audioContext = null;
+        }
+        
+        // Stop all media tracks
+        if (this.mediaStream) {
+            this.mediaStream.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                    console.log(`✅ Stopped ${track.kind} track`);
+                } catch (error) {
+                    console.warn(`Failed to stop ${track.kind} track:`, error);
+                }
+            });
+            this.mediaStream = null;
+        }
+        
+        // Clear audio analysis data
+        this.analyser = null;
+        this.dataArray = null;
+        this.baselineNoiseLevel = null;
+        this.environmentAnalysis = {
+            isQuiet: true,
+            hasConversation: false,
+            noiseLevelHistory: [],
+            lastVoiceActivity: 0
+        };
+        
+        // Remove UI elements
+        this.removeMonitoringUI();
+        
+        // Remove hidden elements
+        if (this.videoElement) {
+            this.videoElement.remove();
+            this.videoElement = null;
+        }
+        if (this.canvas) {
+            this.canvas.remove();
+            this.canvas = null;
+        }
+        
+        console.log('✅ All monitoring systems stopped and cleaned up');
+    }
+    
+    removeMonitoringUI() {
         // Remove camera preview
         const preview = document.getElementById('live-camera-preview');
-        if (preview) preview.remove();
+        if (preview) {
+            preview.remove();
+            console.log('Removed camera preview');
+        }
         
         // Remove audio indicator
         const audioIndicator = document.getElementById('audio-monitoring-indicator');
-        if (audioIndicator) audioIndicator.remove();
+        if (audioIndicator) {
+            audioIndicator.remove();
+            console.log('Removed audio monitoring indicator');
+        }
         
-        // Remove hidden elements
-        if (this.videoElement) this.videoElement.remove();
-        if (this.canvas) this.canvas.remove();
+        // Remove privacy notice if still visible
+        const privacyNotice = document.getElementById('audio-privacy-notice');
+        if (privacyNotice) {
+            privacyNotice.remove();
+            console.log('Removed privacy notice');
+        }
+        
+        // Reset proctoring status
+        const statusAlert = document.getElementById('proctoring-status-alert');
+        if (statusAlert) {
+            statusAlert.className = 'alert alert-secondary';
+            statusAlert.innerHTML = '<i class="fas fa-shield"></i> <strong>MONITORING STOPPED</strong><br><small>All monitoring systems have been disabled</small>';
+        }
     }
     
     async startAudioEnvironmentAnalysis() {
         try {
             console.log('🎤 Starting background noise and environment analysis');
             
-            // Create audio context
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // Get audio track from media stream
-            const audioTrack = this.mediaStream.getAudioTracks()[0];
-            if (!audioTrack) {
-                throw new Error('No audio track available');
+            // Check browser compatibility for AudioContext
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+            if (!AudioContextClass) {
+                throw new Error('AudioContext not supported in this browser');
             }
             
-            // Create audio source
-            const source = this.audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+            // Create audio context with better error handling
+            try {
+                this.audioContext = new AudioContextClass();
+            } catch (contextError) {
+                console.error('Failed to create audio context:', contextError);
+                throw new Error('Audio context creation failed - microphone may be in use');
+            }
             
-            // Create analyser
+            // Check if audio context is running
+            if (this.audioContext.state === 'suspended') {
+                try {
+                    await this.audioContext.resume();
+                } catch (resumeError) {
+                    console.warn('Failed to resume audio context:', resumeError);
+                }
+            }
+            
+            // Get audio track from media stream with validation
+            const audioTrack = this.mediaStream.getAudioTracks()[0];
+            if (!audioTrack) {
+                throw new Error('No audio track available - microphone access may be denied');
+            }
+            
+            // Check if audio track is enabled and active
+            if (!audioTrack.enabled) {
+                throw new Error('Audio track is disabled');
+            }
+            
+            if (audioTrack.readyState !== 'live') {
+                throw new Error('Audio track is not active');
+            }
+            
+            // Create audio source with error handling
+            let source;
+            try {
+                source = this.audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+            } catch (sourceError) {
+                console.error('Failed to create media stream source:', sourceError);
+                throw new Error('Audio source creation failed');
+            }
+            
+            // Create analyser with optimized settings
             this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 2048;
+            this.analyser.fftSize = 1024; // Reduced for better performance
             this.analyser.smoothingTimeConstant = 0.8;
+            this.analyser.minDecibels = -90;
+            this.analyser.maxDecibels = -10;
             
             // Connect source to analyser
             source.connect(this.analyser);
@@ -1003,10 +1113,13 @@ class EnhancedProctoringSystem {
             // Show audio monitoring indicator
             this.showAudioMonitoringIndicator();
             
+            // Show privacy notice for audio monitoring
+            this.showAudioPrivacyNotice();
+            
             // Start baseline noise calibration
             await this.calibrateBaselineNoise();
             
-            // Start continuous audio monitoring
+            // Start continuous audio monitoring with error handling
             this.audioMonitoringActive = true;
             this.startContinuousAudioAnalysis();
             
@@ -1014,7 +1127,7 @@ class EnhancedProctoringSystem {
             
         } catch (error) {
             console.error('Audio monitoring failed:', error);
-            this.recordViolation('audio_setup_failed', 'medium', 'Audio monitoring could not be started');
+            this.handleAudioSetupFailure(error);
         }
     }
     
@@ -1035,6 +1148,7 @@ class EnhancedProctoringSystem {
             z-index: 1001;
             font-size: 12px;
             text-align: center;
+            border: 2px solid #17a2b8;
         `;
         
         indicator.innerHTML = `
@@ -1085,15 +1199,20 @@ class EnhancedProctoringSystem {
     startContinuousAudioAnalysis() {
         if (!this.audioMonitoringActive) return;
         
-        // Analyze audio every 200ms
-        const analysisInterval = setInterval(() => {
+        // Analyze audio every 500ms (optimized from 200ms for better performance)
+        this.audioAnalysisInterval = setInterval(() => {
             if (!this.audioMonitoringActive) {
-                clearInterval(analysisInterval);
+                clearInterval(this.audioAnalysisInterval);
                 return;
             }
             
-            this.analyzeAudioEnvironment();
-        }, 200);
+            try {
+                this.analyzeAudioEnvironment();
+            } catch (error) {
+                console.error('Audio analysis error:', error);
+                // Don't stop monitoring for minor errors
+            }
+        }, 500);
     }
     
     analyzeAudioEnvironment() {
@@ -1334,6 +1453,115 @@ class EnhancedProctoringSystem {
         const mean = samples.reduce((sum, val) => sum + val, 0) / samples.length;
         const variance = samples.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / samples.length;
         return Math.sqrt(variance);
+    }
+    
+    showAudioPrivacyNotice() {
+        // Show privacy notice for audio monitoring
+        const notice = document.createElement('div');
+        notice.id = 'audio-privacy-notice';
+        notice.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            max-width: 280px;
+            background: rgba(23, 162, 184, 0.95);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            z-index: 1002;
+            border: 1px solid #17a2b8;
+        `;
+        
+        notice.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 6px;">🔒 Audio Privacy Notice</div>
+            <div style="margin-bottom: 8px;">Audio is being analyzed in real-time for:</div>
+            <ul style="margin: 0; padding-left: 16px; font-size: 10px;">
+                <li>Background noise levels</li>
+                <li>Voice activity detection</li>
+                <li>Environment quality</li>
+            </ul>
+            <div style="margin-top: 8px; font-weight: bold; font-size: 10px;">NO AUDIO IS RECORDED OR STORED</div>
+            <button onclick="this.parentElement.remove()" style="
+                background: #fff;
+                border: none;
+                color: #17a2b8;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 10px;
+                cursor: pointer;
+                margin-top: 8px;
+            ">Got it</button>
+        `;
+        
+        document.body.appendChild(notice);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (notice.parentElement) notice.remove();
+        }, 10000);
+    }
+    
+    handleAudioSetupFailure(error) {
+        console.error('Audio monitoring setup failed:', error);
+        
+        // Determine error type and provide appropriate feedback
+        let userMessage = '⚠️ Audio monitoring setup failed.';
+        let severity = 'medium';
+        
+        if (error.message.includes('denied') || error.message.includes('not supported')) {
+            userMessage = '🎤 Microphone access denied. Audio monitoring disabled.';
+            severity = 'high';
+        } else if (error.message.includes('in use')) {
+            userMessage = '🎤 Microphone is in use by another application.';
+            severity = 'high';
+        } else if (error.message.includes('context')) {
+            userMessage = '🎤 Audio context failed. Please refresh and try again.';
+            severity = 'medium';
+        }
+        
+        // Record violation with appropriate severity
+        this.recordViolation('audio_setup_failed', severity, error.message);
+        
+        // Show user-friendly message
+        this.showSingleWarning(userMessage);
+        
+        // Set audio monitoring as failed but don't block the quiz
+        this.audioMonitoringActive = false;
+        this.audioSetupFailed = true;
+        
+        // Show fallback indicator
+        this.showAudioFailureIndicator();
+        
+        // Continue with visual monitoring only
+        console.warn('Continuing with visual monitoring only');
+    }
+    
+    showAudioFailureIndicator() {
+        const indicator = document.createElement('div');
+        indicator.id = 'audio-monitoring-indicator';
+        indicator.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 120px;
+            height: 40px;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            border-radius: 8px;
+            padding: 8px;
+            z-index: 1001;
+            font-size: 11px;
+            text-align: center;
+            border: 2px solid #dc3545;
+        `;
+        
+        indicator.innerHTML = `
+            <div>🎤 AUDIO DISABLED</div>
+            <div style="font-size: 9px; margin-top: 4px;">Visual only</div>
+        `;
+        
+        document.body.appendChild(indicator);
     }
     
     // Utility methods
