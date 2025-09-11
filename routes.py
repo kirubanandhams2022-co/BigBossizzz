@@ -3606,6 +3606,73 @@ def export_users():
     
     return response
 
+# Enhanced Proctoring System API
+@app.route('/api/proctoring/violation', methods=['POST'])
+@login_required
+def record_enhanced_violation():
+    """Enhanced proctoring violation endpoint for new security system"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['attemptId', 'type', 'severity', 'description']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        # Get attempt and verify ownership
+        attempt = QuizAttempt.query.get(data['attemptId'])
+        if not attempt:
+            return jsonify({'error': 'Attempt not found'}), 404
+            
+        if attempt.participant_id != current_user.id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Create proctoring event
+        event = ProctoringEvent(
+            attempt_id=data['attemptId'],
+            event_type=data['type'],
+            details=data['description'],
+            severity=data['severity'],
+            timestamp=datetime.utcnow()
+        )
+        
+        db.session.add(event)
+        
+        # Check for termination conditions
+        violation_count = ProctoringEvent.query.filter_by(attempt_id=data['attemptId']).count() + 1
+        critical_count = ProctoringEvent.query.filter_by(
+            attempt_id=data['attemptId'], 
+            severity='critical'
+        ).count()
+        
+        if data['severity'] == 'critical':
+            critical_count += 1
+        
+        should_terminate = (
+            critical_count >= 1 or
+            violation_count >= 3 or
+            data['type'] in ['multiple_people', 'camera_disabled', 'tab_switch']
+        )
+        
+        if should_terminate:
+            attempt.status = 'terminated'
+            attempt.completed_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Enhanced violation recorded successfully',
+            'id': event.id,
+            'should_terminate': should_terminate,
+            'violation_count': violation_count
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to record enhanced violation: {e}")
+        return jsonify({'error': 'Failed to record violation'}), 500
+
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):

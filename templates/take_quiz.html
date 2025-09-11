@@ -31,9 +31,67 @@
 {% block content %}
 {% if quiz.proctoring_enabled %}
 <div class="proctoring-status">
-    <div class="alert alert-info alert-dismissible">
-        <i class="fas fa-eye"></i> Proctoring Active
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <div class="alert alert-danger" id="proctoring-status-alert">
+        <i class="fas fa-shield-alt"></i> <strong>ENHANCED SECURITY MODE ACTIVE</strong>
+        <br><small>Live monitoring • Camera required • Tab switching blocked</small>
+    </div>
+</div>
+
+<!-- Security Check Panel -->
+<div class="modal fade" id="securityCheckModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">🔒 Security Check Required</h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-exclamation-triangle"></i> Before starting this proctored quiz:</h6>
+                </div>
+                
+                <div class="checklist">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="check-camera">
+                        <label class="form-check-label" for="check-camera">
+                            📷 Camera access granted and working
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="check-tabs">
+                        <label class="form-check-label" for="check-tabs">
+                            📑 All other browser tabs and applications closed
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="check-fullscreen">
+                        <label class="form-check-label" for="check-fullscreen">
+                            🖥️ Ready to enter fullscreen mode
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="check-environment">
+                        <label class="form-check-label" for="check-environment">
+                            🏠 Private, quiet environment (no other people visible)
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>⚠️ Warning:</strong> Violations will result in automatic quiz termination.
+                    <ul class="mt-2 mb-0">
+                        <li>Multiple people in camera view</li>
+                        <li>Looking away from screen frequently</li>
+                        <li>Switching tabs or applications</li>
+                        <li>Covering or disabling camera</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" id="start-secure-quiz" disabled>
+                    <i class="fas fa-play"></i> Start Secure Quiz
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -172,10 +230,16 @@
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
 {% if quiz.proctoring_enabled %}
+<script src="{{ url_for('static', filename='js/enhanced-proctoring.js') }}"></script>
 <script src="{{ url_for('static', filename='js/proctoring.js') }}"></script>
 <script>
-// Initialize proctoring for this attempt
-initializeProctoring({{ attempt.id }});
+// Initialize enhanced proctoring system
+const enhancedProctoring = new EnhancedProctoringSystem({{ attempt.id }}, {{ quiz.id }});
+
+// Initialize proctoring for this attempt (fallback)
+if (typeof initializeProctoring === 'function') {
+    initializeProctoring({{ attempt.id }});
+}
 </script>
 {% endif %}
 
