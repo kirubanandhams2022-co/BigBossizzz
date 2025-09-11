@@ -29,16 +29,17 @@ class EnhancedProctoringSystem {
         this.isFullscreenLocked = false;
         this.preventStart = false;
         
-        // Security configuration - More forgiving for single user
+        // Security configuration - Balanced for better user experience
         this.config = {
-            maxLookAwayTime: 5000,        // 5 seconds (more forgiving)
-            maxMultiplePeople: 5,         // 5 detections (reduce false positives)
-            maxCameraHidden: 5,           // 5 detections (more forgiving) 
-            maxTabSwitches: 2,            // 2 switches = warning
-            terminateOnViolations: 5,     // 5 violations = terminate (more lenient)
+            maxLookAwayTime: 10000,       // 10 seconds (as requested)
+            maxMultiplePeople: 8,         // 8 detections (very lenient)
+            maxCameraHidden: 8,           // 8 detections (very forgiving) 
+            maxTabSwitches: 3,            // 3 switches = warning
+            terminateOnViolations: 7,     // 7 violations = terminate (more lenient)
             realTimeAnalysis: true,       // Live analysis only
             noImageStorage: true,         // Never store images
-            strictMode: false             // Less strict for better UX
+            strictMode: false,            // Balanced for UX
+            lookAwayThreshold: 0.6        // Less sensitive look-away detection
         };
         
         // Violation tracking
@@ -55,8 +56,8 @@ class EnhancedProctoringSystem {
     }
     
     preventCheating() {
-        // Basic cheating prevention setup
-        console.log('🔒 Setting up basic cheating prevention');
+        // Enhanced cheating prevention setup
+        console.log('🔒 Setting up enhanced cheating prevention');
         
         // Disable text selection
         document.body.style.userSelect = 'none';
@@ -67,6 +68,125 @@ class EnhancedProctoringSystem {
         // Disable drag and drop
         document.addEventListener('dragstart', (e) => e.preventDefault());
         document.addEventListener('drop', (e) => e.preventDefault());
+        
+        // Disable image saving
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.tagName === 'IMG') {
+                e.preventDefault();
+                this.recordViolation('image_save_attempt', 'medium', 'Attempted to save image');
+            }
+        });
+        
+        // Block screenshot attempts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'PrintScreen') {
+                e.preventDefault();
+                this.recordViolation('screenshot_attempt', 'high', 'Screenshot attempt detected');
+                this.showSingleWarning('⚠️ Screenshots are not allowed during the quiz');
+            }
+        });
+        
+        // Detect zoom changes
+        let lastZoom = window.devicePixelRatio;
+        setInterval(() => {
+            if (this.isActive && Math.abs(window.devicePixelRatio - lastZoom) > 0.1) {
+                this.recordViolation('zoom_change', 'low', 'Browser zoom level changed');
+                lastZoom = window.devicePixelRatio;
+            }
+        }, 2000);
+        
+        // Monitor for unusual mouse patterns (potential automation)
+        let mouseEvents = [];
+        document.addEventListener('mousemove', (e) => {
+            if (this.isActive) {
+                mouseEvents.push({x: e.clientX, y: e.clientY, time: Date.now()});
+                if (mouseEvents.length > 10) mouseEvents.shift();
+                
+                // Check for perfectly straight lines (bot behavior)
+                if (mouseEvents.length >= 5) {
+                    const isLinear = this.checkLinearMovement(mouseEvents.slice(-5));
+                    if (isLinear) {
+                        this.recordViolation('suspicious_mouse', 'medium', 'Suspicious mouse movement detected');
+                    }
+                }
+            }
+        });
+        
+        // Disable common cheating shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (this.isActive) {
+                const blockedCombos = [
+                    {ctrl: true, shift: true, key: 'i'},  // Dev tools
+                    {ctrl: true, shift: true, key: 'j'},  // Console
+                    {ctrl: true, shift: true, key: 'c'},  // Inspect
+                    {ctrl: true, key: 'u'},               // View source
+                    {ctrl: true, key: 'p'},               // Print
+                    {ctrl: true, key: 'h'},               // History
+                    {f12: true},                          // Dev tools
+                ];
+                
+                for (const combo of blockedCombos) {
+                    if (this.matchesCombo(e, combo)) {
+                        e.preventDefault();
+                        this.recordViolation('blocked_shortcut', 'medium', `Blocked shortcut: ${this.getKeyCombo(e)}`);
+                        return false;
+                    }
+                }
+            }
+        });
+        
+        // Disable page refresh attempts
+        window.addEventListener('beforeunload', (e) => {
+            if (this.isActive && !this.isTerminated) {
+                e.preventDefault();
+                e.returnValue = 'Quiz in progress. Are you sure you want to leave?';
+                this.recordViolation('page_refresh_attempt', 'high', 'Attempted to refresh or leave page');
+                return 'Quiz in progress. Are you sure you want to leave?';
+            }
+        });
+    }
+    
+    checkLinearMovement(points) {
+        if (points.length < 3) return false;
+        
+        // Calculate if points form a straight line (bot-like behavior)
+        const tolerance = 5; // pixels
+        const first = points[0];
+        const last = points[points.length - 1];
+        
+        for (let i = 1; i < points.length - 1; i++) {
+            const point = points[i];
+            const expected = {
+                x: first.x + (last.x - first.x) * (i / (points.length - 1)),
+                y: first.y + (last.y - first.y) * (i / (points.length - 1))
+            };
+            
+            const distance = Math.sqrt(
+                Math.pow(point.x - expected.x, 2) + Math.pow(point.y - expected.y, 2)
+            );
+            
+            if (distance > tolerance) return false;
+        }
+        
+        return true;
+    }
+    
+    matchesCombo(event, combo) {
+        if (combo.f12 && event.key === 'F12') return true;
+        if (combo.ctrl && !event.ctrlKey) return false;
+        if (combo.shift && !event.shiftKey) return false;
+        if (combo.alt && !event.altKey) return false;
+        if (combo.key && event.key.toLowerCase() !== combo.key.toLowerCase()) return false;
+        return true;
+    }
+    
+    getKeyCombo(event) {
+        let combo = '';
+        if (event.ctrlKey) combo += 'Ctrl+';
+        if (event.shiftKey) combo += 'Shift+';
+        if (event.altKey) combo += 'Alt+';
+        combo += event.key;
+        return combo;
     }
     
     async init() {
@@ -364,15 +484,16 @@ class EnhancedProctoringSystem {
             }
         }
         
-        // If more brightness on edges than center, user might be looking away
-        if (edgeBrightness > centralBrightness * 1.5) {
+        // Less sensitive look-away detection
+        const lookAwayThreshold = this.config.lookAwayThreshold || 0.6;
+        if (edgeBrightness > centralBrightness * (1 + lookAwayThreshold)) {
             this.lookAwayCount++;
-            if (this.lookAwayCount > 3) {
-                this.recordViolation('looking_away', 'medium', 'User appears to be looking away from screen');
+            if (this.lookAwayCount > 10) { // More forgiving - need 10 consecutive detections
+                this.recordViolation('looking_away', 'low', 'Extended time looking away from screen');
                 this.lookAwayCount = 0;
             }
         } else {
-            this.lookAwayCount = Math.max(0, this.lookAwayCount - 1);
+            this.lookAwayCount = Math.max(0, this.lookAwayCount - 2); // Faster reset
         }
     }
     
