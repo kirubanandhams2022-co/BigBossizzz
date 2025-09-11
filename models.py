@@ -169,6 +169,9 @@ class QuizAttempt(db.Model):
     score = db.Column(db.Float)
     total_points = db.Column(db.Integer)
     status = db.Column(db.String(20), default='in_progress')  # 'in_progress', 'completed', 'abandoned', 'terminated'
+    force_submitted = db.Column(db.Boolean, default=False)
+    termination_reason = db.Column(db.Text)
+    is_flagged = db.Column(db.Boolean, default=False)
     
     # Relationships (participant and quiz backrefs are defined in User and Quiz models)
     answers = db.relationship('Answer', backref='attempt', lazy=True, cascade='all, delete-orphan')

@@ -2,10 +2,11 @@ from flask import render_template, request, redirect, url_for, flash, jsonify, s
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from app import app, db
+from app import app, db, mail
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
+from flask_mail import Message
 from datetime import datetime, timedelta
 import json
 import logging
@@ -2514,6 +2515,34 @@ def take_quiz(quiz_id):
         flash('This quiz is not currently active.', 'error')
         return redirect(url_for('participant_dashboard'))
     
+    # SERVER-SIDE DEVICE POLICY ENFORCEMENT
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile_keywords = ['mobile', 'android', 'iphone', 'ipod', 'blackberry', 'windows phone']
+    tablet_keywords = ['tablet', 'ipad']
+    
+    is_mobile = any(keyword in user_agent for keyword in mobile_keywords)
+    is_tablet = any(keyword in user_agent for keyword in tablet_keywords)
+    
+    if is_mobile or is_tablet:
+        device_type = 'Mobile Phone' if is_mobile else 'Tablet'
+        flash(f'❌ Access denied. Quiz access is restricted to desktop computers only. Device detected: {device_type}', 'error')
+        
+        # Log the blocked device attempt
+        try:
+            event = ProctoringEvent(
+                attempt_id=None,
+                event_type='mobile_device_blocked_server',
+                details=f'Server-side mobile device blocking: {user_agent}',
+                severity='critical',
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(event)
+            db.session.commit()
+        except Exception as e:
+            logging.error(f"Failed to log mobile device blocking: {e}")
+        
+        return redirect(url_for('participant_dashboard'))
+
     # Check if user already has an active attempt
     existing_attempt = QuizAttempt.query.filter_by(
         participant_id=current_user.id,
@@ -3672,6 +3701,200 @@ def record_enhanced_violation():
         db.session.rollback()
         logging.error(f"Failed to record enhanced violation: {e}")
         return jsonify({'error': 'Failed to record violation'}), 500
+
+@app.route('/api/proctoring/mark-malpractice', methods=['POST'])
+@login_required
+def mark_malpractice():
+    """Mark user as malpractice and handle immediate termination"""
+    try:
+        data = request.get_json()
+        
+        attempt_id = data.get('attemptId')
+        quiz_id = data.get('quizId')
+        violation = data.get('violation', {})
+        
+        if not attempt_id:
+            return jsonify({'error': 'Attempt ID required'}), 400
+        
+        # Get attempt and verify ownership
+        attempt = QuizAttempt.query.get(attempt_id)
+        if not attempt or attempt.participant_id != current_user.id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Mark attempt as terminated with malpractice flag
+        attempt.status = 'terminated'
+        attempt.completed_at = datetime.utcnow()
+        attempt.termination_reason = f"Malpractice: {violation.get('description', 'Critical violation detected')}"
+        attempt.is_flagged = True
+        
+        # Create or update user violation record
+        user_violation = UserViolation.query.filter_by(user_id=current_user.id).first()
+        if not user_violation:
+            user_violation = UserViolation(user_id=current_user.id)
+            db.session.add(user_violation)
+        
+        user_violation.is_flagged = True
+        user_violation.flagged_at = datetime.utcnow()
+        user_violation.flagged_by = None  # System flagged
+        
+        # Create security alert
+        alert = SecurityAlert(
+            user_id=current_user.id,
+            quiz_id=quiz_id,
+            attempt_id=attempt_id,
+            alert_type='immediate_malpractice',
+            severity='critical',
+            description=f"Immediate malpractice detected: {violation.get('description', 'Unknown')}",
+            auto_action_taken='quiz_terminated_malpractice'
+        )
+        db.session.add(alert)
+        
+        # Log the malpractice event
+        event = ProctoringEvent(
+            attempt_id=attempt_id,
+            event_type='malpractice_marked',
+            details=f"User marked as malpractice: {violation.get('description', 'Critical violation')}",
+            severity='critical',
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(event)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'User marked as malpractice successfully',
+            'attempt_terminated': True
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to mark malpractice: {e}")
+        return jsonify({'error': 'Failed to mark malpractice'}), 500
+
+@app.route('/api/proctoring/notify-participants', methods=['POST'])
+@login_required
+def notify_participants():
+    """Notify other participants about malpractice detection"""
+    try:
+        data = request.get_json()
+        
+        quiz_id = data.get('quizId')
+        message = data.get('message', 'A participant has been terminated for malpractice.')
+        
+        if not quiz_id:
+            return jsonify({'error': 'Quiz ID required'}), 400
+        
+        # Get all participants in this quiz (except current user)
+        quiz = Quiz.query.get_or_404(quiz_id)
+        participants = QuizAttempt.query.filter(
+            QuizAttempt.quiz_id == quiz_id,
+            QuizAttempt.participant_id != current_user.id,
+            QuizAttempt.status.in_(['in_progress', 'started'])
+        ).all()
+        
+        # Send email notifications to active participants
+        for attempt in participants:
+            try:
+                participant = attempt.participant
+                subject = f"⚠️ Quiz Alert - {quiz.title}"
+                body = f"""
+                Quiz Alert Notification
+                
+                Quiz: {quiz.title}
+                Alert: {message}
+                Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+                
+                This is an automated notification for your awareness.
+                Please continue with your quiz if it's still in progress.
+                
+                Assessment Platform
+                """
+                
+                msg = Message(
+                    subject=subject,
+                    recipients=[participant.email],
+                    body=body
+                )
+                
+                mail.send(msg)
+                
+            except Exception as email_error:
+                logging.error(f"Failed to send participant notification to {participant.email}: {email_error}")
+        
+        # Log the notification event
+        event = ProctoringEvent(
+            attempt_id=None,  # System-wide notification
+            event_type='participant_notification_sent',
+            details=f"Malpractice alert sent to {len(participants)} participants",
+            severity='medium',
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(event)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Notifications sent to {len(participants)} participants'
+        }), 200
+        
+    except Exception as e:
+        logging.error(f"Failed to send participant notifications: {e}")
+        return jsonify({'error': 'Failed to send notifications'}), 500
+
+@app.route('/api/quiz/force-submit', methods=['POST'])
+@login_required
+def force_submit_quiz():
+    """Force submit quiz due to malpractice"""
+    try:
+        data = request.get_json()
+        
+        # Find the current user's active quiz attempt
+        attempt = QuizAttempt.query.filter_by(
+            participant_id=current_user.id,
+            status='in_progress'
+        ).first()
+        
+        if not attempt:
+            return jsonify({'error': 'No active quiz attempt found'}), 404
+        
+        # Force submit the attempt
+        attempt.status = 'submitted'
+        attempt.completed_at = datetime.utcnow()
+        attempt.force_submitted = True
+        attempt.termination_reason = data.get('reason', 'Malpractice detected')
+        
+        # Calculate score with current answers (if any)
+        total_questions = len(attempt.quiz.questions)
+        answered_questions = Answer.query.filter_by(attempt_id=attempt.id).count()
+        
+        if total_questions > 0:
+            attempt.score = (answered_questions / total_questions) * 100
+        else:
+            attempt.score = 0
+        
+        # Log the force submission
+        event = ProctoringEvent(
+            attempt_id=attempt.id,
+            event_type='force_submitted',
+            details=f"Quiz force submitted: {data.get('reason', 'Malpractice detected')}",
+            severity='critical',
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(event)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Quiz force submitted successfully',
+            'score': attempt.score
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to force submit quiz: {e}")
+        return jsonify({'error': 'Failed to force submit quiz'}), 500
 
 # Error handlers
 @app.errorhandler(404)
