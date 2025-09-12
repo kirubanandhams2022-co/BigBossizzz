@@ -9,6 +9,12 @@
     --custom-info: #0dcaf0;
     --custom-light: #f8f9fa;
     --custom-dark: #212529;
+    --custom-purple: #6f42c1;
+}
+
+/* Additional background colors */
+.bg-purple {
+    background-color: var(--custom-purple) !important;
 }
 
 /* Smooth transitions for all interactive elements */

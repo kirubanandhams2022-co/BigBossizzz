@@ -75,6 +75,41 @@
     </div>
 </div>
 
+<!-- Additional Statistics Row -->
+<div class="row mb-4">
+    <div class="col-md-6 col-sm-6 mb-3">
+        <a href="{{ url_for('admin_course_management') }}" class="text-decoration-none">
+            <div class="card bg-purple text-white dashboard-stat-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_courses }}</h4>
+                            <p class="mb-0">Courses Created</p>
+                        </div>
+                        <i class="fas fa-graduation-cap fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    
+    <div class="col-md-6 col-sm-6 mb-3">
+        <a href="{{ url_for('admin_violation_appeals') }}" class="text-decoration-none">
+            <div class="card bg-secondary text-white dashboard-stat-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_violation_appeals }}</h4>
+                            <p class="mb-0">Violation Appeals</p>
+                        </div>
+                        <i class="fas fa-balance-scale fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
 <!-- User Role Breakdown -->
 <div class="row mb-4">
     <div class="col-lg-6 mb-4">
