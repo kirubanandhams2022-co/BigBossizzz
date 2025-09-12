@@ -52,13 +52,41 @@ class QuestionForm(FlaskForm):
     question_type = SelectField('Question Type', choices=[
         ('multiple_choice', 'Multiple Choice'),
         ('true_false', 'True/False'),
-        ('text', 'Text Answer')
+        ('text', 'Text Answer'),
+        ('code_submission', 'Code Submission'),
+        ('file_upload', 'File Upload'),
+        ('drawing', 'Drawing/Diagram')
     ], default='multiple_choice')
     points = IntegerField('Points', validators=[
         DataRequired(), 
         NumberRange(min=1, max=10, message='Points must be between 1 and 10')
     ], default=1)
     options = FieldList(FormField(QuestionOptionForm), min_entries=4)
+    
+    # Advanced question type fields
+    programming_language = SelectField('Programming Language', choices=[
+        ('', 'Select Language'),
+        ('python', 'Python'),
+        ('javascript', 'JavaScript'),
+        ('java', 'Java'),
+        ('cpp', 'C++'),
+        ('c', 'C'),
+        ('sql', 'SQL'),
+        ('html', 'HTML'),
+        ('css', 'CSS')
+    ], default='')
+    starter_code = TextAreaField('Starter Code Template', widget=TextArea())
+    sample_output = TextAreaField('Expected Output Example', widget=TextArea())
+    allowed_file_types = StringField('Allowed File Types (e.g., pdf,docx,jpg,png)', default='pdf,docx,jpg,png,txt')
+    max_file_size_mb = IntegerField('Max File Size (MB)', validators=[
+        NumberRange(min=1, max=100, message='File size must be between 1 and 100 MB')
+    ], default=10)
+    canvas_width = IntegerField('Canvas Width (pixels)', validators=[
+        NumberRange(min=200, max=1200, message='Width must be between 200 and 1200 pixels')
+    ], default=800)
+    canvas_height = IntegerField('Canvas Height (pixels)', validators=[
+        NumberRange(min=200, max=800, message='Height must be between 200 and 800 pixels')
+    ], default=600)
 
 class ProfileForm(FlaskForm):
     username = StringField('Username', validators=[

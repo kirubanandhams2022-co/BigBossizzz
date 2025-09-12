@@ -136,9 +136,18 @@ class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
     question_text = db.Column(db.Text, nullable=False)
-    question_type = db.Column(db.String(20), default='multiple_choice')  # 'multiple_choice', 'text', 'true_false'
+    question_type = db.Column(db.String(20), default='multiple_choice')  # 'multiple_choice', 'text', 'true_false', 'code_submission', 'file_upload', 'drawing'
     points = db.Column(db.Integer, default=1)
     order = db.Column(db.Integer, default=0)
+    
+    # Advanced question type specific fields
+    programming_language = db.Column(db.String(50))  # For code_submission: 'python', 'javascript', 'java', etc.
+    starter_code = db.Column(db.Text)  # For code_submission: initial code template
+    allowed_file_types = db.Column(db.String(200))  # For file_upload: 'pdf,docx,jpg,png'
+    max_file_size_mb = db.Column(db.Integer, default=10)  # For file_upload: max size in MB
+    canvas_width = db.Column(db.Integer, default=800)  # For drawing: canvas dimensions
+    canvas_height = db.Column(db.Integer, default=600)  # For drawing: canvas dimensions
+    sample_output = db.Column(db.Text)  # For code_submission: expected output example
     
     # Relationships
     options = db.relationship('QuestionOption', backref='question', lazy=True, cascade='all, delete-orphan')
@@ -211,6 +220,15 @@ class Answer(db.Model):
     text_answer = db.Column(db.Text)
     is_correct = db.Column(db.Boolean)
     answered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Advanced answer types
+    code_submission = db.Column(db.Text)  # For programming code answers
+    uploaded_file_path = db.Column(db.String(500))  # File path for uploaded files
+    uploaded_file_name = db.Column(db.String(200))  # Original filename
+    uploaded_file_size = db.Column(db.Integer)  # File size in bytes
+    drawing_data = db.Column(db.Text)  # JSON data for drawing/canvas answers
+    execution_output = db.Column(db.Text)  # For code execution results
+    execution_error = db.Column(db.Text)  # For code execution errors
     
     def __repr__(self):
         return f'<Answer {self.id}>'
