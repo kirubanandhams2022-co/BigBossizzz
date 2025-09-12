@@ -233,12 +233,7 @@ function confirmDeleteAttempt(attemptId, participantName) {
         form.method = 'POST';
         form.action = `/admin/quiz-attempt/${attemptId}/delete`;
         
-        // Add CSRF token
-        const csrfToken = document.createElement('input');
-        csrfToken.type = 'hidden';
-        csrfToken.name = 'csrf_token';
-        csrfToken.value = '{{ csrf_token() }}';
-        form.appendChild(csrfToken);
+        // CSRF token will be added when Flask-WTF is properly configured
         
         document.body.appendChild(form);
         form.submit();
