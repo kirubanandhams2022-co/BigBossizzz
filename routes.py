@@ -4,11 +4,27 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch, Role, Permission, UserRole, RolePermission, RoleAuditLog
-from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
-                            get_lti_provider, get_lti_grade_passback)
-from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
-from analytics_engine import (AnalyticsEngine, PredictiveAnalytics, QuestionPerformanceAnalyzer, 
-                              CheatingPatternDetector, InstitutionalDashboard, get_analytics_engine)
+# Import optional LTI integration
+try:
+    from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
+                                get_lti_provider, get_lti_grade_passback)
+except ImportError:
+    LTIProvider = LTIUser = LTIGradePassback = LTIToolConfiguration = None
+    get_lti_provider = get_lti_grade_passback = lambda *args, **kwargs: None
+
+# Import optional proctoring reports
+try:
+    from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
+except ImportError:
+    ProctoringReportGenerator = generate_scheduled_report = export_report_to_pdf = None
+
+# Import optional analytics engine
+try:
+    from analytics_engine import (AnalyticsEngine, PredictiveAnalytics, QuestionPerformanceAnalyzer, 
+                                  CheatingPatternDetector, InstitutionalDashboard, get_analytics_engine)
+except ImportError:
+    AnalyticsEngine = PredictiveAnalytics = QuestionPerformanceAnalyzer = None
+    CheatingPatternDetector = InstitutionalDashboard = get_analytics_engine = None
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -18,9 +34,21 @@ import logging
 import os
 import re
 import csv
-import pandas as pd
-import PyPDF2
-import docx
+# Import optional data processing libraries
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    import PyPDF2
+except ImportError:
+    PyPDF2 = None
+
+try:
+    import docx
+except ImportError:
+    docx = None
 from io import BytesIO
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload

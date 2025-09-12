@@ -182,50 +182,16 @@ class MobileAppManager {
     }
     
     createBottomNavigation() {
-        const currentUser = window.currentUser || {};
-        const userRole = currentUser.role || 'participant';
+        // Mobile navigation is now server-rendered in templates/_mobile_nav.html
+        // This prevents route drift and uses url_for() for correct links
         
-        let navItems = [];
-        
-        if (userRole === 'admin') {
-            navItems = [
-                { icon: 'fas fa-tachometer-alt', label: 'Dashboard', href: '/admin/dashboard' },
-                { icon: 'fas fa-users', label: 'Users', href: '/admin/users' },
-                { icon: 'fas fa-chart-bar', label: 'Reports', href: '/admin/proctoring-reports' },
-                { icon: 'fas fa-user', label: 'Profile', href: '/profile' }
-            ];
-        } else if (userRole === 'host') {
-            navItems = [
-                { icon: 'fas fa-home', label: 'Dashboard', href: '/host/dashboard' },
-                { icon: 'fas fa-plus-circle', label: 'Create', href: '/quiz/create' },
-                { icon: 'fas fa-chart-line', label: 'Monitor', href: '/host/monitoring' },
-                { icon: 'fas fa-user', label: 'Profile', href: '/profile' }
-            ];
-        } else {
-            navItems = [
-                { icon: 'fas fa-home', label: 'Dashboard', href: '/participant/dashboard' },
-                { icon: 'fas fa-play-circle', label: 'Quizzes', href: '/quiz_listing' },
-                { icon: 'fas fa-trophy', label: 'Results', href: '/participant/completed' },
-                { icon: 'fas fa-user', label: 'Profile', href: '/profile' }
-            ];
+        // Just add the mobile navigation enabled class if needed
+        const existingNav = document.getElementById('mobileBottomNav');
+        if (existingNav) {
+            document.body.classList.add('mobile-nav-enabled');
         }
         
-        const bottomNavHTML = `
-            <nav class="mobile-bottom-nav" id="mobileBottomNav">
-                ${navItems.map((item, index) => `
-                    <a href="${item.href}" class="mobile-nav-item ${index === 0 ? 'active' : ''}" data-page="${item.href}">
-                        <i class="${item.icon}"></i>
-                        <span>${item.label}</span>
-                        ${item.badge ? `<span class="badge">${item.badge}</span>` : ''}
-                    </a>
-                `).join('')}
-            </nav>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', bottomNavHTML);
-        document.body.classList.add('mobile-nav-enabled');
-        
-        // Add navigation click handlers
+        // Setup click handlers for any existing navigation
         this.setupBottomNavClickHandlers();
     }
     
