@@ -565,10 +565,75 @@ def host_monitoring():
     # Get recent login events
     recent_logins = LoginEvent.query.order_by(LoginEvent.login_time.desc()).limit(20).all()
     
-    # Get recent proctoring events
-    recent_violations = ProctoringEvent.query.join(QuizAttempt).join(Quiz).filter(
-        Quiz.creator_id == current_user.id if not current_user.is_admin() else True
-    ).order_by(ProctoringEvent.timestamp.desc()).limit(50).all()
+    # OPTIMIZED: Get consolidated violations per person (one entry per person)
+    from sqlalchemy import func, case
+    
+    # CORRECTED: Single-query solution with proper SQL and highest severity selection
+    from sqlalchemy import desc
+    
+    # CORRECTED: Window functions computed BEFORE filtering to get accurate counts
+    violations_with_stats = db.session.query(
+        User.id.label('participant_id'),
+        User.username.label('participant_name'),
+        Quiz.id.label('quiz_id'),
+        Quiz.title.label('quiz_title'),
+        ProctoringEvent.event_type,
+        ProctoringEvent.severity,
+        ProctoringEvent.timestamp,
+        # Rank by severity (highest first), then by timestamp (latest first)
+        func.row_number().over(
+            partition_by=[User.id, Quiz.id],
+            order_by=[
+                case(
+                    (ProctoringEvent.severity == 'critical', 4),
+                    (ProctoringEvent.severity == 'high', 3),
+                    (ProctoringEvent.severity == 'medium', 2),
+                    (ProctoringEvent.severity == 'low', 1),
+                    else_=1  # Default to 'low' rank for unknown severities
+                ).desc(),
+                ProctoringEvent.timestamp.desc()
+            ]
+        ).label('severity_rank'),
+        # CRITICAL: Compute counts and max timestamp BEFORE filtering
+        func.count().over(partition_by=[User.id, Quiz.id]).label('violation_count'),
+        func.max(ProctoringEvent.timestamp).over(partition_by=[User.id, Quiz.id]).label('latest_violation_time')
+    ).select_from(User) \
+     .join(QuizAttempt, QuizAttempt.participant_id == User.id) \
+     .join(Quiz, QuizAttempt.quiz_id == Quiz.id) \
+     .join(ProctoringEvent, ProctoringEvent.attempt_id == QuizAttempt.id) \
+     .filter(
+         Quiz.creator_id == current_user.id if not current_user.is_admin() else True
+     ).subquery()
+    
+    # Get only the highest severity violation (rank 1) with accurate stats
+    consolidated_violations = db.session.query(
+        violations_with_stats.c.participant_id,
+        violations_with_stats.c.participant_name,
+        violations_with_stats.c.quiz_id,
+        violations_with_stats.c.quiz_title,
+        violations_with_stats.c.event_type.label('display_violation_type'),
+        violations_with_stats.c.severity.label('display_severity'),
+        violations_with_stats.c.timestamp.label('highest_severity_time'),
+        violations_with_stats.c.violation_count,
+        violations_with_stats.c.latest_violation_time
+    ).filter(violations_with_stats.c.severity_rank == 1) \
+     .order_by(violations_with_stats.c.latest_violation_time.desc()) \
+     .limit(30).all()
+    
+    # Format results for template
+    recent_violations = []
+    for result in consolidated_violations:
+        recent_violations.append({
+            'participant_id': result.participant_id,
+            'participant_name': result.participant_name,
+            'quiz_id': result.quiz_id,
+            'quiz_title': result.quiz_title,
+            'display_violation_type': result.display_violation_type,
+            'display_severity': result.display_severity,
+            'latest_violation_time': result.latest_violation_time,
+            'violation_count': result.violation_count,
+            'is_multiple': result.violation_count > 1
+        })
     
     # Get participant device info
     participants_online = []
@@ -609,10 +674,23 @@ def get_live_monitoring_data():
     
     participants_data = []
     for attempt in active_attempts:
-        # Get latest violations
-        recent_violations = ProctoringEvent.query.filter_by(attempt_id=attempt.id).order_by(
-            ProctoringEvent.timestamp.desc()
-        ).limit(5).all()
+        # OPTIMIZED: Use highest risk summary instead of individual violations
+        # Get violation summary for this attempt using new schema optimization
+        if hasattr(attempt, 'highest_risk_level') and attempt.highest_risk_level:
+            violation_count = 0
+            latest_violation = attempt.highest_risk_level
+            if attempt.violation_counts_json:
+                try:
+                    import json
+                    counts = json.loads(attempt.violation_counts_json)
+                    violation_count = sum(counts.values()) if counts else 0
+                except:
+                    violation_count = 0
+        else:
+            # Fallback: Get violation count directly from database (for older records)
+            violations = ProctoringEvent.query.filter_by(attempt_id=attempt.id).all()
+            violation_count = len(violations)
+            latest_violation = violations[0].event_type if violations else None
         
         # Calculate time remaining
         time_elapsed = datetime.utcnow() - attempt.started_at
@@ -624,8 +702,8 @@ def get_live_monitoring_data():
             'quiz_title': attempt.quiz.title,
             'time_elapsed': str(time_elapsed).split('.')[0],
             'time_remaining': str(time_remaining).split('.')[0] if time_remaining.total_seconds() > 0 else 'Overtime',
-            'violation_count': len(recent_violations),
-            'latest_violation': recent_violations[0].event_type if recent_violations else None,
+            'violation_count': violation_count,
+            'latest_violation': latest_violation,
             'questions_answered': len(attempt.answers),
             'total_questions': len(attempt.quiz.questions),
             'progress_percentage': round((len(attempt.answers) / len(attempt.quiz.questions)) * 100) if attempt.quiz.questions else 0
