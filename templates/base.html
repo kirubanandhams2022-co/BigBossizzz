@@ -320,6 +320,16 @@
                                                title="View detailed audit logs of system activities and user actions.">
                                             <i class="fas fa-file-alt"></i> Audit Logs
                                         </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('admin_quiz_attempts') }}" 
+                                               data-bs-toggle="tooltip" data-bs-placement="left" 
+                                               title="Monitor and manage all quiz attempts across the system.">
+                                            <i class="fas fa-clock"></i> Quiz Attempts
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('admin_hosts') }}" 
+                                               data-bs-toggle="tooltip" data-bs-placement="left" 
+                                               title="Manage host accounts and monitor their activities.">
+                                            <i class="fas fa-user-tie"></i> Host Management
+                                        </a></li>
                                     </div>
                                 {% endif %}
                                 {% if current_user.is_host() %}
