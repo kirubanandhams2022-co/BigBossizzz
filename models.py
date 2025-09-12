@@ -64,6 +64,14 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime)
     profile_picture = db.Column(db.String(200), default='default.png')
     
+    # LTI Integration fields
+    lti_user_id = db.Column(db.String(255), unique=True, index=True)  # LTI user identifier
+    lti_consumer_key = db.Column(db.String(255))  # LMS consumer key
+    lti_context_id = db.Column(db.String(255))  # Course/context identifier
+    lti_resource_link_id = db.Column(db.String(255))  # Specific resource link
+    lti_grade_passback_url = db.Column(db.String(500))  # Grade passback service URL
+    lti_result_sourcedid = db.Column(db.String(255))  # Grade passback identifier
+    
     # Relationships
     created_quizzes = db.relationship('Quiz', backref='creator', lazy=True, cascade='all, delete-orphan')
     quiz_attempts = db.relationship('QuizAttempt', backref='participant', lazy=True, cascade='all, delete-orphan')
