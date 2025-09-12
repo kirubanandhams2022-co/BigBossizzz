@@ -56,12 +56,10 @@
                                 
                                 <!-- Time Remaining -->
                                 {% if attempt.quiz.time_limit %}
-                                    {% set time_elapsed = (moment.utcnow() - attempt.started_at).total_seconds() / 60 %}
-                                    {% set time_remaining = attempt.quiz.time_limit - time_elapsed %}
-                                    {% if time_remaining > 0 %}
-                                        <div class="badge {% if time_remaining > 15 %}bg-success{% elif time_remaining > 5 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+                                    {% if attempt.time_remaining and attempt.time_remaining > 0 %}
+                                        <div class="badge {% if attempt.time_remaining > 15 %}bg-success{% elif attempt.time_remaining > 5 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
                                             <i class="fas fa-hourglass-half me-1"></i>
-                                            {{ time_remaining|round(0)|int }} min left
+                                            {{ attempt.time_remaining }} min left
                                         </div>
                                     {% else %}
                                         <div class="badge bg-danger fs-6">

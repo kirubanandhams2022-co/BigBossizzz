@@ -64,9 +64,9 @@
                     <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Performance Breakdown</h5>
                 </div>
                 <div class="card-body">
-                    {% set excellent_count = scored_attempts|selectattr('score', '>=', 80)|list|length %}
-                    {% set good_count = scored_attempts|select('score')|select('lambda x: x.score >= 60 and x.score < 80')|list|length %}
-                    {% set needs_improvement_count = scored_attempts|selectattr('score', '<', 60)|list|length %}
+                    {% set excellent_count = performance_breakdown.excellent %}
+                    {% set good_count = performance_breakdown.good %}
+                    {% set needs_improvement_count = performance_breakdown.needs_improvement %}
                     
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">

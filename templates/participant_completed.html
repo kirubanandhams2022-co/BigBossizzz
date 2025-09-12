@@ -59,8 +59,7 @@
         <div class="col-md-3 col-6 mb-3">
             <div class="card bg-primary text-white">
                 <div class="card-body text-center">
-                    {% set total_questions = completed_attempts|map(attribute='quiz')|map(attribute='questions')|map('length')|sum %}
-                    <h3 class="mb-1">{{ total_questions }}</h3>
+                    <h3 class="mb-1">{{ total_questions_answered }}</h3>
                     <small>Questions Answered</small>
                 </div>
             </div>
