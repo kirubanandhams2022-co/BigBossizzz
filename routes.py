@@ -3208,11 +3208,18 @@ def log_interaction_event():
         db.session.add(interaction)
         db.session.commit()
         
-        # Trigger real-time heatmap data update (async)
+        # Trigger real-time heatmap data update and analysis (async)
         try:
             update_heatmap_data(attempt.quiz_id, data.get('questionId'))
+            
+            # Trigger insights analysis periodically (every 10 interactions)
+            interaction_count = InteractionEvent.query.filter_by(attempt_id=attempt_id).count()
+            if interaction_count % 10 == 0:  # Analyze every 10 interactions
+                from heatmap_analysis import trigger_analysis_for_quiz
+                trigger_analysis_for_quiz(attempt.quiz_id)
+                
         except Exception as e:
-            logging.warning(f"Failed to update heatmap data: {e}")
+            logging.warning(f"Failed to update heatmap data or trigger analysis: {e}")
         
         return jsonify({'success': True, 'logged': True})
         
