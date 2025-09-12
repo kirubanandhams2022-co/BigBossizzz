@@ -75,7 +75,7 @@ login_manager.login_message_category = 'info'
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
     flash('Security token expired or missing. Please try again.', 'error')
-    return redirect(request.referrer or url_for('index'))
+    return redirect(url_for('index'))
 
 @login_manager.user_loader
 def load_user(user_id):
