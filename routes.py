@@ -3779,9 +3779,9 @@ def create_quiz():
             creator_id=current_user.id
         )
         
-        # Handle quick text paste if used
-        if request.form.get('use_quick_questions') == 'true':
-            quick_text = request.form.get('quick_questions_text', '').strip()
+        # Handle quick text paste if used (with fallback detection)
+        quick_text = request.form.get('quick_questions_text', '').strip()
+        if request.form.get('use_quick_questions') == 'true' or (quick_text and len(quick_text) > 20):
             if quick_text:
                 try:
                     # Use the same text parsing logic
