@@ -770,37 +770,44 @@ def participant_violations():
         flash('Access denied. Participants only.', 'error')
         return redirect(url_for('index'))
     
-    # Get all proctoring events for this participant with eager loading
-    violations = ProctoringEvent.query.join(QuizAttempt).filter(
-        QuizAttempt.participant_id == current_user.id
+    # OPTIMIZED: Use highest risk summary instead of aggregating individual violations
+    attempts_with_violations = QuizAttempt.query.filter(
+        QuizAttempt.participant_id == current_user.id,
+        QuizAttempt.highest_risk_severity > 1  # Only show attempts with violations (above 'low')
     ).options(
-        joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz)
-    ).order_by(ProctoringEvent.timestamp.desc()).all()
+        joinedload(QuizAttempt.quiz)
+    ).order_by(QuizAttempt.started_at.desc()).all()
     
-    # Group violations by quiz attempt and count by severity
+    # Count violations using the summary fields (much faster)
+    critical_count = sum(1 for attempt in attempts_with_violations if attempt.highest_risk_level == 'critical')
+    high_count = sum(1 for attempt in attempts_with_violations if attempt.highest_risk_level == 'high')
+    
+    # Create simplified violations_by_attempt structure using highest risk only
     violations_by_attempt = {}
-    critical_count = 0
-    high_count = 0
+    total_violations = 0
     
-    for violation in violations:
-        # Count by severity
-        if violation.severity == 'critical':
-            critical_count += 1
-        elif violation.severity == 'high':
-            high_count += 1
-            
-        # Group by attempt
-        attempt_id = violation.attempt_id
-        if attempt_id not in violations_by_attempt:
-            violations_by_attempt[attempt_id] = {
-                'attempt': violation.attempt,
-                'violations': []
-            }
-        violations_by_attempt[attempt_id]['violations'].append(violation)
+    for attempt in attempts_with_violations:
+        # Parse violation counts from JSON
+        try:
+            import json
+            counts = json.loads(attempt.violation_counts_json) if attempt.violation_counts_json else {}
+            attempt_total = sum(counts.values()) if counts else 0
+            total_violations += attempt_total
+        except:
+            attempt_total = 0
+        
+        # Show only the highest risk level violation for this attempt
+        violations_by_attempt[attempt.id] = {
+            'attempt': attempt,
+            'highest_risk_level': attempt.highest_risk_level,
+            'highest_risk_severity': attempt.highest_risk_severity,
+            'violation_count': attempt_total,
+            'violation_counts': counts if 'counts' in locals() else {}
+        }
     
     return render_template('participant_violations.html', 
                          violations_by_attempt=violations_by_attempt,
-                         total_violations=len(violations),
+                         total_violations=total_violations,
                          critical_count=critical_count,
                          high_count=high_count,
                          greeting=get_time_greeting(),

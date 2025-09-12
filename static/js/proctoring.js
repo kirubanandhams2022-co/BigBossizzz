@@ -1243,14 +1243,14 @@ class ProctoringManager {
         let message = 'Proctoring Alert: ';
         switch (violation.severity) {
             case 'high':
-                message = '⚠️ Security Violation: ';
+                message = '?? Security Violation: ';
                 warningDiv.className = warningDiv.className.replace('alert-warning', 'alert-danger');
                 break;
             case 'medium':
-                message = '⚡ Proctoring Warning: ';
+                message = '? Proctoring Warning: ';
                 break;
             case 'low':
-                message = 'ℹ️ Proctoring Notice: ';
+                message = '?? Proctoring Notice: ';
                 warningDiv.className = warningDiv.className.replace('alert-warning', 'alert-info');
                 break;
         }
@@ -1376,14 +1376,14 @@ class ProctoringManager {
             <div style="text-align: center; max-width: 600px; padding: 40px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 80px; margin-bottom: 20px; color: #fff;"></i>
                 <h1 style="font-size: 2.5rem; margin-bottom: 20px; color: #fff;">QUIZ TERMINATED</h1>
-                <h3 style="margin-bottom: 30px; color: #fff;">🚨 SECURITY VIOLATION DETECTED 🚨</h3>
+                <h3 style="margin-bottom: 30px; color: #fff;">? SECURITY VIOLATION DETECTED ?</h3>
                 <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin-bottom: 30px;">
                     <p style="font-size: 1.2rem; margin-bottom: 10px; color: #fff;"><strong>Violation Type:</strong> ${violation.type.replace('_', ' ').toUpperCase()}</p>
                     <p style="font-size: 1.1rem; margin-bottom: 10px; color: #fff;"><strong>Description:</strong> ${violation.description}</p>
                     <p style="font-size: 1rem; color: #fff;"><strong>Total Violations:</strong> ${this.violationCount}</p>
                 </div>
                 <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <p style="margin: 0; font-size: 1rem; color: #fff;">⚠️ Your exam session has been flagged for review</p>
+                    <p style="margin: 0; font-size: 1rem; color: #fff;">?? Your exam session has been flagged for review</p>
                     <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #fff;">Contact your administrator for retake permissions</p>
                 </div>
                 <p style="font-size: 1rem; margin-bottom: 0; color: #fff;">Redirecting to dashboard in <span id="countdown">10</span> seconds...</p>
@@ -1411,21 +1411,21 @@ class ProctoringManager {
     
     updateSecurityStatus() {
         let status = 'secure';
-        let message = `🟢 Secure - ${this.violationCount} violations detected`;
+        let message = `? Secure - ${this.violationCount} violations detected`;
         
         if (this.violationCount >= 1) {
             status = 'warning';
-            message = `🟡 Warning - ${this.violationCount} violations (${this.maxViolations - this.violationCount} remaining)`;
+            message = `? Warning - ${this.violationCount} violations (${this.maxViolations - this.violationCount} remaining)`;
         }
         
         if (this.violationCount >= this.maxViolations - 1) {
             status = 'danger';
-            message = `🔴 Critical - ${this.violationCount} violations (1 more will terminate quiz)`;
+            message = `? Critical - ${this.violationCount} violations (1 more will terminate quiz)`;
         }
         
         if (this.highSeverityCount >= 1) {
             status = 'danger';
-            message = `🔴 High Risk - ${this.highSeverityCount} high-severity violations detected`;
+            message = `? High Risk - ${this.highSeverityCount} high-severity violations detected`;
         }
         
         this.showProctoringStatus(status, message);
@@ -1628,7 +1628,7 @@ class ProctoringManager {
         `;
         
         messageBox.innerHTML = `
-            <h1 style="margin-bottom: 30px; font-size: 3em;">🚫 QUIZ TERMINATED</h1>
+            <h1 style="margin-bottom: 30px; font-size: 3em;">? QUIZ TERMINATED</h1>
             <h2 style="margin-bottom: 20px;">Security Violation Detected</h2>
             <p style="font-size: 1.2em; margin-bottom: 30px;">${reason}</p>
             <p style="font-size: 1em;">Contact your instructor if you believe this is an error.</p>
@@ -1727,14 +1727,14 @@ class ProctoringManager {
         
         modal.innerHTML = `
             <div style="background: #343a40; padding: 30px; border-radius: 10px; text-align: center; max-width: 500px;">
-                <h2 style="margin-bottom: 20px;">🔐 Identity Verification Required</h2>
+                <h2 style="margin-bottom: 20px;">? Identity Verification Required</h2>
                 <p style="margin-bottom: 20px;">Please verify your identity before starting the exam.</p>
                 <p style="margin-bottom: 30px; font-size: 0.9em; color: #adb5bd;">
                     Look directly at the camera and ensure good lighting for best results.
                 </p>
                 <div id="verification-preview" style="margin-bottom: 20px; width: 320px; height: 240px; background: #000; border-radius: 8px; margin: 0 auto 20px;"></div>
                 <button id="capture-verification-btn" class="btn btn-primary" style="margin-right: 10px;">
-                    📸 Capture & Verify
+                    ? Capture & Verify
                 </button>
                 <button id="cancel-verification-btn" class="btn btn-secondary">Cancel</button>
             </div>
@@ -1877,7 +1877,7 @@ class ProctoringManager {
         document.body.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #dc3545; color: white; font-family: Arial;">
                 <div style="text-align: center; max-width: 600px; padding: 40px;">
-                    <h1 style="margin-bottom: 30px;">🚫 Access Denied</h1>
+                    <h1 style="margin-bottom: 30px;">? Access Denied</h1>
                     <h3 style="margin-bottom: 20px;">Face Verification Failed</h3>
                     <p style="margin-bottom: 30px; font-size: 1.1em;">${message}</p>
                     <p>Please contact your instructor for assistance.</p>
