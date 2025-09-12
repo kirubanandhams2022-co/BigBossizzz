@@ -2592,116 +2592,140 @@ def admin_bulk_create_users():
     created_count = 0
     errors = []
     
-    for i, line in enumerate(lines, 1):
-        try:
-            parts = [part.strip() for part in line.split(',')]
-            if len(parts) < 2:
-                errors.append(f"Line {i}: Invalid format. Expected: username,email,password,role,courses")
-                continue
-            
-            username = parts[0]
-            email = parts[1]
-            password = parts[2] if len(parts) >= 3 and parts[2] else f"BigBoss{__import__('random').randrange(1000, 9999)}"
-            role = parts[3] if len(parts) >= 4 and parts[3] else default_role
-            courses_str = parts[4] if len(parts) >= 5 else ''
-            
-            # Validation
-            if not username or not email:
-                errors.append(f"Line {i}: Username and email are required")
-                continue
-            
-            if User.query.filter_by(email=email).first():
-                errors.append(f"Line {i}: Email {email} already exists")
-                continue
-            
-            if User.query.filter_by(username=username).first():
-                errors.append(f"Line {i}: Username {username} already exists")
-                continue
-            
-            if role not in ['admin', 'host', 'participant']:
-                errors.append(f"Line {i}: Invalid role {role}")
-                continue
-            
-            # Create user
-            user = User()
-            user.username = username
-            user.email = email
-            user.role = role
-            user.set_password(password)
-            user.is_verified = True
-            
-            db.session.add(user)
-            db.session.flush()  # Get user ID before processing courses
-            
-            # Process course assignments
-            course_codes = []
-            if courses_str.strip():
-                # Use courses from CSV line
-                course_codes = [code.strip().upper() for code in courses_str.split(';') if code.strip()]
-            elif default_course:
-                # Use default course
-                course_codes = [default_course.upper()]
-            
-            # Assign user to courses
-            for course_code in course_codes:
-                try:
-                    course = Course.query.filter_by(code=course_code).first()
-                    
-                    # Auto-create course if it doesn't exist and auto-create is enabled
-                    if not course and auto_create_courses:
-                        course = Course()
-                        course.name = course_code  # Use code as name
-                        course.code = course_code
-                        course.description = f"Auto-created course for {course_code}"
-                        course.max_participants = 100
-                        course.is_active = True
-                        db.session.add(course)
-                        db.session.flush()  # Get course ID
-                    
-                    if course:
-                        if role == 'participant':
-                            # Check if already enrolled
-                            existing_enrollment = ParticipantEnrollment.query.filter_by(
-                                participant_id=user.id, course_id=course.id
-                            ).first()
-                            if not existing_enrollment:
-                                enrollment = ParticipantEnrollment()
-                                enrollment.participant_id = user.id
-                                enrollment.course_id = course.id
-                                enrollment.enrolled_by = current_user.id
-                                db.session.add(enrollment)
-                        
-                        elif role == 'host':
-                            # Check if already assigned
-                            existing_assignment = HostCourseAssignment.query.filter_by(
-                                host_id=user.id, course_id=course.id
-                            ).first()
-                            if not existing_assignment:
-                                assignment = HostCourseAssignment()
-                                assignment.host_id = user.id
-                                assignment.course_id = course.id
-                                assignment.assigned_by = current_user.id
-                                db.session.add(assignment)
-                    else:
-                        errors.append(f"Line {i}: Course '{course_code}' not found")
-                
-                except Exception as course_error:
-                    errors.append(f"Line {i}: Error assigning course '{course_code}': {str(course_error)}")
-            
-            created_count += 1
-            
-        except Exception as e:
-            errors.append(f"Line {i}: Error processing - {str(e)}")
+    # Process users in small batches to prevent worker timeouts
+    batch_size = 5  # Process 5 users at a time to prevent timeouts
+    total_lines = len(lines)
     
-    try:
-        db.session.commit()
-        if created_count > 0:
-            flash(f'Successfully created {created_count} users.', 'success')
-        if errors:
-            flash(f'Errors encountered: {"; ".join(errors[:5])}{"..." if len(errors) > 5 else ""}', 'warning')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Database error: {str(e)}', 'error')
+    for batch_start in range(0, total_lines, batch_size):
+        batch_end = min(batch_start + batch_size, total_lines)
+        batch_lines = lines[batch_start:batch_end]
+        
+        try:
+            # Process current batch
+            for batch_index, line in enumerate(batch_lines):
+                i = batch_start + batch_index + 1  # Original line number
+                try:
+                    parts = [part.strip() for part in line.split(',')]
+                    if len(parts) < 2:
+                        errors.append(f"Line {i}: Invalid format. Expected: username,email,password,role,courses")
+                        continue
+                    
+                    username = parts[0]
+                    email = parts[1]
+                    password = parts[2] if len(parts) >= 3 and parts[2] else f"BigBoss{__import__('random').randrange(1000, 9999)}"
+                    role = parts[3] if len(parts) >= 4 and parts[3] else default_role
+                    courses_str = parts[4] if len(parts) >= 5 else ''
+                    
+                    # Validation
+                    if not username or not email:
+                        errors.append(f"Line {i}: Username and email are required")
+                        continue
+                    
+                    if User.query.filter_by(email=email).first():
+                        errors.append(f"Line {i}: Email {email} already exists")
+                        continue
+                    
+                    if User.query.filter_by(username=username).first():
+                        errors.append(f"Line {i}: Username {username} already exists")
+                        continue
+                    
+                    if role not in ['admin', 'host', 'participant']:
+                        errors.append(f"Line {i}: Invalid role {role}")
+                        continue
+                    
+                    # Create user
+                    user = User()
+                    user.username = username
+                    user.email = email
+                    user.role = role
+                    user.set_password(password)
+                    user.is_verified = True
+                    
+                    db.session.add(user)
+                    db.session.flush()  # Get user ID before processing courses
+                    
+                    # Process course assignments efficiently
+                    course_codes = []
+                    if courses_str.strip():
+                        # Use courses from CSV line
+                        course_codes = [code.strip().upper() for code in courses_str.split(';') if code.strip()]
+                    elif default_course:
+                        # Use default course  
+                        course_codes = [default_course.upper()]
+                    
+                    # Assign user to courses
+                    for course_code in course_codes:
+                        try:
+                            course = Course.query.filter_by(code=course_code).first()
+                            
+                            # Auto-create course if it doesn't exist and auto-create is enabled
+                            if not course and auto_create_courses:
+                                course = Course()
+                                course.name = course_code  # Use code as name
+                                course.code = course_code
+                                course.description = f"Auto-created course for {course_code}"
+                                course.max_participants = 100
+                                course.is_active = True
+                                db.session.add(course)
+                                db.session.flush()  # Get course ID
+                            
+                            if course:
+                                if role == 'participant':
+                                    # Check if already enrolled
+                                    existing_enrollment = ParticipantEnrollment.query.filter_by(
+                                        participant_id=user.id, course_id=course.id
+                                    ).first()
+                                    if not existing_enrollment:
+                                        enrollment = ParticipantEnrollment()
+                                        enrollment.participant_id = user.id
+                                        enrollment.course_id = course.id
+                                        enrollment.enrolled_by = current_user.id
+                                        db.session.add(enrollment)
+                                
+                                elif role == 'host':
+                                    # Check if already assigned
+                                    existing_assignment = HostCourseAssignment.query.filter_by(
+                                        host_id=user.id, course_id=course.id
+                                    ).first()
+                                    if not existing_assignment:
+                                        assignment = HostCourseAssignment()
+                                        assignment.host_id = user.id
+                                        assignment.course_id = course.id
+                                        assignment.assigned_by = current_user.id
+                                        db.session.add(assignment)
+                            else:
+                                errors.append(f"Line {i}: Course '{course_code}' not found")
+                        
+                        except Exception as course_error:
+                            errors.append(f"Line {i}: Error assigning course '{course_code}': {str(course_error)}")
+                    
+                    created_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Line {i}: Error processing - {str(e)}")
+            
+            # Commit each batch to prevent timeouts
+            try:
+                db.session.commit()
+                
+                # Add small delay between batches to prevent overwhelming the database
+                if batch_end < total_lines:  # Not the last batch
+                    import time
+                    time.sleep(0.1)
+                    
+            except Exception as batch_error:
+                db.session.rollback()
+                errors.append(f"Batch {batch_start//batch_size + 1}: Database error - {str(batch_error)}")
+                
+        except Exception as batch_exception:
+            db.session.rollback()
+            errors.append(f"Batch {batch_start//batch_size + 1}: Processing error - {str(batch_exception)}")
+    
+    # Final status messages
+    if created_count > 0:
+        flash(f'Successfully created {created_count} users.', 'success')
+    if errors:
+        flash(f'Errors encountered: {"; ".join(errors[:5])}{"..." if len(errors) > 5 else ""}', 'warning')
     
     return redirect(url_for('admin_users'))
 
