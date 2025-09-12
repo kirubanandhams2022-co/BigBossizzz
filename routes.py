@@ -27,6 +27,12 @@ try:
 except ImportError:
     detector = None  # Fallback if collaboration detection not available
 
+# Import plagiarism detection
+try:
+    from plagiarism_detector import plagiarism_detector
+except ImportError:
+    plagiarism_detector = None  # Fallback if plagiarism detection not available
+
 # Add email health check endpoint
 @app.route('/admin/email-health')
 def admin_email_health():
@@ -3921,6 +3927,42 @@ def submit_quiz(attempt_id):
                     app.logger.info(f"Detected {len(signals)} collaboration signals for quiz {quiz.id}")
             except Exception as e:
                 app.logger.error(f"Error in collaboration detection: {e}")
+        
+        # AI-Powered Plagiarism Detection for text answers
+        if plagiarism_detector and question.question_type == 'text' and answer.text_answer:
+            try:
+                db.session.flush()  # Ensure answer has an ID
+                
+                # Get all other text answers for this question for comparison
+                other_answers = Answer.query.filter(
+                    Answer.question_id == question.id,
+                    Answer.id != answer.id,
+                    Answer.text_answer.isnot(None),
+                    Answer.text_answer != ''
+                ).all()
+                
+                # Prepare comparison texts
+                comparison_texts = [(ans.id, ans.text_answer) for ans in other_answers]
+                
+                # Run plagiarism analysis
+                if comparison_texts:  # Only analyze if there are other answers to compare against
+                    analysis = plagiarism_detector.analyze_text_for_plagiarism(
+                        target_text=answer.text_answer,
+                        comparison_texts=comparison_texts,
+                        answer_id=answer.id,
+                        quiz_attempt_id=attempt.id,
+                        question_id=question.id
+                    )
+                    
+                    # Save analysis to database
+                    db.session.add(analysis)
+                    
+                    # Log if high-risk plagiarism detected
+                    if analysis.risk_level in ['high', 'critical']:
+                        app.logger.warning(f"High-risk plagiarism detected for answer {answer.id}: {analysis.risk_level} ({analysis.overall_similarity_score:.3f})")
+                    
+            except Exception as e:
+                app.logger.error(f"Error in plagiarism detection: {e}")
     
     # Mark attempt as completed
     attempt.completed_at = datetime.utcnow()

@@ -3,6 +3,7 @@ from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
+import json
 
 # New Course Management System
 class Course(db.Model):
@@ -542,3 +543,90 @@ class CollaborationInsight(db.Model):
     
     def __repr__(self):
         return f'<CollaborationInsight {self.insight_type} for Quiz {self.quiz_id}>'
+
+# AI-Powered Plagiarism Detection Models
+class PlagiarismAnalysis(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
+    answer_id = db.Column(db.Integer, db.ForeignKey('answer.id'), nullable=False)
+    
+    # Analysis Results
+    overall_similarity_score = db.Column(db.Float, nullable=False)  # 0.0 to 1.0
+    risk_level = db.Column(db.String(20), nullable=False)  # 'low', 'medium', 'high', 'critical'
+    
+    # Algorithm-specific scores
+    cosine_similarity = db.Column(db.Float)
+    jaccard_similarity = db.Column(db.Float)
+    levenshtein_similarity = db.Column(db.Float)
+    semantic_similarity = db.Column(db.Float)
+    
+    # Analysis metadata
+    analyzed_text = db.Column(db.Text, nullable=False)
+    analysis_method = db.Column(db.String(50), default='multi_algorithm')
+    confidence_score = db.Column(db.Float)  # How confident we are in the result
+    
+    # Detection flags
+    is_flagged = db.Column(db.Boolean, default=False)
+    requires_review = db.Column(db.Boolean, default=False)
+    is_reviewed = db.Column(db.Boolean, default=False)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reviewed_at = db.Column(db.DateTime)
+    review_decision = db.Column(db.String(20))  # 'innocent', 'suspicious', 'plagiarized'
+    review_notes = db.Column(db.Text)
+    
+    # Timestamps
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    quiz_attempt = db.relationship('QuizAttempt', backref='plagiarism_analyses')
+    question = db.relationship('Question', backref='plagiarism_analyses')
+    answer = db.relationship('Answer', backref='plagiarism_analysis', uselist=False)
+    reviewer = db.relationship('User', foreign_keys=[reviewed_by])
+    matches = db.relationship('PlagiarismMatch', backref='analysis', cascade='all, delete-orphan')
+    
+    def get_risk_color(self):
+        colors = {
+            'low': 'success',
+            'medium': 'warning', 
+            'high': 'danger',
+            'critical': 'dark'
+        }
+        return colors.get(self.risk_level, 'secondary')
+    
+    def get_risk_percentage(self):
+        return round(self.overall_similarity_score * 100, 1)
+    
+    def __repr__(self):
+        return f'<PlagiarismAnalysis {self.id}: {self.risk_level} ({self.overall_similarity_score:.2f})>'
+
+class PlagiarismMatch(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    analysis_id = db.Column(db.Integer, db.ForeignKey('plagiarism_analysis.id'), nullable=False)
+    
+    # Match information
+    matched_against_id = db.Column(db.Integer, db.ForeignKey('answer.id'), nullable=False)
+    similarity_score = db.Column(db.Float, nullable=False)
+    match_type = db.Column(db.String(30), nullable=False)  # 'exact', 'paraphrase', 'structural', 'semantic'
+    
+    # Text analysis
+    matched_text_segment = db.Column(db.Text)  # The specific text that matched
+    original_text_segment = db.Column(db.Text)  # The text it matched against
+    
+    # Position information
+    start_position = db.Column(db.Integer)  # Character position in original text
+    end_position = db.Column(db.Integer)
+    
+    # Match metadata
+    algorithm_used = db.Column(db.String(50))  # Which algorithm detected this match
+    confidence = db.Column(db.Float)  # Confidence in this specific match
+    
+    # Timestamps
+    detected_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    matched_against = db.relationship('Answer', foreign_keys=[matched_against_id])
+    
+    def __repr__(self):
+        return f'<PlagiarismMatch {self.match_type}: {self.similarity_score:.2f}>'
