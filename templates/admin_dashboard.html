@@ -11,59 +11,67 @@
 <!-- System Statistics Overview -->
 <div class="row mb-4">
     <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ stats.total_users }}</h4>
-                        <p class="mb-0">Total Users</p>
+        <a href="{{ url_for('admin_users') }}" class="text-decoration-none">
+            <div class="card bg-primary text-white dashboard-stat-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_users }}</h4>
+                            <p class="mb-0">Total Users</p>
+                        </div>
+                        <i class="fas fa-users fa-2x"></i>
                     </div>
-                    <i class="fas fa-users fa-2x"></i>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     
     <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ stats.total_quizzes }}</h4>
-                        <p class="mb-0">Total Quizzes</p>
+        <a href="{{ url_for('admin_quiz_management') }}" class="text-decoration-none">
+            <div class="card bg-success text-white dashboard-stat-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_quizzes }}</h4>
+                            <p class="mb-0">Total Quizzes</p>
+                        </div>
+                        <i class="fas fa-clipboard-list fa-2x"></i>
                     </div>
-                    <i class="fas fa-clipboard-list fa-2x"></i>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     
     <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ stats.total_attempts }}</h4>
-                        <p class="mb-0">Quiz Attempts</p>
+        <a href="{{ url_for('admin_quiz_attempts') }}" class="text-decoration-none">
+            <div class="card bg-info text-white dashboard-stat-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_attempts }}</h4>
+                            <p class="mb-0">Quiz Attempts</p>
+                        </div>
+                        <i class="fas fa-user-clock fa-2x"></i>
                     </div>
-                    <i class="fas fa-user-clock fa-2x"></i>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     
     <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4>{{ stats.total_hosts }}</h4>
-                        <p class="mb-0">Host Accounts</p>
+        <a href="{{ url_for('admin_hosts') }}" class="text-decoration-none">
+            <div class="card bg-warning text-dark dashboard-stat-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_hosts }}</h4>
+                            <p class="mb-0">Host Accounts</p>
+                        </div>
+                        <i class="fas fa-user-tie fa-2x"></i>
                     </div>
-                    <i class="fas fa-user-tie fa-2x"></i>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 

@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Host Accounts Management - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-user-tie"></i> Host Accounts Management</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label">Search Hosts</label>
+                <input type="text" name="search" class="form-control" placeholder="Search by username or email..." value="{{ search_query }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Status</option>
+                    <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <a href="{{ url_for('admin_hosts') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 col-sm-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ hosts.total }}</h4>
+                <p class="mb-0">Total Hosts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ hosts.items|selectattr('is_active')|list|length }}</h4>
+                <p class="mb-0">Active Hosts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h4>{{ hosts.items|rejectattr('is_active')|list|length }}</h4>
+                <p class="mb-0">Inactive Hosts</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hosts Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list"></i> Host Accounts</h5>
+    </div>
+    <div class="card-body">
+        {% if hosts.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Host Details</th>
+                        <th>Status</th>
+                        <th>Quizzes Created</th>
+                        <th>Last Login</th>
+                        <th>Registration Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in hosts.items %}
+                    <tr class="{% if not host.is_active %}table-secondary{% endif %}">
+                        <td>
+                            <div>
+                                <strong>{{ host.username }}</strong>
+                                {% if host.id == current_user.id %}<span class="badge bg-info ms-1">You</span>{% endif %}
+                                <br><small class="text-muted">{{ host.email }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if host.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                            {% if not host.is_verified %}
+                                <span class="badge bg-warning ms-1">Unverified</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="text-center">
+                                <h5 class="mb-0 text-primary">{{ host_stats[host.id].quiz_count }}</h5>
+                                <small class="text-muted">Quizzes</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if host_stats[host.id].last_login %}
+                                <small>{{ host_stats[host.id].last_login.strftime('%Y-%m-%d %H:%M') }}</small>
+                            {% else %}
+                                <span class="text-muted">Never</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ host.created_at.strftime('%Y-%m-%d') if host.created_at else 'N/A' }}</small>
+                        </td>
+                        <td>
+                            {% if host.id != current_user.id %}
+                            <div class="btn-group btn-group-sm">
+                                <!-- Toggle Status -->
+                                <form method="POST" action="{{ url_for('admin_toggle_user_status', user_id=host.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-{% if host.is_active %}warning{% else %}success{% endif %}" title="{% if host.is_active %}Deactivate{% else %}Activate{% endif %} Host">
+                                        <i class="fas fa-{% if host.is_active %}pause{% else %}play{% endif %}"></i>
+                                    </button>
+                                </form>
+                                
+                                <!-- View Host's Quizzes -->
+                                <a href="{{ url_for('admin_quiz_management') }}?creator_id={{ host.id }}" class="btn btn-outline-info" title="View Host's Quizzes">
+                                    <i class="fas fa-clipboard-list"></i>
+                                </a>
+                                
+                                <!-- Change Role -->
+                                <button class="btn btn-outline-secondary" onclick="showRoleModal({{ host.id }}, '{{ host.username }}', '{{ host.role }}')" title="Change Role">
+                                    <i class="fas fa-user-tag"></i>
+                                </button>
+                                
+                                <!-- Reset Password -->
+                                <button class="btn btn-outline-primary" onclick="showPasswordModal({{ host.id }}, '{{ host.username }}')" title="Reset Password">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                                
+                                <!-- Delete Host -->
+                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=host.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete host {{ host.username }}? This will also delete all their quizzes and cannot be undone.')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete Host">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <span class="text-muted">Cannot modify yourself</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if hosts.pages > 1 %}
+        <nav aria-label="Hosts pagination" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if hosts.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_hosts', page=hosts.prev_num, status=current_status, search=search_query) }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in hosts.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != hosts.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_hosts', page=page_num, status=current_status, search=search_query) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if hosts.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_hosts', page=hosts.next_num, status=current_status, search=search_query) }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-user-tie fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No Host Accounts Found</h5>
+            <p class="text-muted">
+                {% if search_query or current_status != 'all' %}
+                    Try adjusting your search criteria or filters.
+                {% else %}
+                    Host accounts will appear here when they register.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Role Change Modal -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Host Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="roleForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <p>Change role for host: <strong id="roleUsername"></strong></p>
+                    <div class="mb-3">
+                        <label class="form-label">New Role</label>
+                        <select name="role" id="roleSelect" class="form-select" required>
+                            <option value="admin">Administrator</option>
+                            <option value="host">Host</option>
+                            <option value="participant">Participant</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Change Role</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Password Reset Modal -->
+<div class="modal fade" id="passwordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reset Host Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="passwordForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <p>Reset password for host: <strong id="passwordUsername"></strong></p>
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <div class="input-group">
+                            <input type="password" name="new_password" id="newPassword" class="form-control" required minlength="6">
+                            <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('newPassword', this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Minimum 6 characters</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reset Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showRoleModal(userId, username, currentRole) {
+    document.getElementById('roleUsername').textContent = username;
+    document.getElementById('roleSelect').value = currentRole;
+    document.getElementById('roleForm').action = `/admin/user/${userId}/change-role`;
+    new bootstrap.Modal(document.getElementById('roleModal')).show();
+}
+
+function showPasswordModal(userId, username) {
+    document.getElementById('passwordUsername').textContent = username;
+    document.getElementById('passwordForm').action = `/admin/user/${userId}/reset-password`;
+    new bootstrap.Modal(document.getElementById('passwordModal')).show();
+}
+
+function togglePassword(inputId, button) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+</script>
+{% endblock %}
