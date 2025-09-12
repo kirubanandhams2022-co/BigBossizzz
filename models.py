@@ -223,6 +223,9 @@ class Quiz(db.Model):
     max_violations_allowed = db.Column(db.Integer, default=3)
     auto_terminate_on_violation = db.Column(db.Boolean, default=True)
     face_detection_required = db.Column(db.Boolean, default=True)
+    
+    # Question randomization
+    shuffle_questions = db.Column(db.Boolean, default=True)
     screen_recording_required = db.Column(db.Boolean, default=False)
     browser_lockdown = db.Column(db.Boolean, default=True)
     

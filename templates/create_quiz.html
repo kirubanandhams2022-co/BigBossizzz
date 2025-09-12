@@ -52,6 +52,17 @@
                             Monitor participants during the quiz for suspicious activities.
                         </div>
                     </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check">
+                            {{ form.shuffle_questions(class="form-check-input") }}
+                            {{ form.shuffle_questions.label(class="form-check-label") }}
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-random text-success"></i>
+                            Questions appear in random order for each student to prevent cheating.
+                        </div>
+                    </div>
 
                     <div class="mb-4">
                         <div class="card border-success">
