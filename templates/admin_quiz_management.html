@@ -119,6 +119,7 @@
                                 
                                 <!-- Toggle Active Status -->
                                 <form method="POST" action="{{ url_for('admin_toggle_quiz_active', quiz_id=quiz.id) }}" style="display: inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-outline-{% if quiz.is_active %}warning{% else %}success{% endif %}" 
                                             onclick="return confirm('Are you sure?')" title="{% if quiz.is_active %}Deactivate{% else %}Activate{% endif %}">
                                         <i class="fas fa-{% if quiz.is_active %}pause{% else %}play{% endif %}"></i>
@@ -133,6 +134,7 @@
                                 <!-- Delete Quiz -->
                                 <form method="POST" action="{{ url_for('admin_delete_quiz', quiz_id=quiz.id) }}" style="display: inline;" 
                                       onsubmit="return confirm('Are you sure you want to permanently delete this quiz and all its data?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-outline-danger" title="Delete Quiz">
                                         <i class="fas fa-trash"></i>
                                     </button>

@@ -126,7 +126,7 @@
                             <div class="btn-group btn-group-sm">
                                 <!-- Toggle Status -->
                                 <form method="POST" action="{{ url_for('admin_toggle_user_status', user_id=host.id) }}" class="d-inline">
-                                    <!-- CSRF token will be added when Flask-WTF is properly configured -->
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-outline-{% if host.is_active %}warning{% else %}success{% endif %}" title="{% if host.is_active %}Deactivate{% else %}Activate{% endif %} Host">
                                         <i class="fas fa-{% if host.is_active %}pause{% else %}play{% endif %}"></i>
                                     </button>
@@ -149,7 +149,7 @@
                                 
                                 <!-- Delete Host -->
                                 <form method="POST" action="{{ url_for('admin_delete_user', user_id=host.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete host {{ host.username }}? This will also delete all their quizzes and cannot be undone.')">
-                                    <!-- CSRF token will be added when Flask-WTF is properly configured -->
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-outline-danger" title="Delete Host">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -227,7 +227,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="roleForm" method="POST">
-                <!-- CSRF token will be added when Flask-WTF is properly configured -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <p>Change role for host: <strong id="roleUsername"></strong></p>
                     <div class="mb-3">
@@ -257,7 +257,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="passwordForm" method="POST">
-                <!-- CSRF token will be added when Flask-WTF is properly configured -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <p>Reset password for host: <strong id="passwordUsername"></strong></p>
                     <div class="mb-3">
