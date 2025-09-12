@@ -2018,6 +2018,89 @@ def admin_bulk_delete_users():
     
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/quiz-attempts')
+@login_required
+def admin_quiz_attempts():
+    """Admin page to view all quiz attempts"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    quiz_id = request.args.get('quiz_id', type=int)
+    status = request.args.get('status', 'all')
+    
+    query = QuizAttempt.query.options(
+        joinedload(QuizAttempt.participant),
+        joinedload(QuizAttempt.quiz)
+    )
+    
+    if quiz_id:
+        query = query.filter(QuizAttempt.quiz_id == quiz_id)
+    
+    if status != 'all':
+        query = query.filter(QuizAttempt.status == status)
+    
+    attempts = query.order_by(
+        QuizAttempt.started_at.desc()
+    ).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Get available quizzes for filtering
+    quizzes = Quiz.query.order_by(Quiz.title).all()
+    
+    return render_template('admin_quiz_attempts.html',
+                         attempts=attempts,
+                         quizzes=quizzes,
+                         current_quiz_id=quiz_id,
+                         current_status=status)
+
+@app.route('/admin/hosts')
+@login_required
+def admin_hosts():
+    """Admin page to view all host accounts"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    status = request.args.get('status', 'all')
+    search = request.args.get('search', '').strip()
+    
+    query = User.query.filter_by(role='host')
+    
+    if status == 'active':
+        query = query.filter_by(is_active=True)
+    elif status == 'inactive':
+        query = query.filter_by(is_active=False)
+    
+    if search:
+        query = query.filter(
+            (User.username.ilike(f'%{search}%')) |
+            (User.email.ilike(f'%{search}%'))
+        )
+    
+    hosts = query.order_by(User.created_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Get host statistics
+    host_stats = {}
+    for host in hosts.items:
+        quiz_count = Quiz.query.filter_by(creator_id=host.id).count()
+        recent_login = LoginEvent.query.filter_by(user_id=host.id).order_by(LoginEvent.login_time.desc()).first()
+        host_stats[host.id] = {
+            'quiz_count': quiz_count,
+            'last_login': recent_login.login_time if recent_login else None
+        }
+    
+    return render_template('admin_hosts.html',
+                         hosts=hosts,
+                         host_stats=host_stats,
+                         current_status=status,
+                         search_query=search)
+
 @app.route('/admin/create-user', methods=['POST'])
 @login_required
 def admin_create_user():

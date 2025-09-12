@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Attempts Management - Admin Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-user-clock"></i> Quiz Attempts Management</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Quiz</label>
+                <select name="quiz_id" class="form-select">
+                    <option value="">All Quizzes</option>
+                    {% for quiz in quizzes %}
+                    <option value="{{ quiz.id }}" {% if current_quiz_id == quiz.id %}selected{% endif %}>
+                        {{ quiz.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Status</option>
+                    <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="abandoned" {% if current_status == 'abandoned' %}selected{% endif %}>Abandoned</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+                <a href="{{ url_for('admin_quiz_attempts') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ attempts.total }}</h4>
+                <p class="mb-0">Total Attempts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ attempts.items|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                <p class="mb-0">Completed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h4>{{ attempts.items|selectattr('status', 'equalto', 'in_progress')|list|length }}</h4>
+                <p class="mb-0">In Progress</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h4>{{ attempts.items|selectattr('status', 'equalto', 'abandoned')|list|length }}</h4>
+                <p class="mb-0">Abandoned</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Attempts Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list"></i> Quiz Attempts</h5>
+    </div>
+    <div class="card-body">
+        {% if attempts.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Participant</th>
+                        <th>Quiz</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Started</th>
+                        <th>Duration</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in attempts.items %}
+                    <tr class="{% if attempt.status == 'abandoned' %}table-danger{% elif attempt.status == 'completed' %}table-success{% endif %}">
+                        <td>
+                            <div>
+                                <strong>{{ attempt.participant.username }}</strong>
+                                <br><small class="text-muted">{{ attempt.participant.email }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                <strong>{{ attempt.quiz.title }}</strong>
+                                <br><small class="text-muted">{{ attempt.quiz.questions|length }} questions</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if attempt.status == 'completed' %}bg-success
+                                {% elif attempt.status == 'in_progress' %}bg-warning
+                                {% else %}bg-danger{% endif %}">
+                                {{ attempt.status.title() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if attempt.score is not none %}
+                                <strong class="{% if attempt.score >= 80 %}text-success{% elif attempt.score >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                    {{ attempt.score }}%
+                                </strong>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'N/A' }}</small>
+                        </td>
+                        <td>
+                            {% if attempt.completed_at and attempt.started_at %}
+                                {% set duration = (attempt.completed_at - attempt.started_at).total_seconds() %}
+                                {% set minutes = (duration // 60)|int %}
+                                {% set seconds = (duration % 60)|int %}
+                                <small>{{ minutes }}m {{ seconds }}s</small>
+                            {% elif attempt.status == 'in_progress' %}
+                                <span class="badge bg-warning">In Progress</span>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-outline-primary" title="View Results">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if attempt.proctoring_events %}
+                                <a href="{{ url_for('admin_proctoring_events', attempt_id=attempt.id) }}" class="btn btn-outline-warning" title="View Violations">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </a>
+                                {% endif %}
+                                <button class="btn btn-outline-danger" onclick="confirmDeleteAttempt({{ attempt.id }}, '{{ attempt.participant.username }}')" title="Delete Attempt">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if attempts.pages > 1 %}
+        <nav aria-label="Quiz attempts pagination" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if attempts.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_quiz_attempts', page=attempts.prev_num, quiz_id=current_quiz_id, status=current_status) }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in attempts.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != attempts.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_quiz_attempts', page=page_num, quiz_id=current_quiz_id, status=current_status) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if attempts.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_quiz_attempts', page=attempts.next_num, quiz_id=current_quiz_id, status=current_status) }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No Quiz Attempts Found</h5>
+            <p class="text-muted">
+                {% if current_quiz_id or current_status != 'all' %}
+                    Try adjusting your filters to see more results.
+                {% else %}
+                    Quiz attempts will appear here once participants start taking quizzes.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function confirmDeleteAttempt(attemptId, participantName) {
+    if (confirm(`Are you sure you want to delete the quiz attempt by ${participantName}? This action cannot be undone.`)) {
+        // Create form and submit
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/quiz-attempt/${attemptId}/delete`;
+        
+        // Add CSRF token
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrf_token';
+        csrfToken.value = '{{ csrf_token() }}';
+        form.appendChild(csrfToken);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}
