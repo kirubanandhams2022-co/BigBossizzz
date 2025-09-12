@@ -2,8 +2,8 @@ from flask import render_template, request, redirect, url_for, flash, jsonify, s
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from app import app, db, mail
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert
+from app import app, db, mail, socketio
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -20,6 +20,12 @@ from io import BytesIO
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 from utils import get_time_greeting, get_greeting_icon
+
+# Import collaboration detection after other imports to avoid circular imports
+try:
+    from collaboration_detection import detector
+except ImportError:
+    detector = None  # Fallback if collaboration detection not available
 
 # Add email health check endpoint
 @app.route('/admin/email-health')
@@ -3162,6 +3168,20 @@ def submit_quiz(attempt_id):
             answer.is_correct = None
         
         db.session.add(answer)
+        
+        # Trigger collaboration detection for new/updated answers
+        if detector and (not existing_answer or existing_answer.selected_option_id != answer.selected_option_id):
+            try:
+                # Set quiz_id for the answer (if not already set)
+                answer.quiz_id = quiz.id
+                db.session.flush()  # Ensure answer has an ID
+                
+                # Run collaboration detection
+                signals = detector.process_new_answer(answer)
+                if signals:
+                    app.logger.info(f"Detected {len(signals)} collaboration signals for quiz {quiz.id}")
+            except Exception as e:
+                app.logger.error(f"Error in collaboration detection: {e}")
     
     # Mark attempt as completed
     attempt.completed_at = datetime.utcnow()
