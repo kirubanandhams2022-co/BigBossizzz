@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -4540,6 +4540,221 @@ def admin_quiz_management():
     
     quizzes = Quiz.query.order_by(Quiz.display_order.asc(), Quiz.created_at.desc()).all()
     return render_template('admin_quiz_management.html', quizzes=quizzes)
+
+# AI-Powered Plagiarism Detection Admin Routes
+@app.route('/admin/plagiarism-detection')
+@login_required 
+def admin_plagiarism_detection():
+    """Admin dashboard for plagiarism detection monitoring and management"""
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get filter parameters
+    risk_filter = request.args.get('risk', 'all')
+    review_filter = request.args.get('reviewed', 'all')
+    quiz_filter = request.args.get('quiz_id', type=int)
+    
+    # Build query
+    query = db.session.query(PlagiarismAnalysis).join(Answer).join(QuizAttempt).join(Quiz).join(User)
+    
+    # Apply filters
+    if risk_filter != 'all':
+        query = query.filter(PlagiarismAnalysis.risk_level == risk_filter)
+    
+    if review_filter == 'reviewed':
+        query = query.filter(PlagiarismAnalysis.is_reviewed == True)
+    elif review_filter == 'pending':
+        query = query.filter(PlagiarismAnalysis.requires_review == True, PlagiarismAnalysis.is_reviewed == False)
+    
+    if quiz_filter:
+        query = query.filter(Quiz.id == quiz_filter)
+    
+    # Get paginated results
+    page = request.args.get('page', 1, type=int)
+    analyses = query.order_by(PlagiarismAnalysis.analyzed_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Get summary statistics
+    total_analyses = PlagiarismAnalysis.query.count()
+    flagged_count = PlagiarismAnalysis.query.filter_by(is_flagged=True).count()
+    pending_review = PlagiarismAnalysis.query.filter_by(requires_review=True, is_reviewed=False).count()
+    
+    # Risk level breakdown
+    risk_stats = db.session.query(
+        PlagiarismAnalysis.risk_level,
+        func.count(PlagiarismAnalysis.id).label('count')
+    ).group_by(PlagiarismAnalysis.risk_level).all()
+    
+    # Get available quizzes for filter
+    quizzes = Quiz.query.order_by(Quiz.title).all()
+    
+    return render_template('admin_plagiarism_detection.html',
+                         analyses=analyses,
+                         total_analyses=total_analyses,
+                         flagged_count=flagged_count,
+                         pending_review=pending_review,
+                         risk_stats=dict(risk_stats),
+                         quizzes=quizzes,
+                         current_filters={
+                             'risk': risk_filter,
+                             'reviewed': review_filter,
+                             'quiz_id': quiz_filter
+                         })
+
+@app.route('/admin/plagiarism-analysis/<int:analysis_id>')
+@login_required
+def admin_plagiarism_analysis_detail(analysis_id):
+    """Detailed view of a specific plagiarism analysis"""
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    analysis = PlagiarismAnalysis.query.get_or_404(analysis_id)
+    
+    # Get related data
+    answer = analysis.answer
+    quiz_attempt = analysis.quiz_attempt
+    question = analysis.question
+    participant = quiz_attempt.participant
+    quiz = quiz_attempt.quiz
+    
+    # Get plagiarism matches for this analysis
+    matches = PlagiarismMatch.query.filter_by(analysis_id=analysis_id).all()
+    
+    return render_template('admin_plagiarism_analysis_detail.html',
+                         analysis=analysis,
+                         answer=answer,
+                         quiz_attempt=quiz_attempt,
+                         question=question,
+                         participant=participant,
+                         quiz=quiz,
+                         matches=matches)
+
+@app.route('/admin/plagiarism-analysis/<int:analysis_id>/review', methods=['POST'])
+@login_required
+@validate_csrf_token  
+def admin_review_plagiarism(analysis_id):
+    """Review and make decision on plagiarism analysis"""
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    analysis = PlagiarismAnalysis.query.get_or_404(analysis_id)
+    
+    decision = request.form.get('decision')  # 'innocent', 'suspicious', 'plagiarized'
+    notes = request.form.get('notes', '')
+    
+    if decision not in ['innocent', 'suspicious', 'plagiarized']:
+        flash('Invalid decision option.', 'error')
+        return redirect(url_for('admin_plagiarism_analysis_detail', analysis_id=analysis_id))
+    
+    # Update analysis
+    analysis.is_reviewed = True
+    analysis.reviewed_by = current_user.id
+    analysis.reviewed_at = datetime.utcnow()
+    analysis.review_decision = decision
+    analysis.review_notes = notes
+    
+    # Update flagged status based on decision
+    if decision == 'plagiarized':
+        analysis.is_flagged = True
+    elif decision == 'innocent':
+        analysis.is_flagged = False
+    
+    db.session.commit()
+    
+    flash(f'Plagiarism analysis marked as {decision}.', 'success')
+    return redirect(url_for('admin_plagiarism_detection'))
+
+@app.route('/admin/plagiarism-reports/download')
+@login_required
+def download_plagiarism_report():
+    """Download comprehensive plagiarism detection report"""
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Plagiarism Detection Report"
+        
+        # Define headers
+        headers = [
+            'Analysis ID', 'Quiz Title', 'Participant', 'Question Text', 
+            'Risk Level', 'Similarity Score', 'Cosine Similarity', 
+            'Jaccard Similarity', 'Levenshtein Similarity', 'Semantic Similarity',
+            'Flagged', 'Requires Review', 'Reviewed', 'Review Decision',
+            'Analyzed At', 'Reviewed At', 'Reviewer'
+        ]
+        
+        # Add headers with styling
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        
+        # Get all analyses with related data
+        analyses = db.session.query(PlagiarismAnalysis).join(Answer).join(QuizAttempt).join(Quiz).join(User).join(Question).all()
+        
+        # Add data rows
+        for row, analysis in enumerate(analyses, 2):
+            data = [
+                analysis.id,
+                analysis.quiz_attempt.quiz.title,
+                analysis.quiz_attempt.participant.username,
+                analysis.question.question_text[:100] + "..." if len(analysis.question.question_text) > 100 else analysis.question.question_text,
+                analysis.risk_level,
+                f"{analysis.overall_similarity_score:.3f}",
+                f"{analysis.cosine_similarity:.3f}" if analysis.cosine_similarity else "N/A",
+                f"{analysis.jaccard_similarity:.3f}" if analysis.jaccard_similarity else "N/A", 
+                f"{analysis.levenshtein_similarity:.3f}" if analysis.levenshtein_similarity else "N/A",
+                f"{analysis.semantic_similarity:.3f}" if analysis.semantic_similarity else "N/A",
+                "Yes" if analysis.is_flagged else "No",
+                "Yes" if analysis.requires_review else "No",
+                "Yes" if analysis.is_reviewed else "No",
+                analysis.review_decision or "N/A",
+                analysis.analyzed_at.strftime('%Y-%m-%d %H:%M:%S'),
+                analysis.reviewed_at.strftime('%Y-%m-%d %H:%M:%S') if analysis.reviewed_at else "N/A",
+                analysis.reviewer.username if analysis.reviewer else "N/A"
+            ]
+            
+            for col, value in enumerate(data, 1):
+                ws.cell(row=row, column=col, value=value)
+        
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # Create response
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = f'attachment; filename=plagiarism_detection_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        
+        app.logger.info(f"Plagiarism detection report downloaded by admin {current_user.username}")
+        return response
+        
+    except Exception as e:
+        app.logger.error(f"Error generating plagiarism report: {e}")
+        flash('Error generating report. Please try again.', 'error')
+        return redirect(url_for('admin_plagiarism_detection'))
 
 @app.route('/admin/analytics')
 @login_required
