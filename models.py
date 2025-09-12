@@ -458,3 +458,83 @@ class AttemptSimilarity(db.Model):
     
     def __repr__(self):
         return f'<AttemptSimilarity {self.attempt_a_id}-{self.attempt_b_id}: {self.jaccard_score}>'
+
+# Real-time Collaboration Heatmap Models
+class InteractionEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=True)
+    event_type = db.Column(db.String(50), nullable=False)  # 'click', 'focus', 'scroll', 'hover', 'answer_change'
+    element_selector = db.Column(db.String(200))  # CSS selector or element identifier
+    x_coordinate = db.Column(db.Integer)  # Click/hover position
+    y_coordinate = db.Column(db.Integer)
+    viewport_width = db.Column(db.Integer)
+    viewport_height = db.Column(db.Integer)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    duration = db.Column(db.Float)  # For focus/hover events - time spent
+    metadata = db.Column(db.Text)  # JSON metadata for additional context
+    
+    # Relationships
+    attempt = db.relationship('QuizAttempt', backref='interaction_events')
+    question = db.relationship('Question', backref='interaction_events')
+    
+    def __repr__(self):
+        return f'<InteractionEvent {self.event_type} on Question {self.question_id}>'
+
+class QuestionHeatmapData(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
+    
+    # Aggregated metrics
+    total_participants = db.Column(db.Integer, default=0)
+    average_time_spent = db.Column(db.Float, default=0.0)  # in seconds
+    total_clicks = db.Column(db.Integer, default=0)
+    total_hovers = db.Column(db.Integer, default=0)
+    correct_answer_rate = db.Column(db.Float, default=0.0)  # percentage
+    difficulty_score = db.Column(db.Float, default=0.0)  # calculated difficulty
+    engagement_score = db.Column(db.Float, default=0.0)  # based on interactions
+    
+    # Hotspot data (JSON)
+    click_hotspots = db.Column(db.Text)  # JSON array of click coordinates
+    hover_hotspots = db.Column(db.Text)  # JSON array of hover coordinates
+    scroll_patterns = db.Column(db.Text)  # JSON data about scroll behavior
+    
+    # Timestamps
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    quiz = db.relationship('Quiz', backref='heatmap_data')
+    question = db.relationship('Question', backref='heatmap_data')
+    
+    def __repr__(self):
+        return f'<HeatmapData Quiz:{self.quiz_id} Question:{self.question_id}>'
+
+class CollaborationInsight(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    insight_type = db.Column(db.String(50), nullable=False)  # 'difficulty_pattern', 'engagement_drop', 'confusion_area', 'performance_trend'
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.String(20), default='low')  # 'low', 'medium', 'high', 'critical'
+    
+    # Context data
+    affected_questions = db.Column(db.Text)  # JSON array of question IDs
+    metric_values = db.Column(db.Text)  # JSON object with relevant metrics
+    suggested_actions = db.Column(db.Text)  # JSON array of recommendations
+    
+    # Status and timestamps
+    is_active = db.Column(db.Boolean, default=True)
+    is_acknowledged = db.Column(db.Boolean, default=False)
+    acknowledged_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    acknowledged_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    quiz = db.relationship('Quiz', backref='collaboration_insights')
+    acknowledger = db.relationship('User', foreign_keys=[acknowledged_by])
+    
+    def __repr__(self):
+        return f'<CollaborationInsight {self.insight_type} for Quiz {self.quiz_id}>'
