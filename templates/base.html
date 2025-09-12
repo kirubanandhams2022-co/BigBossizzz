@@ -266,87 +266,77 @@
                                 </a></li>
                                 {% if current_user.is_admin() %}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li class="dropdown-item-text p-0">
-                                        <button class="btn btn-link text-dark text-decoration-none w-100 d-flex justify-content-between align-items-center p-2 text-start" 
-                                                type="button" data-bs-toggle="collapse" data-bs-target="#systemManagementMenu" 
-                                                aria-expanded="false" aria-controls="systemManagementMenu"
-                                                style="border: none; background: none; color: #212529 !important;">
-                                            <span><i class="fas fa-cogs me-2"></i> System Management</span>
-                                            <i class="fas fa-chevron-down" id="systemManagementChevron"></i>
-                                        </button>
-                                    </li>
-                                    <div class="collapse ms-3" id="systemManagementMenu">
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_users') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Create, edit, and manage user accounts. View user statistics and permissions.">
-                                            <i class="fas fa-users"></i> User Management
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_quiz_management') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Oversee all quizzes in the system. Monitor quiz performance and settings.">
-                                            <i class="fas fa-clipboard-list"></i> Quiz Management
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_course_management') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Manage courses, assign hosts to courses, and enroll participants.">
-                                            <i class="fas fa-graduation-cap"></i> Course Management
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_violations') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Review proctoring violations and security incidents across all quizzes.">
-                                            <i class="fas fa-exclamation-triangle"></i> Security Violations
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_alert_thresholds') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Configure alert thresholds for proctoring events and automated responses.">
-                                            <i class="fas fa-sliders-h"></i> Alert Thresholds
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_violation_appeals') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Review and process appeals from users who received violation flags.">
-                                            <i class="fas fa-balance-scale"></i> Violation Appeals
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_export_database') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Export system data and generate reports for analysis and backup.">
-                                            <i class="fas fa-database"></i> Database Export
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_system_settings') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Configure global system settings and platform-wide preferences.">
-                                            <i class="fas fa-cog"></i> System Settings
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_audit_logs') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="View detailed audit logs of system activities and user actions.">
-                                            <i class="fas fa-file-alt"></i> Audit Logs
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_quiz_attempts') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Monitor and manage all quiz attempts across the system.">
-                                            <i class="fas fa-clock"></i> Quiz Attempts
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_hosts') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Manage host accounts and monitor their activities.">
-                                            <i class="fas fa-user-tie"></i> Host Management
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_manage_flags') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Manage user flags and review flagged accounts.">
-                                            <i class="fas fa-flag"></i> User Flags
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_analytics') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="View comprehensive system analytics and performance metrics.">
-                                            <i class="fas fa-chart-line"></i> System Analytics
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_bulk_users') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Perform bulk operations on user accounts and data management.">
-                                            <i class="fas fa-users-cog"></i> Bulk Operations
-                                        </a></li>
-                                    </div>
+                                    <li><h6 class="dropdown-header"><i class="fas fa-cogs"></i> System Management</h6></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_users') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Create, edit, and manage user accounts. View user statistics and permissions.">
+                                        <i class="fas fa-users"></i> User Management
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_quiz_management') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Oversee all quizzes in the system. Monitor quiz performance and settings.">
+                                        <i class="fas fa-clipboard-list"></i> Quiz Management
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_course_management') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Manage courses, assign hosts to courses, and enroll participants.">
+                                        <i class="fas fa-graduation-cap"></i> Course Management
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_violations') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Review proctoring violations and security incidents across all quizzes.">
+                                        <i class="fas fa-exclamation-triangle"></i> Security Violations
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_violation_appeals') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Review and process appeals from users who received violation flags.">
+                                        <i class="fas fa-balance-scale"></i> Violation Appeals
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_manage_flags') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Manage user flags and review flagged accounts.">
+                                        <i class="fas fa-flag"></i> User Flags
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_analytics') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="View comprehensive system analytics and performance metrics.">
+                                        <i class="fas fa-chart-line"></i> System Analytics
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_bulk_users') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Perform bulk operations on user accounts and data management.">
+                                        <i class="fas fa-users-cog"></i> Bulk Operations
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_alert_thresholds') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Configure alert thresholds for proctoring events and automated responses.">
+                                        <i class="fas fa-sliders-h"></i> Alert Thresholds
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_export_database') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Export system data and generate reports for analysis and backup.">
+                                        <i class="fas fa-database"></i> Database Export
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_system_settings') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Configure global system settings and platform-wide preferences.">
+                                        <i class="fas fa-cog"></i> System Settings
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_audit_logs') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="View detailed audit logs of system activities and user actions.">
+                                        <i class="fas fa-file-alt"></i> Audit Logs
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_quiz_attempts') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Monitor and manage all quiz attempts across the system.">
+                                        <i class="fas fa-clock"></i> Quiz Attempts
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_hosts') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="Manage host accounts and monitor their activities.">
+                                        <i class="fas fa-user-tie"></i> Host Management
+                                    </a></li>
                                 {% endif %}
                                 {% if current_user.is_host() %}
                                     <li><hr class="dropdown-divider"></li>
