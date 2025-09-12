@@ -76,7 +76,7 @@ class User(UserMixin, db.Model):
     # Relationships
     created_quizzes = db.relationship('Quiz', backref='creator', lazy=True, cascade='all, delete-orphan')
     quiz_attempts = db.relationship('QuizAttempt', backref='participant', lazy=True, cascade='all, delete-orphan')
-    user_roles = db.relationship('UserRole', backref='user', lazy=True, cascade='all, delete-orphan')
+    user_roles = db.relationship('UserRole', foreign_keys='UserRole.user_id', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -95,14 +95,6 @@ class User(UserMixin, db.Model):
             return True
         return False
     
-    def is_host(self):
-        return self.role == 'host'
-    
-    def is_admin(self):
-        return self.role == 'admin'
-    
-    def is_participant(self):
-        return self.role == 'participant'
     
     # New RBAC methods
     def has_permission(self, permission_name):
@@ -158,15 +150,27 @@ class User(UserMixin, db.Model):
         """Get all role names for this user"""
         return [ur.role.name for ur in self.user_roles]
     
-    # Legacy role methods for backward compatibility
+    # Legacy role methods for backward compatibility with safety checks
     def is_admin(self):
-        return self.has_role('admin') or self.role == 'admin'
+        try:
+            return self.has_role('admin') if hasattr(self, 'user_roles') and self.user_roles else False
+        except:
+            pass
+        return self.role == 'admin'
     
     def is_host(self):
-        return self.has_role('host') or self.role == 'host'
+        try:
+            return self.has_role('host') if hasattr(self, 'user_roles') and self.user_roles else False
+        except:
+            pass
+        return self.role == 'host'
     
     def is_participant(self):
-        return self.has_role('participant') or self.role == 'participant'
+        try:
+            return self.has_role('participant') if hasattr(self, 'user_roles') and self.user_roles else False
+        except:
+            pass
+        return self.role == 'participant'
     
     def __repr__(self):
         return f'<User {self.username}>'
