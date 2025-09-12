@@ -1787,7 +1787,8 @@ def admin_users():
         return redirect(url_for('dashboard'))
     
     users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('admin_users.html', users=users)
+    courses = Course.query.filter_by(is_active=True).order_by(Course.code).all()
+    return render_template('admin_users.html', users=users, courses=courses)
 
 @app.route('/admin/user/<int:user_id>/toggle-status', methods=['POST'])
 @login_required
@@ -1969,12 +1970,14 @@ def admin_bulk_create_users():
     
     users_data = request.form.get('users_data', '').strip()
     default_role = request.form.get('default_role', 'participant')
+    default_course = request.form.get('default_course', '').strip()
+    auto_create_courses = request.form.get('auto_create_courses') == 'on'
     
     if not users_data:
         flash('Please provide user data.', 'error')
         return redirect(url_for('admin_users'))
     
-    # Parse user data (format: username,email,password per line)
+    # Parse user data (format: username,email,password,role,courses per line)
     lines = [line.strip() for line in users_data.split('\n') if line.strip()]
     created_count = 0
     errors = []
@@ -1983,13 +1986,14 @@ def admin_bulk_create_users():
         try:
             parts = [part.strip() for part in line.split(',')]
             if len(parts) < 2:
-                errors.append(f"Line {i}: Invalid format. Expected: username,email,password (or username,email for auto-generated password)")
+                errors.append(f"Line {i}: Invalid format. Expected: username,email,password,role,courses")
                 continue
             
             username = parts[0]
             email = parts[1]
-            password = parts[2] if len(parts) >= 3 else f"BigBoss{__import__('random').randrange(1000, 9999)}"
-            role = parts[3] if len(parts) >= 4 else default_role
+            password = parts[2] if len(parts) >= 3 and parts[2] else f"BigBoss{__import__('random').randrange(1000, 9999)}"
+            role = parts[3] if len(parts) >= 4 and parts[3] else default_role
+            courses_str = parts[4] if len(parts) >= 5 else ''
             
             # Validation
             if not username or not email:
@@ -2017,6 +2021,63 @@ def admin_bulk_create_users():
             user.is_verified = True
             
             db.session.add(user)
+            db.session.flush()  # Get user ID before processing courses
+            
+            # Process course assignments
+            course_codes = []
+            if courses_str.strip():
+                # Use courses from CSV line
+                course_codes = [code.strip().upper() for code in courses_str.split(';') if code.strip()]
+            elif default_course:
+                # Use default course
+                course_codes = [default_course.upper()]
+            
+            # Assign user to courses
+            for course_code in course_codes:
+                try:
+                    course = Course.query.filter_by(code=course_code).first()
+                    
+                    # Auto-create course if it doesn't exist and auto-create is enabled
+                    if not course and auto_create_courses:
+                        course = Course()
+                        course.name = course_code  # Use code as name
+                        course.code = course_code
+                        course.description = f"Auto-created course for {course_code}"
+                        course.max_participants = 100
+                        course.is_active = True
+                        db.session.add(course)
+                        db.session.flush()  # Get course ID
+                    
+                    if course:
+                        if role == 'participant':
+                            # Check if already enrolled
+                            existing_enrollment = ParticipantEnrollment.query.filter_by(
+                                participant_id=user.id, course_id=course.id
+                            ).first()
+                            if not existing_enrollment:
+                                enrollment = ParticipantEnrollment()
+                                enrollment.participant_id = user.id
+                                enrollment.course_id = course.id
+                                enrollment.enrolled_by = current_user.id
+                                db.session.add(enrollment)
+                        
+                        elif role == 'host':
+                            # Check if already assigned
+                            existing_assignment = HostCourseAssignment.query.filter_by(
+                                host_id=user.id, course_id=course.id
+                            ).first()
+                            if not existing_assignment:
+                                assignment = HostCourseAssignment()
+                                assignment.host_id = user.id
+                                assignment.course_id = course.id
+                                assignment.assigned_by = current_user.id
+                                db.session.add(assignment)
+                    else:
+                        errors.append(f"Line {i}: Course '{course_code}' not found")
+                
+                except Exception as course_error:
+                    errors.append(f"Line {i}: Error assigning course '{course_code}': {str(course_error)}")
+            
             created_count += 1
             
         except Exception as e:
