@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -3099,6 +3099,245 @@ def notify_violation():
     except Exception as e:
         logging.error(f"Error processing violation notification: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'})
+
+# Helper function for heatmap data processing
+def update_heatmap_data(quiz_id, question_id):
+    """Update aggregated heatmap data for a question"""
+    try:
+        if not question_id:
+            return
+            
+        # Get or create heatmap data record
+        heatmap_data = QuestionHeatmapData.query.filter_by(
+            quiz_id=quiz_id, 
+            question_id=question_id
+        ).first()
+        
+        if not heatmap_data:
+            heatmap_data = QuestionHeatmapData(
+                quiz_id=quiz_id,
+                question_id=question_id
+            )
+            db.session.add(heatmap_data)
+        
+        # Calculate aggregated metrics from interaction events
+        attempts = QuizAttempt.query.filter_by(quiz_id=quiz_id).all()
+        attempt_ids = [attempt.id for attempt in attempts]
+        
+        if attempt_ids:
+            # Get interaction events for this question
+            events = InteractionEvent.query.filter(
+                InteractionEvent.attempt_id.in_(attempt_ids),
+                InteractionEvent.question_id == question_id
+            ).all()
+            
+            # Calculate metrics
+            participants = set([event.attempt_id for event in events])
+            heatmap_data.total_participants = len(participants)
+            
+            # Calculate average time spent (from focus events)
+            focus_events = [e for e in events if e.event_type == 'focus' and e.duration]
+            if focus_events:
+                heatmap_data.average_time_spent = sum([e.duration for e in focus_events]) / len(focus_events)
+            
+            # Count interactions
+            heatmap_data.total_clicks = len([e for e in events if e.event_type == 'click'])
+            heatmap_data.total_hovers = len([e for e in events if e.event_type == 'hover'])
+            
+            # Calculate hotspots (coordinates where most interactions happen)
+            click_coords = [(e.x_coordinate, e.y_coordinate) for e in events 
+                           if e.event_type == 'click' and e.x_coordinate and e.y_coordinate]
+            hover_coords = [(e.x_coordinate, e.y_coordinate) for e in events 
+                           if e.event_type == 'hover' and e.x_coordinate and e.y_coordinate]
+            
+            heatmap_data.click_hotspots = json.dumps(click_coords[:100])  # Store top 100 coords
+            heatmap_data.hover_hotspots = json.dumps(hover_coords[:100])
+            
+            # Calculate engagement score based on interaction frequency
+            if heatmap_data.total_participants > 0:
+                total_interactions = heatmap_data.total_clicks + heatmap_data.total_hovers
+                heatmap_data.engagement_score = total_interactions / heatmap_data.total_participants
+            
+            heatmap_data.last_updated = datetime.utcnow()
+        
+        db.session.commit()
+        
+    except Exception as e:
+        logging.error(f"Error updating heatmap data: {e}")
+        db.session.rollback()
+
+# Real-time Collaboration Heatmap API Endpoints
+
+@app.route('/api/heatmap/interaction', methods=['POST'])
+@login_required
+def log_interaction_event():
+    """Log participant interaction events for heatmap generation"""
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'})
+        
+        # Validate required fields
+        attempt_id = data.get('attemptId')
+        event_type = data.get('eventType')
+        
+        if not attempt_id or not event_type:
+            return jsonify({'success': False, 'error': 'attemptId and eventType are required'})
+        
+        # Verify attempt belongs to current user
+        attempt = QuizAttempt.query.get(attempt_id)
+        if not attempt or attempt.participant_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Invalid attempt or access denied'})
+        
+        # Create interaction event
+        interaction = InteractionEvent(
+            attempt_id=attempt_id,
+            question_id=data.get('questionId'),
+            event_type=event_type,
+            element_selector=data.get('elementSelector'),
+            x_coordinate=data.get('x'),
+            y_coordinate=data.get('y'),
+            viewport_width=data.get('viewportWidth'),
+            viewport_height=data.get('viewportHeight'),
+            duration=data.get('duration'),
+            event_metadata=json.dumps(data.get('metadata', {})),
+            timestamp=datetime.utcnow()
+        )
+        
+        db.session.add(interaction)
+        db.session.commit()
+        
+        # Trigger real-time heatmap data update (async)
+        try:
+            update_heatmap_data(attempt.quiz_id, data.get('questionId'))
+        except Exception as e:
+            logging.warning(f"Failed to update heatmap data: {e}")
+        
+        return jsonify({'success': True, 'logged': True})
+        
+    except Exception as e:
+        logging.error(f"Error logging interaction event: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'})
+
+@app.route('/api/heatmap/data/<int:quiz_id>')
+@login_required
+def get_heatmap_data(quiz_id):
+    """Get aggregated heatmap data for a quiz"""
+    try:
+        # Verify user has access to this quiz
+        quiz = Quiz.query.get_or_404(quiz_id)
+        
+        # Check if user is the host or admin
+        if not (current_user.is_admin() or quiz.creator_id == current_user.id):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Get heatmap data for all questions in the quiz
+        heatmap_data = QuestionHeatmapData.query.filter_by(quiz_id=quiz_id).all()
+        
+        # Format response
+        questions_data = []
+        for data in heatmap_data:
+            question_info = {
+                'questionId': data.question_id,
+                'totalParticipants': data.total_participants,
+                'averageTimeSpent': data.average_time_spent,
+                'totalClicks': data.total_clicks,
+                'totalHovers': data.total_hovers,
+                'correctAnswerRate': data.correct_answer_rate,
+                'difficultyScore': data.difficulty_score,
+                'engagementScore': data.engagement_score,
+                'clickHotspots': json.loads(data.click_hotspots) if data.click_hotspots else [],
+                'hoverHotspots': json.loads(data.hover_hotspots) if data.hover_hotspots else [],
+                'scrollPatterns': json.loads(data.scroll_patterns) if data.scroll_patterns else {},
+                'lastUpdated': data.last_updated.isoformat()
+            }
+            questions_data.append(question_info)
+        
+        return jsonify({
+            'success': True,
+            'quizId': quiz_id,
+            'questionsData': questions_data,
+            'totalQuestions': len(questions_data),
+            'lastUpdated': max([data.last_updated for data in heatmap_data]).isoformat() if heatmap_data else None
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting heatmap data: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/heatmap/insights/<int:quiz_id>')
+@login_required
+def get_collaboration_insights(quiz_id):
+    """Get collaboration insights for a quiz"""
+    try:
+        # Verify user has access to this quiz
+        quiz = Quiz.query.get_or_404(quiz_id)
+        
+        # Check if user is the host or admin
+        if not (current_user.is_admin() or quiz.creator_id == current_user.id):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Get active insights for the quiz
+        insights = CollaborationInsight.query.filter_by(
+            quiz_id=quiz_id,
+            is_active=True
+        ).order_by(CollaborationInsight.created_at.desc()).all()
+        
+        # Format response
+        insights_data = []
+        for insight in insights:
+            insight_info = {
+                'id': insight.id,
+                'type': insight.insight_type,
+                'title': insight.title,
+                'description': insight.description,
+                'severity': insight.severity,
+                'affectedQuestions': json.loads(insight.affected_questions) if insight.affected_questions else [],
+                'metricValues': json.loads(insight.metric_values) if insight.metric_values else {},
+                'suggestedActions': json.loads(insight.suggested_actions) if insight.suggested_actions else [],
+                'isAcknowledged': insight.is_acknowledged,
+                'createdAt': insight.created_at.isoformat(),
+                'updatedAt': insight.updated_at.isoformat()
+            }
+            insights_data.append(insight_info)
+        
+        return jsonify({
+            'success': True,
+            'quizId': quiz_id,
+            'insights': insights_data,
+            'totalInsights': len(insights_data),
+            'criticalCount': len([i for i in insights if i.severity == 'critical']),
+            'highCount': len([i for i in insights if i.severity == 'high'])
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting collaboration insights: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/heatmap/insights/<int:insight_id>/acknowledge', methods=['POST'])
+@login_required
+def acknowledge_insight(insight_id):
+    """Acknowledge a collaboration insight"""
+    try:
+        insight = CollaborationInsight.query.get_or_404(insight_id)
+        
+        # Verify user has access to this quiz
+        if not (current_user.is_admin() or insight.quiz.creator_id == current_user.id):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Acknowledge the insight
+        insight.is_acknowledged = True
+        insight.acknowledged_by = current_user.id
+        insight.acknowledged_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'acknowledged': True})
+        
+    except Exception as e:
+        logging.error(f"Error acknowledging insight: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 import os
