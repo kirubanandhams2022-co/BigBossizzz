@@ -331,7 +331,7 @@ def host_dashboard():
         flash('Access denied. Host privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
-    quizzes = Quiz.query.filter_by(creator_id=current_user.id).order_by(Quiz.created_at.desc()).all()
+    quizzes = Quiz.query.filter_by(creator_id=current_user.id).order_by(Quiz.display_order.asc(), Quiz.created_at.desc()).all()
     
     # Get recent quiz attempts for host's quizzes and add heatmap data flags
     recent_attempts = []
@@ -4496,7 +4496,7 @@ def admin_quiz_management():
         flash('Access denied.', 'error')
         return redirect(url_for('dashboard'))
     
-    quizzes = Quiz.query.order_by(Quiz.created_at.desc()).all()
+    quizzes = Quiz.query.order_by(Quiz.display_order.asc(), Quiz.created_at.desc()).all()
     return render_template('admin_quiz_management.html', quizzes=quizzes)
 
 @app.route('/admin/analytics')
@@ -4779,7 +4779,7 @@ def admin_course_management():
         flash('Access denied. Administrator privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
-    courses = Course.query.order_by(Course.created_at.desc()).all()
+    courses = Course.query.order_by(Course.display_order.asc(), Course.created_at.desc()).all()
     hosts = User.query.filter_by(role='host').all()
     participants = User.query.filter_by(role='participant').all()
     
@@ -5404,6 +5404,65 @@ def host_heatmap_dashboard():
 def help_page():
     """Comprehensive help and documentation page"""
     return render_template('help.html')
+
+# Drag-and-Drop API Endpoints
+@app.route('/api/reorder-courses', methods=['POST'])
+@login_required
+def api_reorder_courses():
+    """API endpoint to handle course reordering via drag-and-drop"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Unauthorized access'}), 403
+    
+    try:
+        data = request.get_json()
+        course_ids = data.get('course_ids', [])
+        
+        if not course_ids:
+            return jsonify({'success': False, 'message': 'No course IDs provided'}), 400
+        
+        # Update display_order for each course
+        for index, course_id in enumerate(course_ids):
+            course = Course.query.get(course_id)
+            if course:
+                course.display_order = index
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Course order updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error updating course order: {str(e)}'}), 500
+
+@app.route('/api/reorder-quizzes', methods=['POST'])
+@login_required
+def api_reorder_quizzes():
+    """API endpoint to handle quiz reordering via drag-and-drop"""
+    if not (current_user.is_admin() or current_user.is_host()):
+        return jsonify({'success': False, 'message': 'Unauthorized access'}), 403
+    
+    try:
+        data = request.get_json()
+        quiz_ids = data.get('quiz_ids', [])
+        course_id = data.get('course_id')
+        
+        if not quiz_ids:
+            return jsonify({'success': False, 'message': 'No quiz IDs provided'}), 400
+        
+        # Update display_order for each quiz
+        for index, quiz_id in enumerate(quiz_ids):
+            quiz = Quiz.query.get(quiz_id)
+            if quiz:
+                # Verify user has permission to modify this quiz
+                if not current_user.is_admin() and quiz.creator_id != current_user.id:
+                    return jsonify({'success': False, 'message': 'Unauthorized to modify this quiz'}), 403
+                quiz.display_order = index
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Quiz order updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error updating quiz order: {str(e)}'}), 500
 
 # Error handlers
 @app.errorhandler(404)

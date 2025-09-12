@@ -56,6 +56,11 @@
     <div class="card-body">
         {% if quizzes %}
         <div class="table-responsive">
+            <div class="alert alert-info d-flex align-items-center mb-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <span>Drag quizzes by their handle <i class="fas fa-grip-vertical"></i> to reorder them</span>
+            </div>
+            <div class="quiz-list" data-course-id="">
             <table class="table table-hover">
                 <thead>
                     <tr>
@@ -71,12 +76,19 @@
                 </thead>
                 <tbody>
                     {% for quiz in quizzes %}
-                    <tr class="{% if not quiz.is_active %}table-secondary{% endif %}">
+                    <tr class="quiz-item {% if not quiz.is_active %}table-secondary{% endif %}" draggable="true" data-item-id="{{ quiz.id }}">
                         <td>
-                            <strong>{{ quiz.title }}</strong>
-                            {% if quiz.description %}
-                                <br><small class="text-muted">{{ quiz.description[:100] }}{% if quiz.description|length > 100 %}...{% endif %}</small>
-                            {% endif %}
+                            <div class="d-flex align-items-center">
+                                <div class="drag-handle me-2" title="Drag to reorder">
+                                    <i class="fas fa-grip-vertical"></i>
+                                </div>
+                                <div>
+                                    <strong>{{ quiz.title }}</strong>
+                                    {% if quiz.description %}
+                                        <br><small class="text-muted">{{ quiz.description[:100] }}{% if quiz.description|length > 100 %}...{% endif %}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <strong>{{ quiz.creator.username }}</strong>
@@ -131,6 +143,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
         {% else %}
         <div class="text-center py-5">
@@ -159,6 +172,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
 <script>
 function showQuizStats(quizId, quizTitle) {
     document.querySelector('#quizStatsModal .modal-title').innerHTML = 
