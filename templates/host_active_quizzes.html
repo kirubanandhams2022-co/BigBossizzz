@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Active Quizzes - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="fas fa-play-circle text-success"></i> {{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!
+    </h1>
+    <div>
+        <a href="{{ url_for('host_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        <a href="{{ url_for('create_quiz') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create New Quiz
+        </a>
+    </div>
+</div>
+
+<!-- Statistics Overview -->
+<div class="row mb-4">
+    <div class="col-md-4 col-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ active_quizzes|length }}</h3>
+                <small>Active Quizzes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ total_active_attempts }}</h3>
+                <small>Total Attempts</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ in_progress_attempts }}</h3>
+                <small>In Progress</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Quizzes List -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Active Quizzes</h5>
+    </div>
+    <div class="card-body">
+        {% if active_quizzes %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Quiz Title</th>
+                            <th>Questions</th>
+                            <th>Time Limit</th>
+                            <th>Proctoring</th>
+                            <th>Attempts</th>
+                            <th>Last Activity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for quiz in active_quizzes %}
+                        <tr class="table-success">
+                            <td>
+                                <div class="fw-bold text-success">{{ quiz.title }}</div>
+                                {% if quiz.description %}
+                                    <small class="text-muted">{{ quiz.description[:60] }}...</small>
+                                {% endif %}
+                                <span class="badge bg-success ms-2">ACTIVE</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ quiz.questions|length }}</span>
+                            </td>
+                            <td>{{ quiz.time_limit }} min</td>
+                            <td>
+                                {% if quiz.proctoring_enabled %}
+                                    <span class="badge bg-info">Enabled</span>
+                                    {% if quiz.face_detection_required %}
+                                        <span class="badge bg-warning ms-1">Face Detect</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">Disabled</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="badge bg-primary mb-1">{{ quiz.attempts|length }} total</span>
+                                    {% set in_progress = quiz.attempts|selectattr('status', 'equalto', 'in_progress')|list|length %}
+                                    {% set completed = quiz.attempts|selectattr('status', 'equalto', 'completed')|list|length %}
+                                    {% if in_progress > 0 %}
+                                        <span class="badge bg-warning">{{ in_progress }} in progress</span>
+                                    {% endif %}
+                                    {% if completed > 0 %}
+                                        <span class="badge bg-success mt-1">{{ completed }} completed</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% set latest_attempt = quiz.attempts|sort(attribute='started_at', reverse=true)|first %}
+                                {% if latest_attempt %}
+                                    {{ latest_attempt.started_at.strftime('%Y-%m-%d') }}
+                                    <div class="small text-muted">{{ latest_attempt.started_at.strftime('%H:%M') }}</div>
+                                {% else %}
+                                    <span class="text-muted">No attempts yet</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('host_monitoring') }}" class="btn btn-outline-info" title="Live Monitor">
+                                        <i class="fas fa-monitor-waveform"></i>
+                                    </a>
+                                    <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-primary" title="Edit Quiz">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if quiz.attempts %}
+                                        <a href="{{ url_for('quiz_results', quiz_id=quiz.id) }}" class="btn btn-outline-success" title="View Results">
+                                            <i class="fas fa-chart-bar"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-play-circle fa-3x text-muted mb-3"></i>
+                <h5>No Active Quizzes</h5>
+                <p class="text-muted">You don't have any active quizzes at the moment.</p>
+                <div>
+                    <a href="{{ url_for('create_quiz') }}" class="btn btn-primary me-2">
+                        <i class="fas fa-plus"></i> Create New Quiz
+                    </a>
+                    <a href="{{ url_for('host_total_quizzes') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-list"></i> View All Quizzes
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
