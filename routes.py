@@ -380,8 +380,16 @@ def login():
             except Exception as e:
                 logging.error(f"Failed to send login notifications: {e}")
             
+            # DEBUG: Log login details
+            print(f"🔍 LOGIN DEBUG - User: {user.email}, Role in DB: {user.role}")
+            print(f"🔍 LOGIN DEBUG - is_admin(): {user.is_admin()}, is_host(): {user.is_host()}, is_participant(): {user.is_participant()}")
+            
             login_user(user)
             flash(f'Welcome back, {user.username}!', 'success')
+            
+            # DEBUG: Check current_user after login_user
+            print(f"🔍 LOGIN DEBUG - current_user.email: {current_user.email}, current_user.role: {current_user.role}")
+            print(f"🔍 LOGIN DEBUG - current_user methods: is_admin()={current_user.is_admin()}, is_host()={current_user.is_host()}, is_participant()={current_user.is_participant()}")
             
             next_page = request.args.get('next')
             if next_page:
