@@ -15,10 +15,6 @@
         <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
             <i class="fas fa-file-excel"></i> Excel Upload
         </button>
-        <a href="{{ url_for('generate_dsa_class_users') }}" class="btn btn-warning" 
-           onclick="return confirm('This will create 60 students (student1-student60) and 1 teacher (dsa_teacher) for DSA class. Continue?')">
-            <i class="fas fa-graduation-cap"></i> Generate DSA Class
-        </a>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left"></i> Dashboard
         </a>
