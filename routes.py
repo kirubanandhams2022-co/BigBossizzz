@@ -5137,6 +5137,41 @@ def force_submit_quiz():
         logging.error(f"Failed to force submit quiz: {e}")
         return jsonify({'error': 'Failed to force submit quiz'}), 500
 
+# Host Heatmap Dashboard Route
+@app.route('/host/heatmap-dashboard')
+@login_required
+def host_heatmap_dashboard():
+    """Host collaboration heatmap dashboard"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get quizzes created by the current host (or all if admin)
+    if current_user.is_admin():
+        quizzes = Quiz.query.filter_by(is_deleted=False).order_by(Quiz.created_at.desc()).all()
+    else:
+        quizzes = Quiz.query.filter_by(
+            creator_id=current_user.id,
+            is_deleted=False
+        ).order_by(Quiz.created_at.desc()).all()
+    
+    # Get selected quiz if specified
+    selected_quiz_id = request.args.get('quiz_id')
+    selected_quiz = None
+    if selected_quiz_id:
+        selected_quiz = Quiz.query.get(selected_quiz_id)
+        # Verify access to selected quiz
+        if selected_quiz and not current_user.is_admin() and selected_quiz.creator_id != current_user.id:
+            selected_quiz = None
+    
+    # Add attempt counts to quizzes
+    for quiz in quizzes:
+        quiz.attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).all()
+    
+    return render_template('host_heatmap_dashboard.html',
+                         quizzes=quizzes,
+                         selected_quiz=selected_quiz)
+
 @app.route('/help')
 def help_page():
     """Comprehensive help and documentation page"""

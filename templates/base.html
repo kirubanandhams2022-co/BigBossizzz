@@ -355,6 +355,11 @@
                                            title="Track login activity and security events for your participants.">
                                         <i class="fas fa-sign-in-alt"></i> Login Activity
                                     </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('host_heatmap_dashboard') }}" 
+                                           data-bs-toggle="tooltip" data-bs-placement="left" 
+                                           title="View real-time collaboration heatmaps and insights for your quizzes.">
+                                        <i class="fas fa-fire"></i> Heatmap Dashboard
+                                    </a></li>
                                 {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('logout') }}">
