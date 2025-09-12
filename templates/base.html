@@ -267,10 +267,11 @@
                                 {% if current_user.is_admin() %}
                                     <li><hr class="dropdown-divider"></li>
                                     <li class="dropdown-item-text p-0">
-                                        <button class="btn btn-link text-light text-decoration-none w-100 d-flex justify-content-between align-items-center p-2" 
+                                        <button class="btn btn-link text-dark text-decoration-none w-100 d-flex justify-content-between align-items-center p-2 text-start" 
                                                 type="button" data-bs-toggle="collapse" data-bs-target="#systemManagementMenu" 
-                                                aria-expanded="false" aria-controls="systemManagementMenu">
-                                            <span><i class="fas fa-cogs"></i> System Management</span>
+                                                aria-expanded="false" aria-controls="systemManagementMenu"
+                                                style="border: none; background: none; color: #212529 !important;">
+                                            <span><i class="fas fa-cogs me-2"></i> System Management</span>
                                             <i class="fas fa-chevron-down" id="systemManagementChevron"></i>
                                         </button>
                                     </li>
