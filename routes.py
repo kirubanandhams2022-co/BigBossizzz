@@ -916,9 +916,11 @@ def admin_export_database():
 
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'csv', 'xlsx', 'txt'}
 UPLOAD_FOLDER = 'uploads'
+QUIZ_ANSWER_UPLOAD_FOLDER = 'uploads/quiz_answers'
 
-# Create upload directory if it doesn't exist
+# Create upload directories if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(QUIZ_ANSWER_UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -3911,6 +3913,68 @@ def submit_quiz(attempt_id):
             answer.text_answer = request.form.get(answer_key, '')
             # For text answers, manual grading would be needed
             answer.is_correct = None
+            
+        elif question.question_type == 'code_submission':
+            answer.code_submission = request.form.get(answer_key, '')
+            # Execute code if provided (basic validation)
+            if answer.code_submission:
+                try:
+                    # Basic code execution simulation (for demonstration)
+                    # In production, use a secure sandboxed environment
+                    answer.execution_output = "Code submitted successfully"
+                    answer.is_correct = None  # Manual grading required
+                except Exception as e:
+                    answer.execution_error = str(e)
+                    answer.is_correct = False
+        
+        elif question.question_type == 'file_upload':
+            # Handle file upload for this answer
+            file_key = f'file_{question.id}'
+            if file_key in request.files:
+                file = request.files[file_key]
+                if file and file.filename:
+                    # Validate file type and size
+                    allowed_types = question.allowed_file_types.split(',') if question.allowed_file_types else ['pdf', 'docx', 'jpg', 'png', 'txt']
+                    file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                    
+                    if file_ext in [t.strip() for t in allowed_types]:
+                        # Check file size
+                        file.seek(0, 2)
+                        file_size = file.tell()
+                        file.seek(0)
+                        
+                        max_size = (question.max_file_size_mb or 10) * 1024 * 1024
+                        if file_size <= max_size:
+                            # Save file
+                            filename = secure_filename(file.filename)
+                            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                            filename = f"{attempt.id}_{question.id}_{timestamp}_{filename}"
+                            file_path = os.path.join(QUIZ_ANSWER_UPLOAD_FOLDER, filename)
+                            file.save(file_path)
+                            
+                            answer.uploaded_file_path = file_path
+                            answer.uploaded_file_name = file.filename
+                            answer.uploaded_file_size = file_size
+                            answer.is_correct = None  # Manual grading required
+                        else:
+                            answer.is_correct = False
+                            answer.text_answer = f"File too large. Maximum size: {question.max_file_size_mb}MB"
+                    else:
+                        answer.is_correct = False
+                        answer.text_answer = f"Invalid file type. Allowed: {question.allowed_file_types}"
+            else:
+                answer.is_correct = False
+                answer.text_answer = "No file uploaded"
+        
+        elif question.question_type == 'drawing':
+            # Handle drawing/canvas data
+            drawing_data = request.form.get(f'drawing_{question.id}', '')
+            if drawing_data:
+                answer.drawing_data = drawing_data
+                answer.is_correct = None  # Manual grading required
+            else:
+                answer.is_correct = False
+                answer.text_answer = "No drawing provided"
         
         db.session.add(answer)
         
