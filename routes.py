@@ -462,6 +462,107 @@ def participant_dashboard():
                          greeting=get_time_greeting(),
                          greeting_icon=get_greeting_icon())
 
+@app.route('/participant/completed')
+@login_required
+def participant_completed():
+    """Show completed quizzes for participant"""
+    if current_user.role != 'participant':
+        flash('Access denied. Participants only.', 'error')
+        return redirect(url_for('index'))
+    
+    # Get completed quiz attempts
+    completed_attempts = QuizAttempt.query.filter_by(
+        participant_id=current_user.id, 
+        status='completed'
+    ).order_by(QuizAttempt.completed_at.desc()).all()
+    
+    return render_template('participant_completed.html', 
+                         completed_attempts=completed_attempts,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
+@app.route('/participant/in-progress')
+@login_required
+def participant_in_progress():
+    """Show in-progress quizzes for participant"""
+    if current_user.role != 'participant':
+        flash('Access denied. Participants only.', 'error')
+        return redirect(url_for('index'))
+    
+    # Get in-progress quiz attempts
+    in_progress_attempts = QuizAttempt.query.filter_by(
+        participant_id=current_user.id, 
+        status='in_progress'
+    ).order_by(QuizAttempt.started_at.desc()).all()
+    
+    return render_template('participant_in_progress.html', 
+                         in_progress_attempts=in_progress_attempts,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
+@app.route('/participant/average-score')
+@login_required
+def participant_average_score():
+    """Show score analysis for participant"""
+    if current_user.role != 'participant':
+        flash('Access denied. Participants only.', 'error')
+        return redirect(url_for('index'))
+    
+    # Get completed quiz attempts with scores
+    scored_attempts = QuizAttempt.query.filter_by(
+        participant_id=current_user.id, 
+        status='completed'
+    ).filter(QuizAttempt.score.is_not(None)).order_by(QuizAttempt.completed_at.desc()).all()
+    
+    # Calculate score statistics
+    if scored_attempts:
+        scores = [attempt.score for attempt in scored_attempts]
+        avg_score = sum(scores) / len(scores)
+        highest_score = max(scores)
+        lowest_score = min(scores)
+    else:
+        avg_score = highest_score = lowest_score = 0
+        scores = []
+    
+    return render_template('participant_average_score.html', 
+                         scored_attempts=scored_attempts,
+                         avg_score=round(avg_score, 1),
+                         highest_score=highest_score,
+                         lowest_score=lowest_score,
+                         total_quizzes=len(scored_attempts),
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
+@app.route('/participant/violations')
+@login_required
+def participant_violations():
+    """Show violation history for participant"""
+    if current_user.role != 'participant':
+        flash('Access denied. Participants only.', 'error')
+        return redirect(url_for('index'))
+    
+    # Get all proctoring events for this participant
+    violations = ProctoringEvent.query.join(QuizAttempt).filter(
+        QuizAttempt.participant_id == current_user.id
+    ).order_by(ProctoringEvent.timestamp.desc()).all()
+    
+    # Group violations by quiz attempt
+    violations_by_attempt = {}
+    for violation in violations:
+        attempt_id = violation.attempt_id
+        if attempt_id not in violations_by_attempt:
+            violations_by_attempt[attempt_id] = {
+                'attempt': violation.attempt,
+                'violations': []
+            }
+        violations_by_attempt[attempt_id]['violations'].append(violation)
+    
+    return render_template('participant_violations.html', 
+                         violations_by_attempt=violations_by_attempt,
+                         total_violations=len(violations),
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
 @app.route('/quiz_listing')
 @login_required
 def quiz_listing():

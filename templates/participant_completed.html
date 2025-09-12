@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Completed Quizzes - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-3">
+                <a href="{{ url_for('participant_dashboard') }}" class="btn btn-outline-primary me-3">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <div>
+                    <h1 class="mb-0"><i class="fas fa-trophy text-success"></i> Completed Quizzes</h1>
+                    <p class="text-muted mb-0">{{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">{{ completed_attempts|length }}</h3>
+                    <small>Total Completed</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    {% set scored_attempts = completed_attempts|selectattr('score')|list %}
+                    <h3 class="mb-1">
+                        {% if scored_attempts %}
+                            {{ (scored_attempts|map(attribute='score')|sum / scored_attempts|length)|round(1) }}%
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </h3>
+                    <small>Average Score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    {% if scored_attempts %}
+                        <h3 class="mb-1">{{ scored_attempts|map(attribute='score')|max }}%</h3>
+                    {% else %}
+                        <h3 class="mb-1">N/A</h3>
+                    {% endif %}
+                    <small>Highest Score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    {% set total_questions = completed_attempts|map(attribute='quiz')|map(attribute='questions')|map('length')|sum %}
+                    <h3 class="mb-1">{{ total_questions }}</h3>
+                    <small>Questions Answered</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed Quizzes List -->
+    <div class="row">
+        <div class="col-12">
+            {% if completed_attempts %}
+                {% for attempt in completed_attempts %}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-1">{{ attempt.quiz.title }}</h5>
+                                <p class="text-muted mb-2">{{ attempt.quiz.description[:50] if attempt.quiz.description else 'No description available' }}...</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    Completed: {{ attempt.completed_at.strftime('%B %d, %Y at %I:%M %p') if attempt.completed_at else 'N/A' }}
+                                </small>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                {% if attempt.score is not none %}
+                                    <div class="d-flex align-items-center justify-content-center">
+                                        <div class="me-3">
+                                            <h4 class="mb-0 {% if attempt.score >= 80 %}text-success{% elif attempt.score >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                                {{ attempt.score|round(1) }}%
+                                            </h4>
+                                            <small class="text-muted">Score</small>
+                                        </div>
+                                        <div>
+                                            <span class="badge {% if attempt.score >= 80 %}bg-success{% elif attempt.score >= 60 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+                                                {% if attempt.score >= 80 %}
+                                                    <i class="fas fa-star"></i> Excellent
+                                                {% elif attempt.score >= 60 %}
+                                                    <i class="fas fa-check-circle"></i> Good
+                                                {% else %}
+                                                    <i class="fas fa-times-circle"></i> Needs Improvement
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">Score not available</p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Duration: 
+                                        {% if attempt.started_at and attempt.completed_at %}
+                                            {% set duration = attempt.completed_at - attempt.started_at %}
+                                            {{ (duration.total_seconds() / 60)|round(0)|int }} min
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye me-1"></i> View Results
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-clipboard-list fa-4x text-muted mb-3"></i>
+                        <h4>No Completed Quizzes</h4>
+                        <p class="text-muted">You haven't completed any quizzes yet. Start taking quizzes to see your results here.</p>
+                        <a href="{{ url_for('participant_dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-play me-2"></i> Start a Quiz
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

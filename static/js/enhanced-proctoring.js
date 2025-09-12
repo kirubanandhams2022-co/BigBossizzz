@@ -290,22 +290,16 @@ class EnhancedProctoringSystem {
         try {
             console.log('📷 Starting live camera monitoring (no storage)');
             
-            // Get camera and audio streams
+            // Get camera stream only (audio monitoring removed per user request)
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 640 },
                     height: { ideal: 480 },
                     frameRate: { ideal: 15 }  // Lower frame rate for performance
-                },
-                audio: {
-                    echoCancellation: false,  // We want to hear background noise
-                    noiseSuppression: false,  // We want to analyze all sounds
-                    autoGainControl: false    // Maintain original audio levels
                 }
             });
             
-            // Start audio monitoring
-            await this.startAudioEnvironmentAnalysis();
+            // Audio monitoring removed per user request
             
             // Create video element for live analysis
             this.videoElement = document.createElement('video');
@@ -1010,28 +1004,7 @@ class EnhancedProctoringSystem {
             this.faceDetectionInterval = null;
         }
         
-        // Stop audio monitoring
-        this.audioMonitoringActive = false;
-        if (this.audioAnalysisInterval) {
-            clearInterval(this.audioAnalysisInterval);
-            this.audioAnalysisInterval = null;
-        }
-        
-        // Properly dispose of audio context
-        if (this.audioContext) {
-            try {
-                if (this.audioContext.state !== 'closed') {
-                    this.audioContext.close().then(() => {
-                        console.log('✅ Audio context closed successfully');
-                    }).catch(err => {
-                        console.warn('Audio context close warning:', err);
-                    });
-                }
-            } catch (error) {
-                console.warn('Failed to close audio context:', error);
-            }
-            this.audioContext = null;
-        }
+        // Audio monitoring removed per user request
         
         // Stop all media tracks
         if (this.mediaStream) {
@@ -1081,12 +1054,7 @@ class EnhancedProctoringSystem {
             console.log('Removed camera preview');
         }
         
-        // Remove audio indicator
-        const audioIndicator = document.getElementById('audio-monitoring-indicator');
-        if (audioIndicator) {
-            audioIndicator.remove();
-            console.log('Removed audio monitoring indicator');
-        }
+        // Audio monitoring removed per user request
         
         // Remove privacy notice if still visible
         const privacyNotice = document.getElementById('audio-privacy-notice');
@@ -1104,368 +1072,20 @@ class EnhancedProctoringSystem {
     }
     
     async startAudioEnvironmentAnalysis() {
-        try {
-            console.log('🎤 Starting background noise and environment analysis');
-            
-            // Check browser compatibility for AudioContext
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-            if (!AudioContextClass) {
-                throw new Error('AudioContext not supported in this browser');
-            }
-            
-            // Create audio context with better error handling
-            try {
-                this.audioContext = new AudioContextClass();
-            } catch (contextError) {
-                console.error('Failed to create audio context:', contextError);
-                throw new Error('Audio context creation failed - microphone may be in use');
-            }
-            
-            // Check if audio context is running
-            if (this.audioContext.state === 'suspended') {
-                try {
-                    await this.audioContext.resume();
-                } catch (resumeError) {
-                    console.warn('Failed to resume audio context:', resumeError);
-                }
-            }
-            
-            // Get audio track from media stream with validation
-            const audioTrack = this.mediaStream.getAudioTracks()[0];
-            if (!audioTrack) {
-                throw new Error('No audio track available - microphone access may be denied');
-            }
-            
-            // Check if audio track is enabled and active
-            if (!audioTrack.enabled) {
-                throw new Error('Audio track is disabled');
-            }
-            
-            if (audioTrack.readyState !== 'live') {
-                throw new Error('Audio track is not active');
-            }
-            
-            // Create audio source with error handling
-            let source;
-            try {
-                source = this.audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-            } catch (sourceError) {
-                console.error('Failed to create media stream source:', sourceError);
-                throw new Error('Audio source creation failed');
-            }
-            
-            // Create analyser with optimized settings
-            this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 1024; // Reduced for better performance
-            this.analyser.smoothingTimeConstant = 0.8;
-            this.analyser.minDecibels = -90;
-            this.analyser.maxDecibels = -10;
-            
-            // Connect source to analyser
-            source.connect(this.analyser);
-            
-            // Create data array for frequency analysis
-            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-            
-            // Show audio monitoring indicator
-            this.showAudioMonitoringIndicator();
-            
-            // Show privacy notice for audio monitoring
-            this.showAudioPrivacyNotice();
-            
-            // Start baseline noise calibration
-            await this.calibrateBaselineNoise();
-            
-            // Start continuous audio monitoring with error handling
-            this.audioMonitoringActive = true;
-            this.startContinuousAudioAnalysis();
-            
-            console.log('✅ Audio environment analysis active');
-            
-        } catch (error) {
-            console.error('Audio monitoring failed:', error);
-            this.handleAudioSetupFailure(error);
-        }
+        // Audio monitoring removed per user request
+        console.log('Audio monitoring has been disabled');
+        return;
     }
     
-    showAudioMonitoringIndicator() {
-        // Create audio monitoring indicator
-        const indicator = document.createElement('div');
-        indicator.id = 'audio-monitoring-indicator';
-        indicator.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 120px;
-            height: 60px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border-radius: 8px;
-            padding: 8px;
-            z-index: 1001;
-            font-size: 12px;
-            text-align: center;
-            border: 2px solid #17a2b8;
-        `;
-        
-        indicator.innerHTML = `
-            <div style="margin-bottom: 4px;">🎤 AUDIO MONITOR</div>
-            <div id="noise-level-bar" style="width: 100%; height: 8px; background: #333; border-radius: 4px; overflow: hidden;">
-                <div id="noise-level-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); transition: width 0.1s;"></div>
-            </div>
-            <div id="environment-status" style="font-size: 10px; margin-top: 4px;">Calibrating...</div>
-        `;
-        
-        document.body.appendChild(indicator);
-    }
     
-    async calibrateBaselineNoise() {
-        console.log('🔧 Calibrating baseline noise level...');
-        
-        return new Promise(resolve => {
-            const samples = [];
-            const sampleDuration = 3000; // 3 seconds
-            const sampleInterval = 100; // Every 100ms
-            
-            const sampleNoise = () => {
-                this.analyser.getByteFrequencyData(this.dataArray);
-                const averageVolume = this.dataArray.reduce((sum, value) => sum + value, 0) / this.dataArray.length;
-                samples.push(averageVolume);
-                
-                if (samples.length < sampleDuration / sampleInterval) {
-                    setTimeout(sampleNoise, sampleInterval);
-                } else {
-                    // Calculate baseline as average of samples
-                    this.baselineNoiseLevel = samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
-                    console.log(`📊 Baseline noise level: ${this.baselineNoiseLevel.toFixed(2)}`);
-                    
-                    // Update status
-                    const statusElement = document.getElementById('environment-status');
-                    if (statusElement) {
-                        statusElement.textContent = 'Active';
-                    }
-                    
-                    resolve();
-                }
-            };
-            
-            sampleNoise();
-        });
-    }
     
-    startContinuousAudioAnalysis() {
-        if (!this.audioMonitoringActive) return;
-        
-        // Analyze audio every 500ms (optimized from 200ms for better performance)
-        this.audioAnalysisInterval = setInterval(() => {
-            if (!this.audioMonitoringActive) {
-                clearInterval(this.audioAnalysisInterval);
-                return;
-            }
-            
-            try {
-                this.analyzeAudioEnvironment();
-            } catch (error) {
-                console.error('Audio analysis error:', error);
-                // Don't stop monitoring for minor errors
-            }
-        }, 500);
-    }
     
-    analyzeAudioEnvironment() {
-        if (!this.analyser || !this.dataArray) return;
-        
-        // Get current audio data
-        this.analyser.getByteFrequencyData(this.dataArray);
-        
-        // Calculate current noise level
-        const currentNoiseLevel = this.dataArray.reduce((sum, value) => sum + value, 0) / this.dataArray.length;
-        
-        // Update noise level history
-        this.environmentAnalysis.noiseLevelHistory.push(currentNoiseLevel);
-        if (this.environmentAnalysis.noiseLevelHistory.length > 50) {
-            this.environmentAnalysis.noiseLevelHistory.shift(); // Keep last 50 samples (10 seconds)
-        }
-        
-        // Update visual indicator
-        this.updateAudioIndicator(currentNoiseLevel);
-        
-        // Analyze for different types of audio events
-        this.detectBackgroundNoise(currentNoiseLevel);
-        this.detectVoiceActivity();
-        this.detectSuspiciousSounds();
-        this.analyzeEnvironmentQuality();
-    }
     
-    updateAudioIndicator(currentLevel) {
-        const fillElement = document.getElementById('noise-level-fill');
-        const statusElement = document.getElementById('environment-status');
-        
-        if (fillElement && this.baselineNoiseLevel) {
-            // Calculate percentage based on baseline (0-200% range)
-            const percentage = Math.min((currentLevel / this.baselineNoiseLevel) * 50, 100);
-            fillElement.style.width = `${percentage}%`;
-        }
-        
-        if (statusElement) {
-            if (this.environmentAnalysis.hasConversation) {
-                statusElement.textContent = '⚠️ Conversation';
-                statusElement.style.color = '#ffc107';
-            } else if (!this.environmentAnalysis.isQuiet) {
-                statusElement.textContent = '🔊 Noisy';
-                statusElement.style.color = '#dc3545';
-            } else {
-                statusElement.textContent = '✅ Quiet';
-                statusElement.style.color = '#28a745';
-            }
-        }
-    }
     
-    detectBackgroundNoise(currentLevel) {
-        if (!this.baselineNoiseLevel) return;
-        
-        // Consider environment noisy if consistently above 150% of baseline
-        const noiseThreshold = this.baselineNoiseLevel * 1.5;
-        
-        if (currentLevel > noiseThreshold) {
-            this.suspiciousSoundCount++;
-            
-            // Trigger violation if noisy for extended period
-            if (this.suspiciousSoundCount > 25) { // 5 seconds of noise
-                this.environmentAnalysis.isQuiet = false;
-                
-                if (!this.warningShown) {
-                    this.recordViolation('noisy_environment', 'medium', 'Environment is too noisy for testing');
-                    this.showSingleWarning('⚠️ Please ensure a quiet environment for testing');
-                    this.warningShown = true;
-                }
-                
-                this.suspiciousSoundCount = 0; // Reset to prevent spam
-            }
-        } else {
-            // Reset if noise level returns to normal
-            if (this.suspiciousSoundCount > 0) {
-                this.suspiciousSoundCount = Math.max(0, this.suspiciousSoundCount - 2);
-            }
-            if (currentLevel < noiseThreshold * 0.8) {
-                this.environmentAnalysis.isQuiet = true;
-                this.warningShown = false; // Allow new warnings
-            }
-        }
-    }
     
-    detectVoiceActivity() {
-        if (!this.dataArray) return;
-        
-        // Voice typically appears in 300-3000 Hz range
-        // FFT bins: bin = frequency * fftSize / sampleRate
-        const sampleRate = this.audioContext.sampleRate;
-        const binSize = sampleRate / this.analyser.fftSize;
-        
-        const voiceStartBin = Math.floor(300 / binSize);
-        const voiceEndBin = Math.floor(3000 / binSize);
-        
-        // Calculate voice band energy
-        let voiceEnergy = 0;
-        for (let i = voiceStartBin; i < voiceEndBin && i < this.dataArray.length; i++) {
-            voiceEnergy += this.dataArray[i];
-        }
-        voiceEnergy /= (voiceEndBin - voiceStartBin);
-        
-        // Detect voice if energy in voice band is significantly higher than baseline
-        const voiceThreshold = this.baselineNoiseLevel ? this.baselineNoiseLevel * 2 : 50;
-        
-        if (voiceEnergy > voiceThreshold) {
-            this.voiceDetectionCount++;
-            this.environmentAnalysis.lastVoiceActivity = Date.now();
-            
-            // Detect conversation if voice activity persists
-            if (this.voiceDetectionCount > 15) { // 3 seconds of voice
-                this.environmentAnalysis.hasConversation = true;
-                
-                if (!this.warningShown) {
-                    this.recordViolation('voice_detected', 'high', 'Voice or conversation detected in background');
-                    this.showSingleWarning('⚠️ Voice activity detected. Please ensure you are alone.');
-                    this.warningShown = true;
-                }
-                
-                this.voiceDetectionCount = 0; // Reset counter
-            }
-        } else {
-            // Reset if no voice detected
-            if (this.voiceDetectionCount > 0) {
-                this.voiceDetectionCount = Math.max(0, this.voiceDetectionCount - 1);
-            }
-            
-            // Consider conversation ended if no voice for 5 seconds
-            if (Date.now() - this.environmentAnalysis.lastVoiceActivity > 5000) {
-                this.environmentAnalysis.hasConversation = false;
-                this.warningShown = false; // Allow new warnings
-            }
-        }
-    }
     
-    detectSuspiciousSounds() {
-        if (!this.dataArray) return;
-        
-        // High frequency sounds (phone rings, notifications, typing)
-        const highFreqStart = Math.floor(2000 / (this.audioContext.sampleRate / this.analyser.fftSize));
-        const highFreqEnd = Math.floor(8000 / (this.audioContext.sampleRate / this.analyser.fftSize));
-        
-        let highFreqEnergy = 0;
-        for (let i = highFreqStart; i < highFreqEnd && i < this.dataArray.length; i++) {
-            highFreqEnergy += this.dataArray[i];
-        }
-        highFreqEnergy /= (highFreqEnd - highFreqStart);
-        
-        // Sudden spikes in high frequency could indicate phone rings, notifications
-        const spikeThreshold = this.baselineNoiseLevel ? this.baselineNoiseLevel * 3 : 80;
-        
-        if (highFreqEnergy > spikeThreshold) {
-            console.log('🔊 Suspicious high-frequency sound detected');
-            this.recordViolation('suspicious_sound', 'low', 'Suspicious high-frequency sound detected (phone, notification, etc.)');
-        }
-        
-        // Repetitive sounds (typing, paper rustling)
-        // This is a simplified version - in practice, you'd use more sophisticated pattern recognition
-        this.detectRepetitiveSounds();
-    }
     
-    detectRepetitiveSounds() {
-        // Simplified repetitive sound detection
-        const history = this.environmentAnalysis.noiseLevelHistory;
-        if (history.length < 20) return;
-        
-        // Check for repetitive patterns in the last 4 seconds
-        const recentSamples = history.slice(-20);
-        let patterns = 0;
-        
-        for (let i = 0; i < recentSamples.length - 5; i++) {
-            const pattern = recentSamples.slice(i, i + 3);
-            const nextPattern = recentSamples.slice(i + 3, i + 6);
-            
-            // Check if patterns are similar (indicating repetitive sounds like typing)
-            if (this.arraysAreSimilar(pattern, nextPattern)) {
-                patterns++;
-            }
-        }
-        
-        if (patterns > 3) {
-            console.log('🔄 Repetitive sound pattern detected (possible typing/paper rustling)');
-            this.recordViolation('repetitive_sound', 'low', 'Repetitive sound pattern detected');
-        }
-    }
     
-    arraysAreSimilar(arr1, arr2, tolerance = 10) {
-        if (arr1.length !== arr2.length) return false;
-        
-        for (let i = 0; i < arr1.length; i++) {
-            if (Math.abs(arr1[i] - arr2[i]) > tolerance) {
-                return false;
-            }
-        }
-        return true;
-    }
     
     analyzeEnvironmentQuality() {
         // Overall environment quality assessment
