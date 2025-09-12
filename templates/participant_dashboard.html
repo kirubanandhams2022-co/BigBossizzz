@@ -62,50 +62,61 @@
 <!-- Statistics Cards -->
 <div class="row mt-4 mb-4">
     <div class="col-6 mb-3">
-        <div class="stats-card">
-            <div class="mb-2" style="width: 50px; height: 50px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-                <i class="fas fa-trophy" style="color: white; font-size: 1.2rem;"></i>
+        <a href="{{ url_for('participant_completed') }}" class="text-decoration-none">
+            <div class="stats-card">
+                <div class="mb-2" style="width: 50px; height: 50px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                    <i class="fas fa-trophy" style="color: white; font-size: 1.2rem;"></i>
+                </div>
+                <h2 class="text-dark mb-1">{{ my_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h2>
+                <p class="text-muted mb-0">Completed</p>
             </div>
-            <h2 class="text-dark mb-1">{{ my_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h2>
-            <p class="text-muted mb-0">Completed</p>
-        </div>
+        </a>
     </div>
     
     <div class="col-6 mb-3">
-        <div class="stats-card">
-            <div class="mb-2" style="width: 50px; height: 50px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-                <i class="fas fa-clock" style="color: white; font-size: 1.2rem;"></i>
+        <a href="{{ url_for('participant_in_progress') }}" class="text-decoration-none">
+            <div class="stats-card">
+                <div class="mb-2" style="width: 50px; height: 50px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                    <i class="fas fa-clock" style="color: white; font-size: 1.2rem;"></i>
+                </div>
+                <h2 class="text-dark mb-1">{{ my_attempts|selectattr('status', 'equalto', 'in_progress')|list|length }}</h2>
+                <p class="text-muted mb-0">In Progress</p>
             </div>
-            <h2 class="text-dark mb-1">{{ my_attempts|selectattr('status', 'equalto', 'in_progress')|list|length }}</h2>
-            <p class="text-muted mb-0">In Progress</p>
-        </div>
+        </a>
     </div>
     
     <div class="col-6 mb-3">
-        <div class="stats-card">
-            <div class="mb-2" style="width: 50px; height: 50px; background: #8b5cf6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-                <i class="fas fa-chart-line" style="color: white; font-size: 1.2rem;"></i>
+        <a href="{{ url_for('participant_average_score') }}" class="text-decoration-none">
+            <div class="stats-card">
+                <div class="mb-2" style="width: 50px; height: 50px; background: #8b5cf6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                    <i class="fas fa-chart-line" style="color: white; font-size: 1.2rem;"></i>
+                </div>
+                {% set completed_attempts = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
+                <h2 class="text-dark mb-1">
+                    {% if completed_attempts %}
+                        {{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(0)|int }}%
+                    {% else %}
+                        87%
+                    {% endif %}
+                </h2>
+                <p class="text-muted mb-0">Average Score</p>
             </div>
-            {% set completed_attempts = my_attempts|selectattr('status', 'equalto', 'completed')|selectattr('score')|list %}
-            <h2 class="text-dark mb-1">
-                {% if completed_attempts %}
-                    {{ (completed_attempts|map(attribute='score')|sum / completed_attempts|length)|round(0)|int }}%
-                {% else %}
-                    87%
-                {% endif %}
-            </h2>
-            <p class="text-muted mb-0">Average Score</p>
-        </div>
+        </a>
     </div>
     
     <div class="col-6 mb-3">
-        <div class="stats-card">
-            <div class="mb-2" style="width: 50px; height: 50px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-                <i class="fas fa-exclamation-triangle" style="color: white; font-size: 1.2rem;"></i>
+        <a href="{{ url_for('participant_violations') }}" class="text-decoration-none">
+            <div class="stats-card">
+                <div class="mb-2" style="width: 50px; height: 50px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                    <i class="fas fa-exclamation-triangle" style="color: white; font-size: 1.2rem;"></i>
+                </div>
+                {% set user_violations = my_attempts|map(attribute='proctoring_events')|list %}
+                {% set total_violations = [] %}
+                {% for events in user_violations %}{% for event in events %}{{ total_violations.append(event) or '' }}{% endfor %}{% endfor %}
+                <h2 class="text-dark mb-1">{{ total_violations|length }}</h2>
+                <p class="text-muted mb-0">Violations</p>
             </div>
-            <h2 class="text-dark mb-1">0</h2>
-            <p class="text-muted mb-0">Violations</p>
-        </div>
+        </a>
     </div>
 </div>
 

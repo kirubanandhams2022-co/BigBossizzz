@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Score Analysis - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-3">
+                <a href="{{ url_for('participant_dashboard') }}" class="btn btn-outline-primary me-3">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <div>
+                    <h1 class="mb-0"><i class="fas fa-chart-line text-purple"></i> Score Analysis</h1>
+                    <p class="text-muted mb-0">{{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Score Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-purple text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">{{ avg_score }}%</h3>
+                    <small>Average Score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">{{ highest_score }}%</h3>
+                    <small>Highest Score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">{{ lowest_score }}%</h3>
+                    <small>Lowest Score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">{{ total_quizzes }}</h3>
+                    <small>Scored Quizzes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Analysis -->
+    {% if scored_attempts %}
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Performance Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    {% set excellent_count = scored_attempts|selectattr('score', '>=', 80)|list|length %}
+                    {% set good_count = scored_attempts|select('score')|select('lambda x: x.score >= 60 and x.score < 80')|list|length %}
+                    {% set needs_improvement_count = scored_attempts|selectattr('score', '<', 60)|list|length %}
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-success"><i class="fas fa-star me-1"></i>Excellent (80%+)</span>
+                            <span class="text-success">{{ excellent_count }} quizzes</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ (excellent_count / total_quizzes * 100)|round(0) if total_quizzes > 0 else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-warning"><i class="fas fa-check-circle me-1"></i>Good (60-79%)</span>
+                            <span class="text-warning">{{ good_count }} quizzes</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-warning" role="progressbar" 
+                                 style="width: {{ (good_count / total_quizzes * 100)|round(0) if total_quizzes > 0 else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-danger"><i class="fas fa-times-circle me-1"></i>Needs Improvement (<60%)</span>
+                            <span class="text-danger">{{ needs_improvement_count }} quizzes</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-danger" role="progressbar" 
+                                 style="width: {{ (needs_improvement_count / total_quizzes * 100)|round(0) if total_quizzes > 0 else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Achievements</h5>
+                </div>
+                <div class="card-body">
+                    {% if avg_score >= 90 %}
+                        <div class="text-center mb-3">
+                            <div class="badge bg-warning fs-6 mb-2">🏆 Outstanding</div>
+                            <p class="small text-muted">Exceptional performance!</p>
+                        </div>
+                    {% elif avg_score >= 80 %}
+                        <div class="text-center mb-3">
+                            <div class="badge bg-success fs-6 mb-2">⭐ Excellent</div>
+                            <p class="small text-muted">Great work!</p>
+                        </div>
+                    {% elif avg_score >= 70 %}
+                        <div class="text-center mb-3">
+                            <div class="badge bg-info fs-6 mb-2">👍 Good</div>
+                            <p class="small text-muted">Keep it up!</p>
+                        </div>
+                    {% else %}
+                        <div class="text-center mb-3">
+                            <div class="badge bg-warning fs-6 mb-2">📚 Improving</div>
+                            <p class="small text-muted">Keep practicing!</p>
+                        </div>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    {% if highest_score == 100 %}
+                        <div class="text-center">
+                            <div class="badge bg-success fs-6">🎯 Perfect Score!</div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if total_quizzes >= 10 %}
+                        <div class="text-center mt-2">
+                            <div class="badge bg-info fs-6">📈 Consistent Learner</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Scores -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Quiz Scores</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Quiz Title</th>
+                                    <th>Score</th>
+                                    <th>Performance</th>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for attempt in scored_attempts[:10] %}
+                                <tr>
+                                    <td>{{ attempt.quiz.title }}</td>
+                                    <td>
+                                        <span class="fw-bold {% if attempt.score >= 80 %}text-success{% elif attempt.score >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                            {{ attempt.score|round(1) }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if attempt.score >= 80 %}
+                                            <span class="badge bg-success">Excellent</span>
+                                        {% elif attempt.score >= 60 %}
+                                            <span class="badge bg-warning">Good</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Needs Improvement</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ attempt.completed_at.strftime('%m/%d/%Y') if attempt.completed_at else 'N/A' }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- No Data State -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-chart-line fa-4x text-muted mb-3"></i>
+                    <h4>No Score Data Available</h4>
+                    <p class="text-muted">Complete some quizzes to see your score analysis here.</p>
+                    <a href="{{ url_for('participant_dashboard') }}" class="btn btn-primary">
+                        <i class="fas fa-play me-2"></i> Take Your First Quiz
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.bg-purple {
+    background-color: #8b5cf6 !important;
+}
+.text-purple {
+    color: #8b5cf6 !important;
+}
+</style>
+{% endblock %}

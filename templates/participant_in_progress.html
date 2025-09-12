@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}In Progress Quizzes - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-3">
+                <a href="{{ url_for('participant_dashboard') }}" class="btn btn-outline-primary me-3">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <div>
+                    <h1 class="mb-0"><i class="fas fa-clock text-warning"></i> In Progress Quizzes</h1>
+                    <p class="text-muted mb-0">{{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- In Progress Quizzes List -->
+    <div class="row">
+        <div class="col-12">
+            {% if in_progress_attempts %}
+                {% for attempt in in_progress_attempts %}
+                <div class="card mb-3 shadow-sm border-warning">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-1">{{ attempt.quiz.title }}</h5>
+                                <p class="text-muted mb-2">{{ attempt.quiz.description[:50] if attempt.quiz.description else 'No description available' }}...</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-play me-1"></i>
+                                    Started: {{ attempt.started_at.strftime('%B %d, %Y at %I:%M %p') }}
+                                </small>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <div class="mb-2">
+                                    {% set answered_count = attempt.answers|length %}
+                                    {% set total_questions = attempt.quiz.questions|length %}
+                                    {% set progress_percent = (answered_count / total_questions * 100)|round(0)|int if total_questions > 0 else 0 %}
+                                    
+                                    <div class="progress mb-2" style="height: 8px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" 
+                                             style="width: {{ progress_percent }}%" 
+                                             aria-valuenow="{{ progress_percent }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ answered_count }} / {{ total_questions }} questions ({{ progress_percent }}%)
+                                    </small>
+                                </div>
+                                
+                                <!-- Time Remaining -->
+                                {% if attempt.quiz.time_limit %}
+                                    {% set time_elapsed = (moment.utcnow() - attempt.started_at).total_seconds() / 60 %}
+                                    {% set time_remaining = attempt.quiz.time_limit - time_elapsed %}
+                                    {% if time_remaining > 0 %}
+                                        <div class="badge {% if time_remaining > 15 %}bg-success{% elif time_remaining > 5 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+                                            <i class="fas fa-hourglass-half me-1"></i>
+                                            {{ time_remaining|round(0)|int }} min left
+                                        </div>
+                                    {% else %}
+                                        <div class="badge bg-danger fs-6">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            Time Expired
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Time Limit: {{ attempt.quiz.time_limit }} min
+                                    </small>
+                                </div>
+                                <a href="{{ url_for('continue_quiz', attempt_id=attempt.id) }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-play me-1"></i> Continue Quiz
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-clock fa-4x text-muted mb-3"></i>
+                        <h4>No Quizzes in Progress</h4>
+                        <p class="text-muted">You don't have any unfinished quizzes. Start a new quiz to see it here.</p>
+                        <a href="{{ url_for('participant_dashboard') }}" class="btn btn-warning">
+                            <i class="fas fa-play me-2"></i> Start a New Quiz
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tips Section -->
+    {% if in_progress_attempts %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6><i class="fas fa-lightbulb text-warning me-2"></i>Tips for Continuing Your Quiz</h6>
+                    <ul class="mb-0 small">
+                        <li>Click "Continue Quiz" to resume where you left off</li>
+                        <li>Your answers are automatically saved as you progress</li>
+                        <li>Pay attention to the remaining time to avoid incomplete submissions</li>
+                        <li>Ensure stable internet connection before continuing</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
