@@ -3711,6 +3711,9 @@ def acknowledge_insight(insight_id):
 import os
 import csv
 import io
+import logging
+import tempfile
+import mimetypes
 from werkzeug.utils import secure_filename
 
 @app.route('/quiz/create', methods=['GET', 'POST'])
@@ -3738,21 +3741,66 @@ def create_quiz():
             if file and file.filename:
                 filename = secure_filename(file.filename)
                 
-                # Parse file and create questions
+                # Save file temporarily for parsing
+                temp_file_path = None
                 try:
-                    questions_data = parse_quiz_file(file)
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp_file:
+                        file.save(temp_file.name)
+                        temp_file_path = temp_file.name
+                    
+                    # Get MIME type
+                    mime_type, _ = mimetypes.guess_type(filename)
+                    if not mime_type:
+                        # Fallback based on file extension
+                        ext = os.path.splitext(filename)[1].lower()
+                        mime_type_map = {
+                            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            '.xls': 'application/vnd.ms-excel',  
+                            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            '.pdf': 'application/pdf',
+                            '.csv': 'text/csv',
+                            '.txt': 'text/plain'
+                        }
+                        mime_type = mime_type_map.get(ext, 'text/plain')
+                    
+                    # Use comprehensive file parsing
+                    candidate_questions = parse_file_for_questions(temp_file_path, mime_type)
+                    
+                    if not candidate_questions:
+                        flash('No questions found in the uploaded file. Please check the format and try again.', 'warning')
+                        return render_template('create_quiz.html', form=form)
+                    
                     db.session.add(quiz)
                     db.session.commit()
                     
-                    # Create questions from parsed data
-                    for q_data in questions_data:
-                        create_question_from_data(quiz, q_data)
+                    # Create questions from parsed data with better error handling
+                    created_count = 0
+                    for q_data in candidate_questions:
+                        try:
+                            create_question_from_comprehensive_data(quiz, q_data)
+                            created_count += 1
+                        except Exception as e:
+                            logging.warning(f"Failed to create question: {e}")
+                            continue
                     
-                    flash(f'Quiz created successfully from file "{filename}"! {len(questions_data)} questions added.', 'success')
-                    return redirect(url_for('edit_quiz', quiz_id=quiz.id))
+                    if created_count > 0:
+                        flash(f'Quiz created successfully from file "{filename}"! {created_count} questions added.', 'success')
+                        return redirect(url_for('edit_quiz', quiz_id=quiz.id))
+                    else:
+                        flash('No valid questions could be created from the uploaded file.', 'error')
+                        return render_template('create_quiz.html', form=form)
+                        
                 except Exception as e:
                     flash(f'Error parsing file: {str(e)}', 'error')
                     return render_template('create_quiz.html', form=form)
+                    
+                finally:
+                    # Always clean up temporary file
+                    if temp_file_path and os.path.exists(temp_file_path):
+                        try:
+                            os.unlink(temp_file_path)
+                        except Exception as e:
+                            logging.warning(f"Failed to clean up temp file {temp_file_path}: {e}")
         
         db.session.add(quiz)
         db.session.commit()
@@ -3820,8 +3868,49 @@ def parse_quiz_file(file):
     
     return questions_data
 
+def create_question_from_comprehensive_data(quiz, question_data):
+    """Create a question and its options from comprehensive parsed data"""
+    # Handle different data formats from comprehensive parser
+    question_text = question_data.get('question', question_data.get('question_text', ''))
+    question_type = question_data.get('type', 'multiple_choice')
+    
+    if not question_text:
+        raise ValueError("Question text is required")
+    
+    question = Question(
+        quiz_id=quiz.id,
+        question_text=question_text,
+        question_type=question_type,
+        points=question_data.get('points', 1),
+        order=len(quiz.questions)
+    )
+    
+    db.session.add(question)
+    db.session.commit()
+    
+    # Create options for multiple choice questions
+    if question_type == 'multiple_choice':
+        options = question_data.get('options', [])
+        correct_index = question_data.get('correct_option_index', 0)
+        
+        if len(options) < 2:
+            raise ValueError("Multiple choice questions need at least 2 options")
+        
+        for i, option_text in enumerate(options):
+            if option_text:  # Only add non-empty options
+                option = QuestionOption(
+                    question_id=question.id,
+                    option_text=option_text,
+                    is_correct=(i == correct_index),
+                    option_order=i
+                )
+                db.session.add(option)
+    
+    db.session.commit()
+    return question
+
 def create_question_from_data(quiz, question_data):
-    """Create a question and its options from parsed data"""
+    """Create a question and its options from parsed data (legacy format)"""
     question = Question(
         quiz_id=quiz.id,
         question_text=question_data['question_text'],
