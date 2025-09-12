@@ -304,6 +304,25 @@ class QuizCreationManager {
         });
     }
 
+    toggleAutoSave(enabled) {
+        this.autoSaveEnabled = enabled;
+        
+        if (enabled) {
+            // Start auto-save if it was disabled
+            if (!this.autoSaveInterval) {
+                this.startAutoSave();
+            }
+            this.showToast('Auto-save enabled', 'success');
+        } else {
+            // Stop auto-save interval
+            if (this.autoSaveInterval) {
+                clearInterval(this.autoSaveInterval);
+                this.autoSaveInterval = null;
+            }
+            this.showToast('Auto-save disabled', 'warning');
+        }
+    }
+
     markDirty() {
         this.isDirty = true;
         const lastSaved = document.getElementById('lastSaved');
