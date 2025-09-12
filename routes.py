@@ -18,6 +18,7 @@ import PyPDF2
 import docx
 from io import BytesIO
 from sqlalchemy import func, text
+from sqlalchemy.orm import joinedload, selectinload
 from utils import get_time_greeting, get_greeting_icon
 
 # Add email health check endpoint
@@ -358,6 +359,146 @@ def host_dashboard():
                          greeting=get_time_greeting(),
                          greeting_icon=get_greeting_icon())
 
+@app.route('/host/total-quizzes')
+@login_required
+def host_total_quizzes():
+    """Show all quizzes created by the host"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all quizzes created by this host with eager loading
+    quizzes = Quiz.query.filter_by(creator_id=current_user.id).options(
+        joinedload(Quiz.questions),
+        joinedload(Quiz.attempts)
+    ).order_by(Quiz.created_at.desc()).all()
+    
+    # Calculate statistics
+    total_questions = sum(len(quiz.questions) for quiz in quizzes)
+    total_attempts = sum(len(quiz.attempts) for quiz in quizzes)
+    
+    return render_template('host_total_quizzes.html',
+                         quizzes=quizzes,
+                         total_questions=total_questions,
+                         total_attempts=total_attempts,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
+@app.route('/host/active-quizzes')
+@login_required
+def host_active_quizzes():
+    """Show active quizzes created by the host"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get active quizzes created by this host with eager loading
+    active_quizzes = Quiz.query.filter_by(
+        creator_id=current_user.id, 
+        is_active=True
+    ).options(
+        joinedload(Quiz.questions),
+        joinedload(Quiz.attempts)
+    ).order_by(Quiz.created_at.desc()).all()
+    
+    # Calculate statistics for active quizzes
+    total_active_attempts = sum(len(quiz.attempts) for quiz in active_quizzes)
+    in_progress_attempts = sum(len([a for a in quiz.attempts if a.status == 'in_progress']) for quiz in active_quizzes)
+    
+    return render_template('host_active_quizzes.html',
+                         active_quizzes=active_quizzes,
+                         total_active_attempts=total_active_attempts,
+                         in_progress_attempts=in_progress_attempts,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
+@app.route('/host/recent-attempts')
+@login_required
+def host_recent_attempts():
+    """Show recent quiz attempts for host's quizzes"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get recent attempts for host's quizzes with eager loading
+    quiz_ids = [quiz.id for quiz in Quiz.query.filter_by(creator_id=current_user.id).all()]
+    
+    if quiz_ids:
+        recent_attempts = QuizAttempt.query.filter(
+            QuizAttempt.quiz_id.in_(quiz_ids)
+        ).options(
+            joinedload(QuizAttempt.quiz),
+            joinedload(QuizAttempt.participant),
+            joinedload(QuizAttempt.answers)
+        ).order_by(QuizAttempt.started_at.desc()).limit(50).all()
+    else:
+        recent_attempts = []
+    
+    # Calculate statistics
+    attempts_today = sum(1 for attempt in recent_attempts 
+                        if attempt.started_at.date() == datetime.utcnow().date())
+    unique_participants = len(set(attempt.participant_id for attempt in recent_attempts))
+    
+    return render_template('host_recent_attempts.html',
+                         recent_attempts=recent_attempts,
+                         attempts_today=attempts_today,
+                         unique_participants=unique_participants,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
+@app.route('/host/completed-attempts')
+@login_required
+def host_completed_attempts():
+    """Show completed quiz attempts for host's quizzes"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied. Host privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get completed attempts for host's quizzes with eager loading
+    quiz_ids = [quiz.id for quiz in Quiz.query.filter_by(creator_id=current_user.id).all()]
+    
+    if quiz_ids:
+        completed_attempts = QuizAttempt.query.filter(
+            QuizAttempt.quiz_id.in_(quiz_ids),
+            QuizAttempt.status == 'completed'
+        ).options(
+            joinedload(QuizAttempt.quiz),
+            joinedload(QuizAttempt.participant),
+            joinedload(QuizAttempt.answers)
+        ).order_by(QuizAttempt.completed_at.desc()).all()
+    else:
+        completed_attempts = []
+    
+    # Calculate statistics
+    if completed_attempts:
+        scores = [attempt.score for attempt in completed_attempts if attempt.score is not None]
+        avg_score = sum(scores) / len(scores) if scores else 0
+        highest_score = max(scores) if scores else 0
+        lowest_score = min(scores) if scores else 0
+        
+        # Performance breakdown
+        excellent_count = len([s for s in scores if s >= 80])
+        good_count = len([s for s in scores if 60 <= s < 80])
+        needs_improvement_count = len([s for s in scores if s < 60])
+    else:
+        avg_score = highest_score = lowest_score = 0
+        excellent_count = good_count = needs_improvement_count = 0
+    
+    performance_breakdown = {
+        'excellent': excellent_count,
+        'good': good_count,
+        'needs_improvement': needs_improvement_count
+    }
+    
+    return render_template('host_completed_attempts.html',
+                         completed_attempts=completed_attempts,
+                         avg_score=round(avg_score, 1),
+                         highest_score=highest_score,
+                         lowest_score=lowest_score,
+                         performance_breakdown=performance_breakdown,
+                         greeting=get_time_greeting(),
+                         greeting_icon=get_greeting_icon())
+
 @app.route('/host/monitoring')
 @login_required  
 def host_monitoring():
@@ -475,8 +616,8 @@ def participant_completed():
         participant_id=current_user.id, 
         status='completed'
     ).options(
-        db.joinedload(QuizAttempt.quiz).joinedload(Quiz.questions),
-        db.joinedload(QuizAttempt.answers)
+        joinedload(QuizAttempt.quiz).joinedload(Quiz.questions),
+        joinedload(QuizAttempt.answers)
     ).order_by(QuizAttempt.completed_at.desc()).all()
     
     # Calculate total questions answered
@@ -503,8 +644,8 @@ def participant_in_progress():
         participant_id=current_user.id, 
         status='in_progress'
     ).options(
-        db.joinedload(QuizAttempt.quiz).joinedload(Quiz.questions),
-        db.joinedload(QuizAttempt.answers)
+        joinedload(QuizAttempt.quiz).joinedload(Quiz.questions),
+        joinedload(QuizAttempt.answers)
     ).order_by(QuizAttempt.started_at.desc()).all()
     
     # Calculate time remaining for each attempt
@@ -536,8 +677,8 @@ def participant_average_score():
         participant_id=current_user.id, 
         status='completed'
     ).filter(QuizAttempt.score.is_not(None)).options(
-        db.joinedload(QuizAttempt.quiz),
-        db.joinedload(QuizAttempt.answers)
+        joinedload(QuizAttempt.quiz),
+        joinedload(QuizAttempt.answers)
     ).order_by(QuizAttempt.completed_at.desc()).all()
     
     # Calculate score statistics
@@ -583,7 +724,7 @@ def participant_violations():
     violations = ProctoringEvent.query.join(QuizAttempt).filter(
         QuizAttempt.participant_id == current_user.id
     ).options(
-        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz)
+        joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz)
     ).order_by(ProctoringEvent.timestamp.desc()).all()
     
     # Group violations by quiz attempt and count by severity
@@ -2165,7 +2306,7 @@ def host_login_activity():
     
     # Get recent login events for participants with proper eager loading
     login_events = LoginEvent.query.options(
-        db.joinedload(LoginEvent.user)
+        joinedload(LoginEvent.user)
     ).join(User).filter(
         User.role == 'participant'
     ).order_by(LoginEvent.login_time.desc()).limit(50).all()

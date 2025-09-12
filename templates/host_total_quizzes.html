@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Total Quizzes - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="fas fa-clipboard-list text-primary"></i> {{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!
+    </h1>
+    <div>
+        <a href="{{ url_for('host_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        <a href="{{ url_for('create_quiz') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create New Quiz
+        </a>
+    </div>
+</div>
+
+<!-- Statistics Overview -->
+<div class="row mb-4">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ quizzes|length }}</h3>
+                <small>Total Quizzes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ quizzes|selectattr('is_active')|list|length }}</h3>
+                <small>Active</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ total_questions }}</h3>
+                <small>Total Questions</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ total_attempts }}</h3>
+                <small>Total Attempts</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quizzes List -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Your Quizzes</h5>
+    </div>
+    <div class="card-body">
+        {% if quizzes %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Quiz Title</th>
+                            <th>Questions</th>
+                            <th>Time Limit</th>
+                            <th>Status</th>
+                            <th>Attempts</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for quiz in quizzes %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ quiz.title }}</div>
+                                {% if quiz.description %}
+                                    <small class="text-muted">{{ quiz.description[:60] }}...</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ quiz.questions|length }}</span>
+                            </td>
+                            <td>{{ quiz.time_limit }} min</td>
+                            <td>
+                                {% if quiz.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                                {% if quiz.proctoring_enabled %}
+                                    <span class="badge bg-info ms-1">Proctored</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ quiz.attempts|length }}</span>
+                                {% if quiz.attempts %}
+                                    <div class="small text-muted">
+                                        {{ quiz.attempts|selectattr('status', 'equalto', 'completed')|list|length }} completed
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ quiz.created_at.strftime('%Y-%m-%d') }}
+                                <div class="small text-muted">{{ quiz.created_at.strftime('%H:%M') }}</div>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-primary" title="Edit Quiz">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{{ url_for('view_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-info" title="View Quiz">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if quiz.attempts %}
+                                        <a href="{{ url_for('quiz_results', quiz_id=quiz.id) }}" class="btn btn-outline-success" title="View Results">
+                                            <i class="fas fa-chart-bar"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h5>No Quizzes Created Yet</h5>
+                <p class="text-muted">Create your first quiz to start managing assessments.</p>
+                <a href="{{ url_for('create_quiz') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Your First Quiz
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

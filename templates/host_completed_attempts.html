@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Completed Attempts - BigBossizzz{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="fas fa-check-circle text-warning"></i> {{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!
+    </h1>
+    <div>
+        <a href="{{ url_for('host_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        <a href="{{ url_for('create_quiz') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create New Quiz
+        </a>
+    </div>
+</div>
+
+<!-- Performance Overview -->
+<div class="row mb-4">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ completed_attempts|length }}</h3>
+                <small>Completed Attempts</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ avg_score }}%</h3>
+                <small>Average Score</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ highest_score }}%</h3>
+                <small>Highest Score</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-1">{{ lowest_score }}%</h3>
+                <small>Lowest Score</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Breakdown -->
+{% if completed_attempts %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Performance Breakdown</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-success"><i class="fas fa-star me-1"></i>Excellent (80%+)</span>
+                            <span class="fw-bold text-success">{{ performance_breakdown.excellent }}</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" style="width: {{ (performance_breakdown.excellent / completed_attempts|length * 100) if completed_attempts else 0 }}%"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-warning"><i class="fas fa-thumbs-up me-1"></i>Good (60-79%)</span>
+                            <span class="fw-bold text-warning">{{ performance_breakdown.good }}</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-warning" style="width: {{ (performance_breakdown.good / completed_attempts|length * 100) if completed_attempts else 0 }}%"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-danger"><i class="fas fa-arrow-up me-1"></i>Needs Improvement (<60%)</span>
+                            <span class="fw-bold text-danger">{{ performance_breakdown.needs_improvement }}</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-danger" style="width: {{ (performance_breakdown.needs_improvement / completed_attempts|length * 100) if completed_attempts else 0 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Completed Attempts List -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Completed Quiz Attempts</h5>
+    </div>
+    <div class="card-body">
+        {% if completed_attempts %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Participant</th>
+                            <th>Quiz</th>
+                            <th>Score</th>
+                            <th>Performance</th>
+                            <th>Completed</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for attempt in completed_attempts %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-user-circle fa-lg text-muted me-2"></i>
+                                    <div>
+                                        <div class="fw-bold">{{ attempt.participant.username }}</div>
+                                        <small class="text-muted">{{ attempt.participant.email }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="fw-bold">{{ attempt.quiz.title }}</div>
+                                <small class="text-muted">{{ attempt.quiz.questions|length }} questions</small>
+                            </td>
+                            <td>
+                                {% if attempt.score is not none %}
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge fs-6 {% if attempt.score >= 80 %}bg-success{% elif attempt.score >= 60 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ attempt.score|round(1) }}%
+                                        </span>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Not scored</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if attempt.score is not none %}
+                                    {% if attempt.score >= 80 %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-star me-1"></i>Excellent
+                                        </span>
+                                    {% elif attempt.score >= 60 %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-thumbs-up me-1"></i>Good
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-arrow-up me-1"></i>Needs Improvement
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ attempt.completed_at.strftime('%Y-%m-%d') }}
+                                <div class="small text-muted">{{ attempt.completed_at.strftime('%H:%M') }}</div>
+                            </td>
+                            <td>
+                                {% if attempt.completed_at %}
+                                    {% set duration = (attempt.completed_at - attempt.started_at).total_seconds() / 60 %}
+                                    {{ duration|round(0)|int }} min
+                                    {% if duration > attempt.quiz.time_limit %}
+                                        <small class="text-danger">(Overtime)</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('view_attempt_details', attempt_id=attempt.id) }}" class="btn btn-outline-info" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('download_host_report', attempt_id=attempt.id) }}" class="btn btn-outline-success" title="Download Report">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <a href="{{ url_for('view_participant_violations', participant_id=attempt.participant_id) }}" class="btn btn-outline-danger" title="View Violations">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-check-circle fa-3x text-muted mb-3"></i>
+                <h5>No Completed Attempts</h5>
+                <p class="text-muted">No participants have completed your quizzes yet.</p>
+                <div>
+                    <a href="{{ url_for('host_participants') }}" class="btn btn-primary me-2">
+                        <i class="fas fa-users"></i> Manage Participants
+                    </a>
+                    <a href="{{ url_for('host_active_quizzes') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-play-circle"></i> View Active Quizzes
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
