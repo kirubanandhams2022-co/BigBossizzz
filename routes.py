@@ -2034,6 +2034,75 @@ def admin_bulk_create_users():
     
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/generate-dsa-class-users')
+@login_required
+def generate_dsa_class_users():
+    """Generate 60 students and 1 teacher for DSA class"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    import random
+    import string
+    
+    created_count = 0
+    errors = []
+    
+    try:
+        # Create 1 teacher first
+        teacher_username = "dsa_teacher"
+        teacher_email = "dsa_teacher@bigbossizzz.com"
+        teacher_password = "DSATeacher2025!"
+        
+        if not User.query.filter_by(username=teacher_username).first() and not User.query.filter_by(email=teacher_email).first():
+            teacher = User()
+            teacher.username = teacher_username
+            teacher.email = teacher_email
+            teacher.role = 'host'  # Teacher as host
+            teacher.set_password(teacher_password)
+            teacher.is_verified = True
+            
+            db.session.add(teacher)
+            created_count += 1
+        else:
+            errors.append("DSA Teacher already exists")
+        
+        # Generate 60 students
+        for i in range(1, 61):
+            student_username = f"student{i}"
+            student_email = f"student{i}@bigbossizzz.com"
+            student_password = f"Student{i}@DSA"
+            
+            # Check if user already exists
+            if User.query.filter_by(username=student_username).first() or User.query.filter_by(email=student_email).first():
+                errors.append(f"Student {i} already exists")
+                continue
+            
+            # Create student
+            student = User()
+            student.username = student_username
+            student.email = student_email
+            student.role = 'participant'
+            student.set_password(student_password)
+            student.is_verified = True
+            
+            db.session.add(student)
+            created_count += 1
+        
+        # Commit all users
+        db.session.commit()
+        
+        if created_count > 0:
+            flash(f'Successfully created {created_count} users for DSA class (1 teacher + {created_count-1} students).', 'success')
+        if errors:
+            flash(f'Some users already exist: {len(errors)} skipped. Check existing users.', 'warning')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating DSA class users: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users'))
+
 @app.route('/admin/upload-users-excel', methods=['POST'])
 @login_required
 def admin_upload_users_excel():
