@@ -267,7 +267,7 @@ def send_login_notification(user, login_event=None):
     try:
         subject = f'🔔 Academic Login Alert - {user.username}'
         
-        login_time = login_event.timestamp if login_event else datetime.now()
+        login_time = login_event.login_time if login_event else datetime.now()
         
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 500px;">

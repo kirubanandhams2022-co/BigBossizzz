@@ -282,6 +282,11 @@ class QuizAttempt(db.Model):
     termination_reason = db.Column(db.Text)
     is_flagged = db.Column(db.Boolean, default=False)
     
+    # Highest risk violation summary fields for performance optimization
+    highest_risk_level = db.Column(db.String(20), default='low')  # 'low', 'medium', 'high', 'critical'
+    highest_risk_severity = db.Column(db.Integer, default=1)  # 1=low, 2=medium, 3=high, 4=critical
+    violation_counts_json = db.Column(db.Text)  # JSON: {"low": 2, "medium": 1, "high": 0, "critical": 0}
+    
     # Relationships (participant and quiz backrefs are defined in User and Quiz models)
     answers = db.relationship('Answer', backref='attempt', lazy=True, cascade='all, delete-orphan')
     
@@ -303,6 +308,36 @@ class QuizAttempt(db.Model):
         self.score = (correct_answers / total_points * 100) if total_points > 0 else 0
         self.total_points = total_points
         return self.score
+    
+    def update_highest_risk(self, new_severity_level):
+        """Update highest risk summary when a new violation is added"""
+        import json
+        
+        # Severity mapping: critical > high > medium > low
+        severity_map = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+        new_severity_score = severity_map.get(new_severity_level, 1)
+        
+        # Update highest risk if new violation is more severe
+        if new_severity_score > self.highest_risk_severity:
+            self.highest_risk_level = new_severity_level
+            self.highest_risk_severity = new_severity_score
+        
+        # Update violation counts
+        try:
+            counts = json.loads(self.violation_counts_json) if self.violation_counts_json else {}
+        except (json.JSONDecodeError, TypeError):
+            counts = {}
+        
+        # Initialize counts if missing
+        for level in ['low', 'medium', 'high', 'critical']:
+            if level not in counts:
+                counts[level] = 0
+        
+        # Increment count for this severity level
+        counts[new_severity_level] = counts.get(new_severity_level, 0) + 1
+        
+        # Save updated counts
+        self.violation_counts_json = json.dumps(counts)
     
     def __repr__(self):
         return f'<Attempt {self.id}>'
