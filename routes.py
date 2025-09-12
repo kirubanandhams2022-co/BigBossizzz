@@ -38,6 +38,18 @@ try:
 except ImportError:
     plagiarism_detector = None  # Fallback if plagiarism detection not available
 
+# Import RBAC system
+try:
+    from rbac_service import RBACService, initialize_rbac_system
+    from rbac_decorators import require_permission, require_role, admin_required, permission_context_processor
+except ImportError:
+    RBACService = None
+    initialize_rbac_system = None
+    require_permission = lambda perm: lambda f: f  # Fallback decorator
+    require_role = lambda role: lambda f: f
+    admin_required = lambda f: f
+    permission_context_processor = lambda: {}
+
 # Add email health check endpoint
 @app.route('/admin/email-health')
 def admin_email_health():
@@ -5795,6 +5807,360 @@ def api_reorder_quizzes():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Error updating quiz order: {str(e)}'}), 500
+
+# RBAC Admin Routes - Role and Permission Management
+
+@app.route('/admin/rbac')
+@login_required
+def admin_rbac_dashboard():
+    """RBAC management dashboard"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    roles = Role.query.order_by(Role.created_at.desc()).all()
+    permissions = Permission.query.order_by(Permission.category, Permission.name).all()
+    
+    # Group permissions by category
+    permissions_by_category = {}
+    for permission in permissions:
+        category = permission.category
+        if category not in permissions_by_category:
+            permissions_by_category[category] = []
+        permissions_by_category[category].append(permission)
+    
+    # Get recent audit logs
+    recent_logs = RoleAuditLog.query.order_by(RoleAuditLog.created_at.desc()).limit(10).all()
+    
+    # Statistics
+    stats = {
+        'total_roles': len(roles),
+        'total_permissions': len(permissions),
+        'active_roles': len([r for r in roles if r.is_active]),
+        'system_roles': len([r for r in roles if r.is_system_role]),
+        'total_users_with_roles': UserRole.query.filter_by(is_active=True).count()
+    }
+    
+    return render_template('admin_rbac_dashboard.html',
+                         roles=roles,
+                         permissions_by_category=permissions_by_category,
+                         recent_logs=recent_logs,
+                         stats=stats)
+
+@app.route('/admin/rbac/roles')
+@login_required
+def admin_rbac_roles():
+    """Role management interface"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    roles = Role.query.order_by(Role.created_at.desc()).all()
+    permissions = Permission.query.order_by(Permission.category, Permission.name).all()
+    
+    # Add user count and permission details to each role
+    for role in roles:
+        role.active_users = UserRole.query.filter_by(role_id=role.id, is_active=True).count()
+        role.permission_details = [rp.permission for rp in role.role_permissions]
+    
+    return render_template('admin_rbac_roles.html', roles=roles, permissions=permissions)
+
+@app.route('/admin/rbac/permissions')
+@login_required
+def admin_rbac_permissions():
+    """Permission management interface"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    permissions = Permission.query.order_by(Permission.category, Permission.name).all()
+    
+    # Group by category
+    permissions_by_category = {}
+    for permission in permissions:
+        category = permission.category
+        if category not in permissions_by_category:
+            permissions_by_category[category] = []
+        permissions_by_category[category].append(permission)
+    
+    return render_template('admin_rbac_permissions.html', 
+                         permissions_by_category=permissions_by_category)
+
+@app.route('/admin/rbac/user-assignments')
+@login_required
+def admin_rbac_user_assignments():
+    """User role assignment interface"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    users = User.query.order_by(User.username).all()
+    roles = Role.query.filter_by(is_active=True).order_by(Role.name).all()
+    
+    # Get current assignments
+    assignments = UserRole.query.filter_by(is_active=True).all()
+    user_assignments = {}
+    for assignment in assignments:
+        if assignment.user_id not in user_assignments:
+            user_assignments[assignment.user_id] = []
+        user_assignments[assignment.user_id].append(assignment)
+    
+    return render_template('admin_rbac_user_assignments.html',
+                         users=users,
+                         roles=roles,
+                         user_assignments=user_assignments)
+
+@app.route('/admin/rbac/audit-logs')
+@login_required
+def admin_rbac_audit_logs():
+    """RBAC audit log viewer"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    entity_type = request.args.get('entity_type', '')
+    action = request.args.get('action', '')
+    
+    query = RoleAuditLog.query
+    
+    if entity_type:
+        query = query.filter_by(entity_type=entity_type)
+    if action:
+        query = query.filter_by(action=action)
+    
+    logs = query.order_by(RoleAuditLog.created_at.desc()).paginate(
+        page=page, per_page=50, error_out=False
+    )
+    
+    return render_template('admin_rbac_audit_logs.html', logs=logs, 
+                         entity_type=entity_type, action=action)
+
+# RBAC API Endpoints
+
+@app.route('/api/rbac/role', methods=['POST'])
+@login_required
+def api_create_role():
+    """Create a new role"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        role = RBACService.create_role(
+            name=data['name'],
+            display_name=data['display_name'],
+            description=data.get('description', ''),
+            permission_names=data.get('permissions', []),
+            created_by_user_id=current_user.id
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Role "{role.display_name}" created successfully',
+            'role_id': role.id
+        })
+    
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to create role'}), 500
+
+@app.route('/api/rbac/role/<int:role_id>', methods=['PUT'])
+@login_required
+def api_update_role(role_id):
+    """Update an existing role"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        data['updated_by'] = current_user.id
+        
+        role = RBACService.update_role(role_id, **data)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Role "{role.display_name}" updated successfully'
+        })
+    
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to update role'}), 500
+
+@app.route('/api/rbac/role/<int:role_id>', methods=['DELETE'])
+@login_required
+def api_delete_role(role_id):
+    """Delete a role"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        RBACService.delete_role(role_id, current_user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Role deleted successfully'
+        })
+    
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to delete role'}), 500
+
+@app.route('/api/rbac/assign-role', methods=['POST'])
+@login_required
+def api_assign_role():
+    """Assign role to user"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        expires_at = None
+        if data.get('expires_at'):
+            expires_at = datetime.fromisoformat(data['expires_at'])
+        
+        user_role = RBACService.assign_role_to_user(
+            user_id=data['user_id'],
+            role_name=data['role_name'],
+            assigned_by_user_id=current_user.id,
+            expires_at=expires_at
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Role assigned successfully'
+        })
+    
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to assign role'}), 500
+
+@app.route('/api/rbac/revoke-role', methods=['POST'])
+@login_required
+def api_revoke_role():
+    """Revoke role from user"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        RBACService.revoke_role_from_user(
+            user_id=data['user_id'],
+            role_name=data['role_name'],
+            revoked_by_user_id=current_user.id
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Role revoked successfully'
+        })
+    
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to revoke role'}), 500
+
+@app.route('/api/rbac/role/<int:role_id>/permissions', methods=['PUT'])
+@login_required
+def api_update_role_permissions(role_id):
+    """Update role permissions"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        role = Role.query.get_or_404(role_id)
+        
+        # Clear existing permissions
+        RolePermission.query.filter_by(role_id=role_id).delete()
+        
+        # Add new permissions
+        for perm_name in data['permissions']:
+            permission = Permission.query.filter_by(name=perm_name).first()
+            if permission:
+                role_permission = RolePermission(
+                    role_id=role_id,
+                    permission_id=permission.id,
+                    granted_by=current_user.id
+                )
+                db.session.add(role_permission)
+        
+        # Create audit log
+        RBACService._create_audit_log(
+            action='update_permissions',
+            entity_type='role',
+            entity_id=role_id,
+            performed_by=current_user.id,
+            new_values=json.dumps({'permissions': data['permissions']})
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Permissions updated for role "{role.display_name}"'
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Failed to update permissions'}), 500
+
+@app.route('/api/rbac/bulk-assign', methods=['POST'])
+@login_required
+def api_bulk_assign_roles():
+    """Bulk assign roles to multiple users"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        results = RBACService.bulk_assign_roles(
+            user_ids=data['user_ids'],
+            role_names=data['role_names'],
+            assigned_by_user_id=current_user.id
+        )
+        
+        successful = len([r for r in results if r['success']])
+        total = len(results)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Bulk assignment completed: {successful}/{total} successful',
+            'results': results
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to perform bulk assignment'}), 500
+
+@app.route('/api/rbac/initialize', methods=['POST'])
+@login_required
+def api_initialize_rbac():
+    """Initialize RBAC system with default roles and permissions"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        if initialize_rbac_system:
+            result = initialize_rbac_system()
+            return jsonify({
+                'success': True,
+                'message': 'RBAC system initialized successfully',
+                'permissions_created': result['permissions_created'],
+                'roles_created': result['roles_created']
+            })
+        else:
+            return jsonify({'success': False, 'error': 'RBAC system not available'}), 500
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Failed to initialize RBAC system'}), 500
 
 # Error handlers
 @app.errorhandler(404)
