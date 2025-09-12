@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch, Role, Permission, UserRole, RolePermission, RoleAuditLog
 from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
                             get_lti_provider, get_lti_grade_passback)
 from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
