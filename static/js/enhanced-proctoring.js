@@ -88,7 +88,7 @@ class EnhancedProctoringSystem {
     
     preventCheating() {
         // Enhanced cheating prevention setup
-        console.log('? Setting up enhanced cheating prevention');
+        console.log('[INFO] Setting up enhanced cheating prevention');
         
         // Activate strong security enforcement
         this.activateStrongEnforcement();
@@ -142,7 +142,7 @@ class EnhancedProctoringSystem {
                     const isLinear = this.checkLinearMovement(mouseEvents.slice(-10));
                     if (isLinear) {
                         // Just log, don't record violation
-                        console.log('?? Unusual mouse pattern detected (logged only)');
+                        console.log('[DEBUG] Unusual mouse pattern detected (logged only)');
                     }
                 }
             }
@@ -225,7 +225,7 @@ class EnhancedProctoringSystem {
     }
     
     async init() {
-        console.log('? Initializing Enhanced Proctoring System');
+        console.log('[INFO] Initializing Enhanced Proctoring System');
         await this.checkSystemRequirements();
         this.setupEventListeners();
         this.preventCheating();
@@ -288,7 +288,7 @@ class EnhancedProctoringSystem {
         if (this.isActive) return;
         
         try {
-            console.log('? Starting live camera monitoring (no storage)');
+            console.log('[INFO] Starting live camera monitoring (no storage)');
             
             // Get camera stream only
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -383,7 +383,7 @@ class EnhancedProctoringSystem {
     }
     
     startRealTimeAnalysis() {
-        console.log('? Starting real-time behavioral analysis');
+        console.log('[INFO] Starting real-time behavioral analysis');
         
         // Real-time face detection (NO STORAGE) - Less frequent
         this.faceDetectionInterval = setInterval(() => {
@@ -737,7 +737,7 @@ class EnhancedProctoringSystem {
     }
     
     activateDoNotDisturbMode() {
-        console.log('? Activating Do Not Disturb Mode');
+        console.log('[INFO] Activating Do Not Disturb Mode');
         
         // Hide all other UI elements
         const elementsToHide = ['nav', 'header', 'footer', '.sidebar', '.notification'];
@@ -840,7 +840,7 @@ class EnhancedProctoringSystem {
                 this.showNotification(`?? ${violation.description}`, 'warning');
                 break;
             case 'low':
-                console.log(`?? ${violation.description}`);
+                console.log(`[DEBUG] ${violation.description}`);
                 break;
         }
     }
@@ -887,7 +887,7 @@ class EnhancedProctoringSystem {
         if (this.isTerminated) return;
         
         this.isTerminated = true;
-        console.error('? QUIZ TERMINATED DUE TO VIOLATIONS');
+        console.error('[ERROR] QUIZ TERMINATED DUE TO VIOLATIONS');
         
         // Stop all monitoring
         this.stopMonitoring();
@@ -992,7 +992,7 @@ class EnhancedProctoringSystem {
     }
     
     stopMonitoring() {
-        console.log('? Stopping all monitoring systems');
+        console.log('[INFO] Stopping all monitoring systems');
         this.isActive = false;
         
         // Deactivate strong enforcement
@@ -1011,7 +1011,7 @@ class EnhancedProctoringSystem {
             this.mediaStream.getTracks().forEach(track => {
                 try {
                     track.stop();
-                    console.log(`? Stopped ${track.kind} track`);
+                    console.log(`[INFO] Stopped ${track.kind} track`);
                 } catch (error) {
                     console.warn(`Failed to stop ${track.kind} track:`, error);
                 }

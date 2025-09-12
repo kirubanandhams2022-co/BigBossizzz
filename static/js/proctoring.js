@@ -1243,14 +1243,14 @@ class ProctoringManager {
         let message = 'Proctoring Alert: ';
         switch (violation.severity) {
             case 'high':
-                message = '?? Security Violation: ';
+                message = '[CRITICAL] Security Violation: ';
                 warningDiv.className = warningDiv.className.replace('alert-warning', 'alert-danger');
                 break;
             case 'medium':
-                message = '? Proctoring Warning: ';
+                message = '[WARNING] Proctoring Warning: ';
                 break;
             case 'low':
-                message = '?? Proctoring Notice: ';
+                message = '[INFO] Proctoring Notice: ';
                 warningDiv.className = warningDiv.className.replace('alert-warning', 'alert-info');
                 break;
         }
@@ -1376,14 +1376,14 @@ class ProctoringManager {
             <div style="text-align: center; max-width: 600px; padding: 40px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 80px; margin-bottom: 20px; color: #fff;"></i>
                 <h1 style="font-size: 2.5rem; margin-bottom: 20px; color: #fff;">QUIZ TERMINATED</h1>
-                <h3 style="margin-bottom: 30px; color: #fff;">? SECURITY VIOLATION DETECTED ?</h3>
+                <h3 style="margin-bottom: 30px; color: #fff;">[CRITICAL] SECURITY VIOLATION DETECTED</h3>
                 <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin-bottom: 30px;">
                     <p style="font-size: 1.2rem; margin-bottom: 10px; color: #fff;"><strong>Violation Type:</strong> ${violation.type.replace('_', ' ').toUpperCase()}</p>
                     <p style="font-size: 1.1rem; margin-bottom: 10px; color: #fff;"><strong>Description:</strong> ${violation.description}</p>
                     <p style="font-size: 1rem; color: #fff;"><strong>Total Violations:</strong> ${this.violationCount}</p>
                 </div>
                 <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <p style="margin: 0; font-size: 1rem; color: #fff;">?? Your exam session has been flagged for review</p>
+                    <p style="margin: 0; font-size: 1rem; color: #fff;">[WARNING] Your exam session has been flagged for review</p>
                     <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #fff;">Contact your administrator for retake permissions</p>
                 </div>
                 <p style="font-size: 1rem; margin-bottom: 0; color: #fff;">Redirecting to dashboard in <span id="countdown">10</span> seconds...</p>
@@ -1411,7 +1411,7 @@ class ProctoringManager {
     
     updateSecurityStatus() {
         let status = 'secure';
-        let message = `? Secure - ${this.violationCount} violations detected`;
+        let message = `[INFO] Secure - ${this.violationCount} violations detected`;
         
         if (this.violationCount >= 1) {
             status = 'warning';
