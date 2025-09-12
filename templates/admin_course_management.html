@@ -74,7 +74,12 @@
         </div>
         <div class="card-body">
             {% if courses %}
+                <div class="alert alert-info d-flex align-items-center mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Drag courses by their handle <i class="fas fa-grip-vertical"></i> to reorder them</span>
+                </div>
                 <div class="table-responsive">
+                    <div class="courses-container" data-course-id="">
                     <table class="table table-hover">
                         <thead>
                             <tr>
@@ -91,9 +96,14 @@
                         <tbody>
                             {% for course in courses %}
                                 {% set stats = course_stats[course.id] %}
-                                <tr>
+                                <tr class="course-item" draggable="true" data-item-id="{{ course.id }}">
                                     <td>
-                                        <span class="badge bg-primary">{{ course.code }}</span>
+                                        <div class="d-flex align-items-center">
+                                            <div class="drag-handle me-2" title="Drag to reorder">
+                                                <i class="fas fa-grip-vertical"></i>
+                                            </div>
+                                            <span class="badge bg-primary">{{ course.code }}</span>
+                                        </div>
                                     </td>
                                     <td>
                                         <strong>{{ course.name }}</strong>
@@ -143,6 +153,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             {% else %}
                 <div class="text-center py-4">
@@ -323,7 +334,8 @@
 
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
 <script>
 // Auto-uppercase course codes
 document.getElementById('courseCode').addEventListener('input', function() {
