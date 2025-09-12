@@ -177,7 +177,7 @@
                                     </td>
                                     <td>
                                         <div style="max-width: 250px;">
-                                            <small>{{ event.description[:80] + '...' if event.description|length > 80 else event.description }}</small>
+                                            <small>{{ (event.description[:80] + '...') if event.description and event.description|length > 80 else (event.description or 'No description') }}</small>
                                         </div>
                                     </td>
                                     <td>
