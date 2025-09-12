@@ -2155,64 +2155,86 @@ def admin_bulk_delete_users():
     deleted_count = 0
     errors = []
     
-    # Process users in smaller batches to avoid timeouts
-    batch_size = 10  # Process 10 users at a time
+    # Process users in very small batches to prevent worker timeouts
+    batch_size = 3  # Process only 3 users at a time for stability
     for i in range(0, len(user_ids), batch_size):
         batch_ids = user_ids[i:i + batch_size]
         
         try:
             for user_id in batch_ids:
-                user = User.query.get(user_id)
-                if not user:
-                    errors.append(f'User with ID {user_id} not found.')
+                try:
+                    user = User.query.get(user_id)
+                    if not user:
+                        errors.append(f'User with ID {user_id} not found.')
+                        continue
+                    
+                    username = user.username
+                    
+                    # Delete related data with explicit session flushing and optimized operations
+                    # 1. Delete user's quiz attempts and related data first
+                    user_attempt_ids = db.session.query(QuizAttempt.id).filter_by(participant_id=user.id).all()
+                    if user_attempt_ids:
+                        attempt_ids = [aid[0] for aid in user_attempt_ids]
+                        # Delete in smaller chunks to avoid timeout
+                        chunk_size = 50
+                        for i in range(0, len(attempt_ids), chunk_size):
+                            chunk = attempt_ids[i:i + chunk_size]
+                            Answer.query.filter(Answer.attempt_id.in_(chunk)).delete(synchronize_session=False)
+                            ProctoringEvent.query.filter(ProctoringEvent.attempt_id.in_(chunk)).delete(synchronize_session=False)
+                        
+                    QuizAttempt.query.filter_by(participant_id=user.id).delete(synchronize_session=False)
+                    db.session.flush()  # Explicit flush to ensure data consistency
+                    
+                    # 2. Delete user's login events and violations (simplified)
+                    LoginEvent.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+                    UserViolation.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+                    db.session.flush()
+                    
+                    # 3. Delete course enrollments and assignments
+                    ParticipantEnrollment.query.filter_by(participant_id=user.id).delete(synchronize_session=False)
+                    HostCourseAssignment.query.filter_by(host_id=user.id).delete(synchronize_session=False)
+                    db.session.flush()
+                    
+                    # 4. Delete user-created quizzes (only for hosts, simplified)
+                    if user.role == 'host':
+                        # Get quiz IDs first
+                        user_quiz_ids = db.session.query(Quiz.id).filter_by(creator_id=user.id).all()
+                        if user_quiz_ids:
+                            quiz_ids = [qid[0] for qid in user_quiz_ids]
+                            
+                            # Delete quiz attempts for these quizzes
+                            quiz_attempt_ids = db.session.query(QuizAttempt.id).filter(QuizAttempt.quiz_id.in_(quiz_ids)).all()
+                            if quiz_attempt_ids:
+                                quiz_attempt_ids = [qaid[0] for qaid in quiz_attempt_ids]
+                                Answer.query.filter(Answer.attempt_id.in_(quiz_attempt_ids)).delete(synchronize_session=False)
+                                ProctoringEvent.query.filter(ProctoringEvent.attempt_id.in_(quiz_attempt_ids)).delete(synchronize_session=False)
+                            
+                            QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(quiz_ids)).delete(synchronize_session=False)
+                            
+                            # Delete questions and options  
+                            question_ids = db.session.query(Question.id).filter(Question.quiz_id.in_(quiz_ids)).all()
+                            if question_ids:
+                                question_ids = [qid[0] for qid in question_ids]
+                                QuestionOption.query.filter(QuestionOption.question_id.in_(question_ids)).delete(synchronize_session=False)
+                            
+                            Question.query.filter(Question.quiz_id.in_(quiz_ids)).delete(synchronize_session=False)
+                            Quiz.query.filter(Quiz.id.in_(quiz_ids)).delete(synchronize_session=False)
+                            db.session.flush()
+                    
+                    # 5. Finally delete the user
+                    db.session.delete(user)
+                    deleted_count += 1
+                    
+                except Exception as user_error:
+                    errors.append(f'Error deleting user {username if "username" in locals() else user_id}: {str(user_error)}')
                     continue
-                
-                username = user.username
-                
-                # Delete related data efficiently with bulk operations
-                # 1. Delete answers and proctoring events for user's attempts
-                user_attempt_ids = [attempt.id for attempt in QuizAttempt.query.filter_by(participant_id=user.id).all()]
-                if user_attempt_ids:
-                    Answer.query.filter(Answer.attempt_id.in_(user_attempt_ids)).delete(synchronize_session=False)
-                    ProctoringEvent.query.filter(ProctoringEvent.attempt_id.in_(user_attempt_ids)).delete(synchronize_session=False)
-                
-                # 2. Delete user's quiz attempts
-                QuizAttempt.query.filter_by(participant_id=user.id).delete()
-                
-                # 3. Delete user's login events and violations
-                LoginEvent.query.filter_by(user_id=user.id).delete()
-                UserViolation.query.filter_by(user_id=user.id).delete()
-                
-                # 4. Delete user-created quizzes and related data (only for hosts)
-                if user.role == 'host':
-                    user_quiz_ids = [quiz.id for quiz in Quiz.query.filter_by(creator_id=user.id).all()]
-                    if user_quiz_ids:
-                        # Delete quiz attempts and related data for these quizzes
-                        quiz_attempt_ids = [attempt.id for attempt in QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(user_quiz_ids)).all()]
-                        if quiz_attempt_ids:
-                            Answer.query.filter(Answer.attempt_id.in_(quiz_attempt_ids)).delete(synchronize_session=False)
-                            ProctoringEvent.query.filter(ProctoringEvent.attempt_id.in_(quiz_attempt_ids)).delete(synchronize_session=False)
-                        QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(user_quiz_ids)).delete(synchronize_session=False)
-                        
-                        # Delete questions and options
-                        question_ids = [q.id for quiz in Quiz.query.filter_by(creator_id=user.id).all() for q in quiz.questions]
-                        if question_ids:
-                            QuestionOption.query.filter(QuestionOption.question_id.in_(question_ids)).delete(synchronize_session=False)
-                        Question.query.filter(Question.quiz_id.in_(user_quiz_ids)).delete(synchronize_session=False)
-                        
-                        # Delete the quizzes
-                        Quiz.query.filter_by(creator_id=user.id).delete()
-                
-                # 5. Delete course enrollments and assignments
-                ParticipantEnrollment.query.filter_by(participant_id=user.id).delete()
-                HostCourseAssignment.query.filter_by(host_id=user.id).delete()
-                
-                # 6. Finally delete the user
-                db.session.delete(user)
-                deleted_count += 1
             
-            # Commit each batch
+            # Commit each batch with explicit transaction handling
             db.session.commit()
+            
+            # Add small delay between batches to prevent overwhelming the database
+            import time
+            time.sleep(0.1)
             
         except Exception as e:
             db.session.rollback()
