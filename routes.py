@@ -1922,6 +1922,102 @@ def admin_reset_password(user_id):
     flash(f'Password reset for user {user.username}.', 'success')
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/bulk-delete-users', methods=['POST'])
+@login_required
+def admin_bulk_delete_users():
+    """Bulk delete multiple users"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user_ids = request.form.getlist('user_ids')
+    
+    if not user_ids:
+        flash('No users selected for deletion.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Convert to integers and validate
+    try:
+        user_ids = [int(uid) for uid in user_ids]
+    except ValueError:
+        flash('Invalid user IDs provided.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Prevent deleting current user
+    if current_user.id in user_ids:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    deleted_count = 0
+    errors = []
+    
+    for user_id in user_ids:
+        try:
+            user = User.query.get(user_id)
+            if not user:
+                errors.append(f'User with ID {user_id} not found.')
+                continue
+            
+            username = user.username
+            
+            # Delete related data (similar to single user deletion)
+            # 1. Delete user's quiz attempts and answers
+            user_attempts = QuizAttempt.query.filter_by(participant_id=user.id).all()
+            for attempt in user_attempts:
+                Answer.query.filter_by(attempt_id=attempt.id).delete()
+                ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
+            QuizAttempt.query.filter_by(participant_id=user.id).delete()
+            
+            # 2. Delete user's login events and violations
+            LoginEvent.query.filter_by(user_id=user.id).delete()
+            UserViolation.query.filter_by(user_id=user.id).delete()
+            
+            # 3. Delete user-created quizzes and related data
+            user_quizzes = Quiz.query.filter_by(creator_id=user.id).all()
+            for quiz in user_quizzes:
+                # Delete all attempts for these quizzes first
+                quiz_attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).all()
+                for attempt in quiz_attempts:
+                    Answer.query.filter_by(attempt_id=attempt.id).delete()
+                    ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
+                QuizAttempt.query.filter_by(quiz_id=quiz.id).delete()
+                
+                # Delete questions and options
+                for question in quiz.questions:
+                    QuestionOption.query.filter_by(question_id=question.id).delete()
+                Question.query.filter_by(quiz_id=quiz.id).delete()
+                
+                # Delete the quiz
+                db.session.delete(quiz)
+            
+            # 4. Delete course enrollments and assignments
+            ParticipantEnrollment.query.filter_by(user_id=user.id).delete()
+            HostCourseAssignment.query.filter_by(host_id=user.id).delete()
+            
+            # 5. Finally delete the user
+            db.session.delete(user)
+            deleted_count += 1
+            
+        except Exception as e:
+            errors.append(f'Error deleting user {username}: {str(e)}')
+            continue
+    
+    try:
+        db.session.commit()
+        
+        if deleted_count > 0:
+            flash(f'Successfully deleted {deleted_count} user(s).', 'success')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'error')
+                
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error during bulk deletion: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users'))
+
 @app.route('/admin/create-user', methods=['POST'])
 @login_required
 def admin_create_user():

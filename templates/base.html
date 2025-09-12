@@ -237,6 +237,14 @@
                     </li>
                 </ul>
                 
+                <!-- Real-time Date and Time Display -->
+                <div class="navbar-text d-none d-lg-block me-3">
+                    <div class="text-center">
+                        <div id="currentTime" class="fw-bold text-primary mb-0" style="font-size: 0.9rem;"></div>
+                        <div id="currentDate" class="text-muted" style="font-size: 0.75rem;"></div>
+                    </div>
+                </div>
+                
                 <ul class="navbar-nav">
                     {% if current_user.is_authenticated %}
                         <li class="nav-item dropdown">
@@ -390,6 +398,48 @@
                 behavior: 'smooth'
             });
         }
+        
+        // Real-time Date and Time Display
+        function updateDateTime() {
+            const now = new Date();
+            
+            // Format time (HH:MM:SS AM/PM)
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            };
+            
+            // Format date (Day, Month DD, YYYY)
+            const dateOptions = {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            };
+            
+            const timeString = now.toLocaleTimeString('en-US', timeOptions);
+            const dateString = now.toLocaleDateString('en-US', dateOptions);
+            
+            // Update DOM elements if they exist
+            const timeElement = document.getElementById('currentTime');
+            const dateElement = document.getElementById('currentDate');
+            
+            if (timeElement) {
+                timeElement.textContent = timeString;
+            }
+            
+            if (dateElement) {
+                dateElement.textContent = dateString;
+            }
+        }
+        
+        // Update time immediately and then every second
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+        });
     </script>
     
     {% block extra_scripts %}{% endblock %}
