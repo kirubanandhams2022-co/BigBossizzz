@@ -4640,6 +4640,13 @@ def admin_review_plagiarism(analysis_id):
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
+    # CSRF Protection - Check token
+    csrf_token = request.form.get('csrf_token')
+    expected_token = session.get('csrf_token')
+    if not csrf_token or csrf_token != expected_token:
+        flash('Security error: Invalid CSRF token. Please try again.', 'error')
+        return redirect(url_for('admin_plagiarism_detection'))
+    
     analysis = PlagiarismAnalysis.query.get_or_404(analysis_id)
     
     decision = request.form.get('decision')  # 'innocent', 'suspicious', 'plagiarized'
