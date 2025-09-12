@@ -88,7 +88,7 @@ class EnhancedProctoringSystem {
     
     preventCheating() {
         // Enhanced cheating prevention setup
-        console.log('🔒 Setting up enhanced cheating prevention');
+        console.log('? Setting up enhanced cheating prevention');
         
         // Activate strong security enforcement
         this.activateStrongEnforcement();
@@ -116,7 +116,7 @@ class EnhancedProctoringSystem {
             if (e.key === 'PrintScreen') {
                 e.preventDefault();
                 this.recordViolation('screenshot_attempt', 'high', 'Screenshot attempt detected');
-                this.showSingleWarning('⚠️ Screenshots are not allowed during the quiz');
+                this.showSingleWarning('?? Screenshots are not allowed during the quiz');
             }
         });
         
@@ -142,7 +142,7 @@ class EnhancedProctoringSystem {
                     const isLinear = this.checkLinearMovement(mouseEvents.slice(-10));
                     if (isLinear) {
                         // Just log, don't record violation
-                        console.log('ℹ️ Unusual mouse pattern detected (logged only)');
+                        console.log('?? Unusual mouse pattern detected (logged only)');
                     }
                 }
             }
@@ -225,7 +225,7 @@ class EnhancedProctoringSystem {
     }
     
     async init() {
-        console.log('🔒 Initializing Enhanced Proctoring System');
+        console.log('? Initializing Enhanced Proctoring System');
         await this.checkSystemRequirements();
         this.setupEventListeners();
         this.preventCheating();
@@ -234,7 +234,7 @@ class EnhancedProctoringSystem {
     async checkSystemRequirements() {
         // Check if HTTPS (required for camera)
         if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-            this.showCriticalError('⚠️ HTTPS required for camera access. Please use the secure URL.');
+            this.showCriticalError('?? HTTPS required for camera access. Please use the secure URL.');
             return false;
         }
         
@@ -246,11 +246,11 @@ class EnhancedProctoringSystem {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
             if (cameras.length === 0) {
-                this.showCriticalError('📷 No camera detected. Camera is required for this quiz.');
+                this.showCriticalError('? No camera detected. Camera is required for this quiz.');
                 return false;
             }
         } catch (error) {
-            this.showCriticalError('📷 Camera access denied. Please allow camera access.');
+            this.showCriticalError('? Camera access denied. Please allow camera access.');
             return false;
         }
         
@@ -274,13 +274,13 @@ class EnhancedProctoringSystem {
         // Check window focus
         if (!document.hasFocus()) {
             this.preventStart = true;
-            this.showWarning('⚠️ Please focus on this window and close all other applications before starting.');
+            this.showWarning('?? Please focus on this window and close all other applications before starting.');
         }
         
         // Check for developer tools
         if (this.isDevToolsOpen()) {
             this.preventStart = true;
-            this.showCriticalError('⚠️ Developer tools detected. Please close developer tools.');
+            this.showCriticalError('?? Developer tools detected. Please close developer tools.');
         }
     }
     
@@ -288,7 +288,7 @@ class EnhancedProctoringSystem {
         if (this.isActive) return;
         
         try {
-            console.log('📷 Starting live camera monitoring (no storage)');
+            console.log('? Starting live camera monitoring (no storage)');
             
             // Get camera stream only
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -326,11 +326,11 @@ class EnhancedProctoringSystem {
             };
             
             this.isActive = true;
-            this.showNotification('✅ Live camera monitoring active', 'success');
+            this.showNotification('? Live camera monitoring active', 'success');
             
         } catch (error) {
             console.error('Camera initialization failed:', error);
-            this.showCriticalError('📷 Camera access failed. Please allow camera access and refresh.');
+            this.showCriticalError('? Camera access failed. Please allow camera access and refresh.');
             throw error;
         }
     }
@@ -375,7 +375,7 @@ class EnhancedProctoringSystem {
             font-size: 12px;
             font-weight: bold;
         `;
-        statusIndicator.textContent = '🔴 LIVE';
+        statusIndicator.textContent = '? LIVE';
         
         previewContainer.appendChild(previewVideo);
         previewContainer.appendChild(statusIndicator);
@@ -383,7 +383,7 @@ class EnhancedProctoringSystem {
     }
     
     startRealTimeAnalysis() {
-        console.log('🔍 Starting real-time behavioral analysis');
+        console.log('? Starting real-time behavioral analysis');
         
         // Real-time face detection (NO STORAGE) - Less frequent
         this.faceDetectionInterval = setInterval(() => {
@@ -455,11 +455,11 @@ class EnhancedProctoringSystem {
         if (faceCount === 0) {
             // No face detected or camera covered
             this.cameraHiddenCount++;
-            this.updateCameraStatus('⚠️ CHECK CAMERA', '#ffc107');
+            this.updateCameraStatus('?? CHECK CAMERA', '#ffc107');
             
             if (this.cameraHiddenCount > this.config.maxCameraHidden && !this.warningShown) {
                 this.warningShown = true;
-                this.showSingleWarning('⚠️ Please ensure your camera shows your face clearly');
+                this.showSingleWarning('?? Please ensure your camera shows your face clearly');
                 // Reset counter to give user time to adjust
                 this.cameraHiddenCount = 0;
             }
@@ -468,15 +468,15 @@ class EnhancedProctoringSystem {
             this.cameraHiddenCount = 0;
             this.multiplePeopleCount = 0;
             this.warningShown = false; // Allow new warnings after normal detection
-            this.updateCameraStatus('🔴 LIVE', '#28a745');
+            this.updateCameraStatus('? LIVE', '#28a745');
         } else if (faceCount >= 2) {
             // Multiple people detected
             this.multiplePeopleCount++;
-            this.updateCameraStatus('⚠️ MULTIPLE PEOPLE', '#dc3545');
+            this.updateCameraStatus('?? MULTIPLE PEOPLE', '#dc3545');
             
             if (this.multiplePeopleCount > this.config.maxMultiplePeople && !this.warningShown) {
                 this.warningShown = true;
-                this.showSingleWarning('⚠️ Multiple people detected. Please ensure you are alone during the quiz.');
+                this.showSingleWarning('?? Multiple people detected. Please ensure you are alone during the quiz.');
                 // Give user time to address the issue
                 this.multiplePeopleCount = 0;
             }
@@ -579,7 +579,7 @@ class EnhancedProctoringSystem {
                 this.recordViolation('tab_switch', 'high', `Tab switched away (${this.tabSwitchCount} times)`);
                 
                 if (this.tabSwitchCount >= this.config.maxTabSwitches) {
-                    this.showCriticalWarning('⚠️ TAB SWITCHING DETECTED! Return to quiz immediately or it will be terminated.');
+                    this.showCriticalWarning('?? TAB SWITCHING DETECTED! Return to quiz immediately or it will be terminated.');
                 }
             }
         });
@@ -737,7 +737,7 @@ class EnhancedProctoringSystem {
     }
     
     activateDoNotDisturbMode() {
-        console.log('🔒 Activating Do Not Disturb Mode');
+        console.log('? Activating Do Not Disturb Mode');
         
         // Hide all other UI elements
         const elementsToHide = ['nav', 'header', 'footer', '.sidebar', '.notification'];
@@ -768,7 +768,7 @@ class EnhancedProctoringSystem {
         
         lockdownOverlay.innerHTML = `
             <div style="text-align: center;">
-                <h2>🔒 PROCTORED QUIZ MODE</h2>
+                <h2>? PROCTORED QUIZ MODE</h2>
                 <p>Quiz is locked in secure mode</p>
                 <p>Do not attempt to exit or switch applications</p>
                 <div id="lockdown-status">Waiting for quiz to start...</div>
@@ -804,7 +804,7 @@ class EnhancedProctoringSystem {
         this.violations.push(violation);
         this.violationLog.push(violation);
         
-        console.warn(`🚨 VIOLATION [${severity.toUpperCase()}]: ${description}`);
+        console.warn(`? VIOLATION [${severity.toUpperCase()}]: ${description}`);
         
         // Count violations by severity
         if (severity === 'critical') {
@@ -831,16 +831,16 @@ class EnhancedProctoringSystem {
         
         switch (violation.severity) {
             case 'critical':
-                this.showCriticalWarning(`🚨 CRITICAL: ${violation.description}`);
+                this.showCriticalWarning(`? CRITICAL: ${violation.description}`);
                 break;
             case 'high':
-                this.showSingleWarning(`⚠️ WARNING: ${violation.description}`);
+                this.showSingleWarning(`?? WARNING: ${violation.description}`);
                 break;
             case 'medium':
-                this.showNotification(`⚠️ ${violation.description}`, 'warning');
+                this.showNotification(`?? ${violation.description}`, 'warning');
                 break;
             case 'low':
-                console.log(`ℹ️ ${violation.description}`);
+                console.log(`?? ${violation.description}`);
                 break;
         }
     }
@@ -887,7 +887,7 @@ class EnhancedProctoringSystem {
         if (this.isTerminated) return;
         
         this.isTerminated = true;
-        console.error('🚨 QUIZ TERMINATED DUE TO VIOLATIONS');
+        console.error('? QUIZ TERMINATED DUE TO VIOLATIONS');
         
         // Stop all monitoring
         this.stopMonitoring();
@@ -926,7 +926,7 @@ class EnhancedProctoringSystem {
         
         terminationScreen.innerHTML = `
             <div>
-                <h1>🚨 QUIZ TERMINATED</h1>
+                <h1>? QUIZ TERMINATED</h1>
                 <h3>Multiple violations detected</h3>
                 <p>Your quiz session has been terminated due to:</p>
                 <ul style="text-align: left; margin: 20px 0;">
@@ -992,7 +992,7 @@ class EnhancedProctoringSystem {
     }
     
     stopMonitoring() {
-        console.log('🚫 Stopping all monitoring systems');
+        console.log('? Stopping all monitoring systems');
         this.isActive = false;
         
         // Deactivate strong enforcement
@@ -1011,7 +1011,7 @@ class EnhancedProctoringSystem {
             this.mediaStream.getTracks().forEach(track => {
                 try {
                     track.stop();
-                    console.log(`✅ Stopped ${track.kind} track`);
+                    console.log(`? Stopped ${track.kind} track`);
                 } catch (error) {
                     console.warn(`Failed to stop ${track.kind} track:`, error);
                 }
@@ -1043,7 +1043,7 @@ class EnhancedProctoringSystem {
             this.canvas = null;
         }
         
-        console.log('✅ All monitoring systems stopped and cleaned up');
+        console.log('? All monitoring systems stopped and cleaned up');
     }
     
     removeMonitoringUI() {
@@ -1113,7 +1113,7 @@ class EnhancedProctoringSystem {
         if (statusAlert && this.audioMonitoringActive) {
             if (isEnvironmentGood) {
                 statusAlert.className = 'alert alert-success';
-                statusAlert.innerHTML = '<i class="fas fa-shield-check"></i> <strong>SECURE ENVIRONMENT</strong><br><small>Camera • Audio • Quiet environment detected</small>';
+                statusAlert.innerHTML = '<i class="fas fa-shield-check"></i> <strong>SECURE ENVIRONMENT</strong><br><small>Camera ? Audio ? Quiet environment detected</small>';
             } else if (this.environmentAnalysis.hasConversation) {
                 statusAlert.className = 'alert alert-warning';
                 statusAlert.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>VOICE DETECTED</strong><br><small>Conversation or voice activity in background</small>';
@@ -1151,7 +1151,7 @@ class EnhancedProctoringSystem {
         `;
         
         notice.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 6px;">🔒 Audio Privacy Notice</div>
+            <div style="font-weight: bold; margin-bottom: 6px;">? Audio Privacy Notice</div>
             <div style="margin-bottom: 8px;">Audio is being analyzed in real-time for:</div>
             <ul style="margin: 0; padding-left: 16px; font-size: 10px;">
                 <li>Background noise levels</li>
@@ -1183,17 +1183,17 @@ class EnhancedProctoringSystem {
         console.error('Audio monitoring setup failed:', error);
         
         // Determine error type and provide appropriate feedback
-        let userMessage = '⚠️ Audio monitoring setup failed.';
+        let userMessage = '?? Audio monitoring setup failed.';
         let severity = 'medium';
         
         if (error.message.includes('denied') || error.message.includes('not supported')) {
-            userMessage = '🎤 Microphone access denied. Audio monitoring disabled.';
+            userMessage = '? Microphone access denied. Audio monitoring disabled.';
             severity = 'high';
         } else if (error.message.includes('in use')) {
-            userMessage = '🎤 Microphone is in use by another application.';
+            userMessage = '? Microphone is in use by another application.';
             severity = 'high';
         } else if (error.message.includes('context')) {
-            userMessage = '🎤 Audio context failed. Please refresh and try again.';
+            userMessage = '? Audio context failed. Please refresh and try again.';
             severity = 'medium';
         }
         
@@ -1234,7 +1234,7 @@ class EnhancedProctoringSystem {
         `;
         
         indicator.innerHTML = `
-            <div>🎤 AUDIO DISABLED</div>
+            <div>? AUDIO DISABLED</div>
             <div style="font-size: 9px; margin-top: 4px;">Visual only</div>
         `;
         
@@ -1297,7 +1297,7 @@ class EnhancedProctoringSystem {
     }
 
     blockMobileAccess() {
-        console.error('🚫 Mobile device detected - Quiz access blocked');
+        console.error('? Mobile device detected - Quiz access blocked');
         
         // Create blocking overlay
         const blockingOverlay = document.createElement('div');
@@ -1319,7 +1319,7 @@ class EnhancedProctoringSystem {
         
         blockingOverlay.innerHTML = `
             <div style="max-width: 400px; padding: 20px;">
-                <h1>📱 Mobile Access Blocked</h1>
+                <h1>? Mobile Access Blocked</h1>
                 <h3>Quiz access restricted to desktop computers only</h3>
                 <p>For security and proctoring requirements, this quiz must be taken on a desktop or laptop computer.</p>
                 <p><strong>Device detected:</strong> ${this.isMobile ? 'Mobile Phone' : 'Tablet'}</p>
@@ -1347,7 +1347,7 @@ class EnhancedProctoringSystem {
         const reloadAttempts = parseInt(sessionStorage.getItem('quiz_reload_attempts') || '0');
         
         if (reloadAttempts >= 3) {
-            console.error('🚫 Multiple reload attempts detected - blocking further reloads');
+            console.error('? Multiple reload attempts detected - blocking further reloads');
             this.showCriticalError('Too many page reload attempts detected. Please contact your instructor.');
             return;
         }
@@ -1406,7 +1406,7 @@ class EnhancedProctoringSystem {
     }
 
     async handleImmediateMalpractice(violation, serverResponse) {
-        console.error('🚨 IMMEDIATE MALPRACTICE DETECTED:', violation);
+        console.error('? IMMEDIATE MALPRACTICE DETECTED:', violation);
         
         this.isTerminated = true;
         this.criticalViolations++;
@@ -1455,7 +1455,7 @@ class EnhancedProctoringSystem {
             attemptId: this.attemptId,
             quizId: this.quizId,
             violation: violation,
-            message: `🚨 IMMEDIATE MALPRACTICE: ${violation.description}`,
+            message: `? IMMEDIATE MALPRACTICE: ${violation.description}`,
             severity: 'critical',
             student: {
                 name: document.querySelector('[data-username]')?.dataset.username || 'Unknown',
@@ -1476,7 +1476,7 @@ class EnhancedProctoringSystem {
         const participantNotification = {
             type: 'malpractice_alert',
             quizId: this.quizId,
-            message: '⚠️ A participant has been terminated for malpractice during this quiz session.'
+            message: '?? A participant has been terminated for malpractice during this quiz session.'
         };
 
         await fetch('/api/proctoring/notify-participants', {
@@ -1509,7 +1509,7 @@ class EnhancedProctoringSystem {
         
         terminationScreen.innerHTML = `
             <div style="max-width: 500px; padding: 30px;">
-                <h1>🚨 MALPRACTICE DETECTED</h1>
+                <h1>? MALPRACTICE DETECTED</h1>
                 <h2>Quiz Terminated Immediately</h2>
                 <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3>Violation: ${violation.description}</h3>
@@ -1518,10 +1518,10 @@ class EnhancedProctoringSystem {
                 </div>
                 <p><strong>Actions Taken:</strong></p>
                 <ul style="text-align: left; margin: 20px 0;">
-                    <li>✅ Host notified immediately</li>
-                    <li>✅ Incident logged in system</li>
-                    <li>✅ Quiz attempt marked as malpractice</li>
-                    <li>✅ Academic integrity office alerted</li>
+                    <li>? Host notified immediately</li>
+                    <li>? Incident logged in system</li>
+                    <li>? Quiz attempt marked as malpractice</li>
+                    <li>? Academic integrity office alerted</li>
                 </ul>
                 <p style="color: #ffcccc;"><strong>This incident will be reviewed by your instructor and academic integrity committee.</strong></p>
                 <p>Redirecting to dashboard in <span id="countdown">10</span> seconds...</p>
@@ -1578,7 +1578,7 @@ class EnhancedProctoringSystem {
     // ============== ENHANCED BACKGROUND NOISE & SPEECH DETECTION ==============
     
     async setupEnhancedAudioMonitoring() {
-        console.log('🔇 Audio monitoring disabled per user request');
+        console.log('? Audio monitoring disabled per user request');
         
         try {
             // Request enhanced audio permissions
@@ -1617,7 +1617,7 @@ class EnhancedProctoringSystem {
             // Start continuous enhanced audio analysis
             this.startEnhancedAudioAnalysis();
             
-            console.log('✅ Camera monitoring activated (audio disabled)');
+            console.log('? Camera monitoring activated (audio disabled)');
             this.showAudioMonitoringIndicator();
 
         } catch (error) {
@@ -1627,7 +1627,7 @@ class EnhancedProctoringSystem {
     }
 
     async calibrateEnvironmentBaseline() {
-        console.log('📊 Calibrating environment baseline for speech detection...');
+        console.log('? Calibrating environment baseline for speech detection...');
         
         const calibrationSamples = [];
         const calibrationDuration = 8000; // 8 seconds
@@ -1664,7 +1664,7 @@ class EnhancedProctoringSystem {
                     this.baselineNoiseLevel = this.calculateBaselineMetrics(calibrationSamples);
                     this.environmentAnalysis.baselineCalibrated = true;
                     
-                    console.log('✅ Environment baseline calibrated:', this.baselineNoiseLevel);
+                    console.log('? Environment baseline calibrated:', this.baselineNoiseLevel);
                     resolve();
                 }
             }, sampleInterval);
@@ -1802,14 +1802,14 @@ class EnhancedProctoringSystem {
                 this.handleConversationDetection();
             }
             
-            console.log('🔄 Sustained speech pattern detected');
+            console.log('? Sustained speech pattern detected');
             this.recordViolation('sustained_speech', 'medium', 
                 `Sustained speech detected (${recentSpeech.length} segments in 3s)`);
         }
         
         // Log regular voice activity
         if (this.voiceDetectionCount % 5 === 0) {
-            console.log(`ℹ️ Voice activity detected (${this.voiceDetectionCount} times)`);
+            console.log(`?? Voice activity detected (${this.voiceDetectionCount} times)`);
             this.recordViolation('voice_activity', 'low', 
                 `Voice activity detected (count: ${this.voiceDetectionCount})`);
         }
@@ -1835,14 +1835,14 @@ class EnhancedProctoringSystem {
         this.environmentAnalysis.hasConversation = true;
         this.environmentAnalysis.conversationStartTime = Date.now();
         
-        console.error('🚨 CONVERSATION DETECTED - Potential malpractice');
+        console.error('? CONVERSATION DETECTED - Potential malpractice');
         
         // Record as critical violation for immediate malpractice handling
         this.recordViolation('sustained_conversation', 'critical', 
             'Sustained conversation detected - multiple speech patterns identified');
         
         // Show immediate warning
-        this.showCriticalWarning('⚠️ CONVERSATION DETECTED: Sustained speech patterns indicate possible conversation during the quiz');
+        this.showCriticalWarning('?? CONVERSATION DETECTED: Sustained speech patterns indicate possible conversation during the quiz');
     }
 
     resetSpeechDetection() {
@@ -1907,7 +1907,7 @@ class EnhancedProctoringSystem {
         indicator.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                 <div>
-                    <div>🎤 ENHANCED AUDIO</div>
+                    <div>? ENHANCED AUDIO</div>
                     <div style="font-size: 9px; margin-top: 2px;">Speech Detection Active</div>
                 </div>
             </div>
@@ -1923,7 +1923,7 @@ class EnhancedProctoringSystem {
                 indicator.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                         <div>
-                            <div>🚨 CONVERSATION</div>
+                            <div>? CONVERSATION</div>
                             <div style="font-size: 9px; margin-top: 2px;">Multiple Voices</div>
                         </div>
                     </div>
@@ -1934,7 +1934,7 @@ class EnhancedProctoringSystem {
                 indicator.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                         <div>
-                            <div>🔊 VOICE DETECTED</div>
+                            <div>? VOICE DETECTED</div>
                             <div style="font-size: 9px; margin-top: 2px;">Count: ${this.voiceDetectionCount}</div>
                         </div>
                     </div>
@@ -1968,7 +1968,7 @@ class EnhancedProctoringSystem {
     // ============== SMART SECURITY MONITORING ==============
     
     activateStrongEnforcement() {
-        console.log('🔐 Activating smart security monitoring');
+        console.log('? Activating smart security monitoring');
         this.enforcementActive = true;
         
         try {
@@ -1993,7 +1993,7 @@ class EnhancedProctoringSystem {
             // Smart focus monitoring
             this.startSmartFocusMonitoring();
             
-            console.log('✅ Smart security monitoring activated');
+            console.log('? Smart security monitoring activated');
         } catch (error) {
             console.error('Security monitoring setup failed:', error);
             this.handleSecuritySetupFailure(error);
@@ -2003,7 +2003,7 @@ class EnhancedProctoringSystem {
     deactivateStrongEnforcement() {
         if (!this.enforcementActive) return;
         
-        console.log('🔓 Deactivating security monitoring');
+        console.log('? Deactivating security monitoring');
         this.enforcementActive = false;
         this.blockingActive = false;
         
@@ -2035,7 +2035,7 @@ class EnhancedProctoringSystem {
                 });
             }
             
-            console.log('✅ Security monitoring deactivated');
+            console.log('? Security monitoring deactivated');
         } catch (error) {
             console.error('Error during security monitoring deactivation:', error);
         }
@@ -2046,7 +2046,7 @@ class EnhancedProctoringSystem {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
                 console.warn('Fullscreen request failed:', err);
-                this.showSingleWarning('⚠️ Fullscreen mode recommended for enhanced security');
+                this.showSingleWarning('?? Fullscreen mode recommended for enhanced security');
                 // Don't record as violation - user may have legitimate reasons
             });
         }
@@ -2054,7 +2054,7 @@ class EnhancedProctoringSystem {
         // Monitor fullscreen changes (detection only)
         const fullscreenMonitor = () => {
             if (this.enforcementActive && !document.fullscreenElement) {
-                console.log('📊 Fullscreen exited - monitoring only');
+                console.log('? Fullscreen exited - monitoring only');
                 this.recordViolation('fullscreen_exited', 'medium', 'Exited fullscreen mode');
                 // Don't try to force back - just detect and record
             }
@@ -2068,7 +2068,7 @@ class EnhancedProctoringSystem {
             if (e.key === 'Escape' && this.enforcementActive && document.fullscreenElement) {
                 // Just record the attempt, don't block it
                 this.recordViolation('escape_pressed', 'low', 'Escape key pressed in fullscreen mode');
-                console.log('📊 Escape key usage detected');
+                console.log('? Escape key usage detected');
             }
         };
         
@@ -2085,7 +2085,7 @@ class EnhancedProctoringSystem {
             if (e.altKey && e.key === 'Tab') {
                 this.tabSwitchCount++;
                 this.recordViolation('alt_tab_detected', 'medium', 'Alt+Tab key combination detected');
-                console.log('📊 Alt+Tab detected');
+                console.log('? Alt+Tab detected');
                 // Don't prevent - OS handles this, we just detect
             }
         };
@@ -2098,11 +2098,11 @@ class EnhancedProctoringSystem {
                 
                 // Show warning but don't try to force focus (can be annoying)
                 if (this.tabSwitchCount === 1) {
-                    this.showSingleWarning('⚠️ Please stay focused on the quiz window');
+                    this.showSingleWarning('?? Please stay focused on the quiz window');
                 } else if (this.tabSwitchCount === 5) {
-                    this.showSingleWarning('⚠️ Multiple tab switches detected - please remain focused');
+                    this.showSingleWarning('?? Multiple tab switches detected - please remain focused');
                 } else if (this.tabSwitchCount >= 10) {
-                    this.showCriticalWarning('⚠️ Excessive tab switching detected - quiz integrity at risk');
+                    this.showCriticalWarning('?? Excessive tab switching detected - quiz integrity at risk');
                 }
             }
         };
@@ -2143,12 +2143,12 @@ class EnhancedProctoringSystem {
                 this.screenshotAttempts++;
                 
                 this.recordViolation('screenshot_attempt_detected', 'medium', `Screenshot key detected: ${e.key}`);
-                console.log('📊 Screenshot-related key detected:', e.key);
+                console.log('? Screenshot-related key detected:', e.key);
                 
                 if (this.screenshotAttempts === 1) {
-                    this.showSingleWarning('⚠️ Screenshot attempts are monitored and logged');
+                    this.showSingleWarning('?? Screenshot attempts are monitored and logged');
                 } else if (this.screenshotAttempts >= 5) {
-                    this.showSingleWarning('⚠️ Multiple screenshot attempts detected');
+                    this.showSingleWarning('?? Multiple screenshot attempts detected');
                 }
                 
                 // Note: We don't preventDefault() because browsers can't actually block OS-level screenshots
@@ -2160,7 +2160,7 @@ class EnhancedProctoringSystem {
         const contextMonitor = (e) => {
             if (this.enforcementActive) {
                 this.recordViolation('right_click_detected', 'low', 'Right-click menu accessed');
-                console.log('📊 Right-click detected');
+                console.log('? Right-click detected');
                 // Don't block - just monitor
             }
         };
@@ -2182,13 +2182,13 @@ class EnhancedProctoringSystem {
                 if (window.outerHeight <= 100 || window.outerWidth <= 100) {
                     this.minimizeAttempts++;
                     this.recordViolation('window_resized_small', 'medium', `Window resized very small (${this.minimizeAttempts} times)`);
-                    console.log('📊 Small window size detected');
+                    console.log('? Small window size detected');
                 }
                 
                 // Detect if window is hidden (visibility API)
                 if (document.visibilityState === 'hidden') {
                     this.recordViolation('window_hidden', 'medium', 'Window became hidden');
-                    console.log('📊 Window hidden detected');
+                    console.log('? Window hidden detected');
                 }
             }
         };
@@ -2203,7 +2203,7 @@ class EnhancedProctoringSystem {
             // Monitor Windows+D (show desktop), Windows+M (minimize all)
             if (e.metaKey && (e.key === 'd' || e.key === 'm')) {
                 this.recordViolation('minimize_shortcut_detected', 'low', `Minimize shortcut detected: ${this.getKeyCombo(e)}`);
-                console.log('📊 Minimize shortcut detected:', this.getKeyCombo(e));
+                console.log('? Minimize shortcut detected:', this.getKeyCombo(e));
                 // Don't block - just detect and log
             }
         };
@@ -2228,10 +2228,10 @@ class EnhancedProctoringSystem {
             for (const combo of systemShortcuts) {
                 if (this.matchesKeyCombo(e, combo)) {
                     this.recordViolation('system_shortcut_detected', 'high', `System shortcut detected: ${this.getKeyCombo(e)}`);
-                    console.log('📊 System shortcut detected:', this.getKeyCombo(e));
+                    console.log('? System shortcut detected:', this.getKeyCombo(e));
                     
                     // Note: We can't actually block these at OS level, just detect and log
-                    this.showSingleWarning('⚠️ System shortcut detected and logged');
+                    this.showSingleWarning('?? System shortcut detected and logged');
                 }
             }
         };
@@ -2280,7 +2280,7 @@ class EnhancedProctoringSystem {
                     e.preventDefault();
                     e.stopPropagation();
                     this.recordViolation('suspicious_shortcut_blocked', 'high', `Blocked: ${this.getKeyCombo(e)}`);
-                    console.log('🚫 Blocked suspicious shortcut:', this.getKeyCombo(e));
+                    console.log('? Blocked suspicious shortcut:', this.getKeyCombo(e));
                     return false;
                 }
             }
@@ -2289,7 +2289,7 @@ class EnhancedProctoringSystem {
             for (const combo of monitoredShortcuts) {
                 if (this.matchesKeyCombo(e, combo)) {
                     this.recordViolation('shortcut_used', 'low', `Used: ${this.getKeyCombo(e)}`);
-                    console.log('📊 Monitored shortcut used:', this.getKeyCombo(e));
+                    console.log('? Monitored shortcut used:', this.getKeyCombo(e));
                     // Don't prevent - just log for awareness
                 }
             }
@@ -2307,13 +2307,13 @@ class EnhancedProctoringSystem {
                 // More reasonable focus loss detection
                 if (timeSinceLastFocus > 30000 && document.hidden) { // 30 seconds instead of 2
                     this.recordViolation('extended_focus_loss', 'medium', 'Window out of focus for extended period');
-                    console.log('📊 Extended focus loss detected');
+                    console.log('? Extended focus loss detected');
                     
                     // Don't automatically try to regain focus - let user control their browser
                     
                     // Show gentle reminder instead of aggressive warning
                     if (timeSinceLastFocus > 60000) { // 1 minute
-                        this.showSingleWarning('⚠️ Please return to the quiz window when ready');
+                        this.showSingleWarning('?? Please return to the quiz window when ready');
                     }
                 }
             }
@@ -2367,14 +2367,14 @@ class EnhancedProctoringSystem {
         console.error('Security monitoring setup failed:', error);
         
         // Determine appropriate user feedback based on error type
-        let userMessage = '⚠️ Some security monitoring features could not be enabled.';
+        let userMessage = '?? Some security monitoring features could not be enabled.';
         
         if (error.message && error.message.includes('fullscreen')) {
-            userMessage = '⚠️ Fullscreen mode could not be activated. Please enable manually if needed.';
+            userMessage = '?? Fullscreen mode could not be activated. Please enable manually if needed.';
         } else if (error.message && error.message.includes('permission')) {
-            userMessage = '⚠️ Some monitoring features require additional permissions.';
+            userMessage = '?? Some monitoring features require additional permissions.';
         } else if (error.message && error.message.includes('not supported')) {
-            userMessage = '⚠️ Your browser has limited security monitoring support.';
+            userMessage = '?? Your browser has limited security monitoring support.';
         }
         
         // Show user-friendly message

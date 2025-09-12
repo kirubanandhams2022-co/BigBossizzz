@@ -37,10 +37,10 @@ class MobileAppManager {
     }
     
     async init() {
-        console.log('🚀 Initializing Mobile App Manager...');
+        console.log('? Initializing Mobile App Manager...');
         
         if (!this.isMobile && !this.isStandalone) {
-            console.log('📱 Not on mobile device, skipping mobile enhancements');
+            console.log('? Not on mobile device, skipping mobile enhancements');
             return;
         }
         
@@ -54,9 +54,9 @@ class MobileAppManager {
             this.applyMobileStyles();
             this.initializeUIComponents();
             
-            console.log('✅ Mobile App Manager initialized successfully');
+            console.log('? Mobile App Manager initialized successfully');
         } catch (error) {
-            console.error('❌ Mobile App Manager initialization failed:', error);
+            console.error('? Mobile App Manager initialization failed:', error);
         }
     }
     
@@ -64,7 +64,7 @@ class MobileAppManager {
     async setupPWA() {
         // Check if PWA is already installed
         if (this.isStandalone) {
-            console.log('📱 Running as installed PWA');
+            console.log('? Running as installed PWA');
             document.body.classList.add('pwa-installed');
             this.hidePWAPrompt();
             return;
@@ -72,7 +72,7 @@ class MobileAppManager {
         
         // Listen for beforeinstallprompt event
         window.addEventListener('beforeinstallprompt', (e) => {
-            console.log('📥 PWA install prompt available');
+            console.log('? PWA install prompt available');
             e.preventDefault();
             this.deferredPrompt = e;
             this.showPWAPrompt();
@@ -80,7 +80,7 @@ class MobileAppManager {
         
         // Listen for app installed event
         window.addEventListener('appinstalled', () => {
-            console.log('🎉 PWA installed successfully');
+            console.log('? PWA installed successfully');
             this.hidePWAPrompt();
             this.showToast('App installed successfully!', 'success');
         });
@@ -89,15 +89,15 @@ class MobileAppManager {
         if ('serviceWorker' in navigator) {
             try {
                 const registration = await navigator.serviceWorker.register('/static/js/sw.js');
-                console.log('🔧 Service Worker registered:', registration);
+                console.log('? Service Worker registered:', registration);
                 
                 // Listen for updates
                 registration.addEventListener('updatefound', () => {
-                    console.log('🔄 New version available');
+                    console.log('? New version available');
                     this.showUpdatePrompt();
                 });
             } catch (error) {
-                console.error('❌ Service Worker registration failed:', error);
+                console.error('? Service Worker registration failed:', error);
             }
         }
     }
