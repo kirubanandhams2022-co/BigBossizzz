@@ -333,11 +333,31 @@ def host_dashboard():
     
     quizzes = Quiz.query.filter_by(creator_id=current_user.id).order_by(Quiz.created_at.desc()).all()
     
-    # Get recent quiz attempts for host's quizzes
+    # Get recent quiz attempts for host's quizzes and add heatmap data flags
     recent_attempts = []
+    heatmap_ready_count = 0
+    
     for quiz in quizzes:
         attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).order_by(QuizAttempt.started_at.desc()).limit(5).all()
+        quiz.attempts = attempts  # Add attempts to quiz object for template access
         recent_attempts.extend(attempts)
+        
+        # Check if quiz has completed attempts with interaction data for accurate heatmap counting
+        completed_attempts = QuizAttempt.query.filter_by(
+            quiz_id=quiz.id, 
+            status='completed'
+        ).first()
+        
+        if completed_attempts:
+            # Check if there's actual interaction data
+            interaction_exists = InteractionEvent.query.filter_by(
+                attempt_id=completed_attempts.id
+            ).first()
+            quiz.has_heatmap_data = interaction_exists is not None
+            if quiz.has_heatmap_data:
+                heatmap_ready_count += 1
+        else:
+            quiz.has_heatmap_data = False
     
     recent_attempts.sort(key=lambda x: x.started_at, reverse=True)
     recent_attempts = recent_attempts[:10]  # Show only 10 most recent
@@ -362,6 +382,7 @@ def host_dashboard():
                          participants=participants,
                          recent_logins=recent_logins,
                          high_violations=high_violations,
+                         heatmap_ready_count=heatmap_ready_count,
                          greeting=get_time_greeting(),
                          greeting_icon=get_greeting_icon())
 

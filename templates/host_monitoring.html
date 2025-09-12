@@ -52,6 +52,81 @@
         </div>
     </div>
 
+    <!-- Heatmap Analytics Section -->
+    <div class="row mb-4">
+        <div class="col-lg-4">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-fire me-2"></i>Live Heatmap Analytics</h6>
+                    <a href="{{ url_for('host_heatmap_dashboard') }}" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% set active_quizzes_with_data = [] %}
+                    {% for attempt in active_attempts %}
+                        {% if attempt.quiz not in active_quizzes_with_data %}
+                            {% set _ = active_quizzes_with_data.append(attempt.quiz) %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <div class="text-center mb-3">
+                        <h4 class="text-info">{{ active_quizzes_with_data|length }}</h4>
+                        <small class="text-muted">Quizzes Generating Data</small>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="text-success">
+                                <i class="fas fa-mouse-pointer"></i>
+                                <div class="small">Click Tracking</div>
+                                <div class="text-success fw-bold">Active</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-warning">
+                                <i class="fas fa-chart-line"></i>
+                                <div class="small">Real-time Insights</div>
+                                <div class="text-warning fw-bold">Live</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <small class="text-muted">Interaction data is being collected from {{ participants_online|length }} active participants</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-eye me-2"></i>Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <a href="{{ url_for('host_heatmap_dashboard') }}" class="btn btn-outline-info w-100">
+                                <i class="fas fa-fire me-2"></i>Heatmap Dashboard
+                            </a>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <a href="{{ url_for('host_live_monitoring') }}" class="btn btn-outline-warning w-100">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Violation Monitor
+                            </a>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <a href="{{ url_for('host_completed_attempts') }}" class="btn btn-outline-success w-100">
+                                <i class="fas fa-chart-bar me-2"></i>Performance Analytics
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <!-- Live Participant Activity -->
         <div class="col-lg-8 mb-4">
@@ -92,8 +167,15 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <strong>{{ data.quiz_title }}</strong><br>
-                                        <small class="text-muted">{{ data.attempt.quiz.time_limit }} min limit</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ data.quiz_title }}</strong><br>
+                                                <small class="text-muted">{{ data.attempt.quiz.time_limit }} min limit</small>
+                                            </div>
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-fire"></i> Live Data
+                                            </span>
+                                        </div>
                                     </td>
                                     <td>
                                         {% set progress = (data.attempt.answers|length / data.attempt.quiz.questions|length * 100) if data.attempt.quiz.questions else 0 %}
