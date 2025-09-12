@@ -2968,6 +2968,9 @@ def log_proctoring_event():
         
         db.session.add(event)
         
+        # Update highest risk summary for this attempt (performance optimization)
+        attempt.update_highest_risk(data.get('severity', 'medium'))
+        
         # Enhanced violation tracking and termination logic
         violation_count = ProctoringEvent.query.filter_by(attempt_id=attempt_id).count() + 1
         high_severity_count = ProctoringEvent.query.filter_by(
