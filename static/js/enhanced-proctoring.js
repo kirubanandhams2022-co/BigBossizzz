@@ -290,7 +290,7 @@ class EnhancedProctoringSystem {
         try {
             console.log('📷 Starting live camera monitoring (no storage)');
             
-            // Get camera stream only (audio monitoring removed per user request)
+            // Get camera stream only
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 640 },
@@ -1133,7 +1133,7 @@ class EnhancedProctoringSystem {
     }
     
     showAudioPrivacyNotice() {
-        // Show privacy notice for audio monitoring
+        // Show privacy notice
         const notice = document.createElement('div');
         notice.id = 'audio-privacy-notice';
         notice.style.cssText = `
@@ -1216,7 +1216,7 @@ class EnhancedProctoringSystem {
     
     showAudioFailureIndicator() {
         const indicator = document.createElement('div');
-        indicator.id = 'audio-monitoring-indicator';
+        indicator.id = 'monitoring-indicator';
         indicator.style.cssText = `
             position: fixed;
             top: 20px;
@@ -1578,7 +1578,7 @@ class EnhancedProctoringSystem {
     // ============== ENHANCED BACKGROUND NOISE & SPEECH DETECTION ==============
     
     async setupEnhancedAudioMonitoring() {
-        console.log('🎤 Setting up enhanced audio monitoring with speech detection');
+        console.log('🔇 Audio monitoring disabled per user request');
         
         try {
             // Request enhanced audio permissions
@@ -1617,11 +1617,11 @@ class EnhancedProctoringSystem {
             // Start continuous enhanced audio analysis
             this.startEnhancedAudioAnalysis();
             
-            console.log('✅ Enhanced audio monitoring with speech detection activated');
+            console.log('✅ Camera monitoring activated (audio disabled)');
             this.showAudioMonitoringIndicator();
 
         } catch (error) {
-            console.error('Enhanced audio monitoring setup failed:', error);
+            console.error('Monitoring setup failed:', error);
             this.handleAudioSetupFailure(error);
         }
     }
