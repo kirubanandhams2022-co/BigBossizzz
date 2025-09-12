@@ -68,20 +68,28 @@ class RBACService:
         
         created_count = 0
         for perm_data in default_permissions:
-            if not Permission.query.filter_by(name=perm_data['name']).first():
-                permission = Permission(
-                    name=perm_data['name'],
-                    display_name=perm_data['display_name'],
-                    description=perm_data['description'],
-                    category=perm_data['category'],
-                    is_system_permission=True
-                )
-                db.session.add(permission)
-                created_count += 1
+            try:
+                if not Permission.query.filter_by(name=perm_data['name']).first():
+                    permission = Permission()
+                    permission.name = perm_data['name']
+                    permission.display_name = perm_data['display_name']
+                    permission.description = perm_data['description']
+                    permission.category = perm_data['category']
+                    permission.is_system_permission = True
+                    db.session.add(permission)
+                    created_count += 1
+                    logging.info(f"Created permission: {perm_data['name']}")
+            except Exception as e:
+                logging.error(f"Failed to create permission {perm_data['name']}: {e}")
         
         if created_count > 0:
-            db.session.commit()
-            logging.info(f"Initialized {created_count} default permissions")
+            try:
+                db.session.commit()
+                logging.info(f"Initialized {created_count} default permissions")
+            except Exception as e:
+                logging.error(f"Failed to commit permissions: {e}")
+                db.session.rollback()
+                created_count = 0
         
         return created_count
     
@@ -148,12 +156,11 @@ class RBACService:
         for role_data in default_roles:
             existing_role = Role.query.filter_by(name=role_data['name']).first()
             if not existing_role:
-                role = Role(
-                    name=role_data['name'],
-                    display_name=role_data['display_name'],
-                    description=role_data['description'],
-                    is_system_role=True
-                )
+                role = Role()
+                role.name = role_data['name']
+                role.display_name = role_data['display_name']
+                role.description = role_data['description']
+                role.is_system_role = True
                 db.session.add(role)
                 db.session.flush()  # Get the role ID
                 
@@ -161,7 +168,9 @@ class RBACService:
                 for perm_name in role_data['permissions']:
                     permission = Permission.query.filter_by(name=perm_name).first()
                     if permission:
-                        role_permission = RolePermission(role_id=role.id, permission_id=permission.id)
+                        role_permission = RolePermission()
+                        role_permission.role_id = role.id
+                        role_permission.permission_id = permission.id
                         db.session.add(role_permission)
                 
                 created_count += 1
@@ -178,12 +187,11 @@ class RBACService:
         if Role.query.filter_by(name=name).first():
             raise ValueError(f"Role '{name}' already exists")
         
-        role = Role(
-            name=name,
-            display_name=display_name,
-            description=description,
-            created_by=created_by_user_id
-        )
+        role = Role()
+        role.name = name
+        role.display_name = display_name
+        role.description = description
+        role.created_by = created_by_user_id
         db.session.add(role)
         db.session.flush()
         
@@ -192,11 +200,10 @@ class RBACService:
             for perm_name in permission_names:
                 permission = Permission.query.filter_by(name=perm_name).first()
                 if permission:
-                    role_permission = RolePermission(
-                        role_id=role.id, 
-                        permission_id=permission.id,
-                        granted_by=created_by_user_id
-                    )
+                    role_permission = RolePermission()
+                    role_permission.role_id = role.id
+                    role_permission.permission_id = permission.id
+                    role_permission.granted_by = created_by_user_id
                     db.session.add(role_permission)
         
         # Create audit log
@@ -299,12 +306,11 @@ class RBACService:
                 existing.expires_at = expires_at
                 user_role = existing
         else:
-            user_role = UserRole(
-                user_id=user_id,
-                role_id=role.id,
-                assigned_by=assigned_by_user_id,
-                expires_at=expires_at
-            )
+            user_role = UserRole()
+            user_role.user_id = user_id
+            user_role.role_id = role.id
+            user_role.assigned_by = assigned_by_user_id
+            user_role.expires_at = expires_at
             db.session.add(user_role)
         
         # Create audit log
@@ -437,18 +443,17 @@ class RBACService:
     def _create_audit_log(action, entity_type, entity_id, performed_by=None, 
                          target_user_id=None, old_values=None, new_values=None, reason=None):
         """Create an audit log entry"""
-        audit_log = RoleAuditLog(
-            action=action,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            target_user_id=target_user_id,
-            performed_by=performed_by,
-            old_values=old_values,
-            new_values=new_values,
-            reason=reason,
-            ip_address=request.remote_addr if request else None,
-            user_agent=request.headers.get('User-Agent') if request else None
-        )
+        audit_log = RoleAuditLog()
+        audit_log.action = action
+        audit_log.entity_type = entity_type
+        audit_log.entity_id = entity_id
+        audit_log.target_user_id = target_user_id
+        audit_log.performed_by = performed_by
+        audit_log.old_values = old_values
+        audit_log.new_values = new_values
+        audit_log.reason = reason
+        audit_log.ip_address = request.remote_addr if request else None
+        audit_log.user_agent = request.headers.get('User-Agent') if request else None
         db.session.add(audit_log)
         return audit_log
 
