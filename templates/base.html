@@ -18,7 +18,7 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     
-    <!-- Loading Screen Styles -->
+    <!-- Professional Loading Screen Styles -->
     <style>
         .loading-screen {
             position: fixed;
@@ -26,101 +26,115 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
             z-index: 9999;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         .loading-container {
             text-align: center;
             position: relative;
             z-index: 10;
+            max-width: 400px;
+            padding: 2rem;
         }
 
-        .stylish-loader {
+        .professional-loader {
             position: relative;
             margin: 0 auto 2rem;
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .loader-circle {
             width: 60px;
             height: 60px;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-top: 3px solid #fff;
-            border-radius: 50%;
-            animation: elegant-spin 1s linear infinite;
         }
 
-        .loader-pulse {
+        .loader-ring {
             position: absolute;
-            width: 80px;
-            height: 80px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(59, 130, 246, 0.1);
             border-radius: 50%;
-            animation: elegant-pulse 2s ease-in-out infinite;
+            border-top: 2px solid #3b82f6;
+            animation: professional-spin 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) infinite;
         }
 
-        @keyframes elegant-spin {
+        .loader-ring:nth-child(2) {
+            width: 45px;
+            height: 45px;
+            top: 7.5px;
+            left: 7.5px;
+            border-top: 2px solid #6366f1;
+            animation-delay: -0.3s;
+            animation-duration: 1.5s;
+        }
+
+        .loader-ring:nth-child(3) {
+            width: 30px;
+            height: 30px;
+            top: 15px;
+            left: 15px;
+            border-top: 2px solid #8b5cf6;
+            animation-delay: -0.6s;
+            animation-duration: 1.8s;
+        }
+
+        @keyframes professional-spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
 
-        @keyframes elegant-pulse {
-            0%, 100% { 
-                transform: scale(1);
-                opacity: 0.3;
-            }
-            50% { 
-                transform: scale(1.1);
-                opacity: 0.7;
-            }
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
         }
 
         .brand-name {
-            font-size: 2rem;
-            font-weight: bold;
-            background: linear-gradient(45deg, #8b5cf6, #6366f1, #ec4899);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 1rem;
-            animation: brandGlow 3s ease-in-out infinite;
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.025em;
         }
 
-        @keyframes brandGlow {
-            0%, 100% { text-shadow: 0 0 20px rgba(0, 123, 255, 0.3); }
-            50% { text-shadow: 0 0 30px rgba(0, 123, 255, 0.8); }
+        .brand-tagline {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
         }
 
         .loading-text {
-            font-size: 1.5rem;
-            font-weight: 300;
-            margin-bottom: 1rem;
-            animation: fadeInOut 2s ease-in-out infinite;
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: #e2e8f0;
+            margin-bottom: 0.5rem;
         }
 
         .loading-subtitle {
-            font-size: 1rem;
+            font-size: 0.875rem;
             color: #94a3b8;
             margin-bottom: 2rem;
-            animation: fadeInOut 2s ease-in-out infinite 0.5s;
+            line-height: 1.5;
+        }
+
+        .progress-container {
+            width: 280px;
+            margin: 0 auto;
         }
 
         .progress-bar-container {
-            width: 300px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            margin: 0 auto;
+            width: 100%;
+            height: 3px;
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 3px;
             overflow: hidden;
+            margin-bottom: 0.75rem;
         }
 
         .progress-fill {
@@ -138,49 +152,42 @@
 
         @keyframes progressMove {
             0% { width: 0%; margin-left: 0%; }
-            50% { width: 70%; margin-left: 15%; }
-            100% { width: 0%; margin-left: 100%; }
-        }
-
-        .dots {
-            display: inline-block;
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: ''; }
-            40% { content: '.'; }
-            60% { content: '..'; }
-            80%, 100% { content: '...'; }
+            50% { width: 75%; margin-left: 12.5%; }
+            100% { width: 100%; margin-left: 0%; }
         }
     </style>
     
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <!-- Simple Loading Screen -->
+    <!-- Professional Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-container">
-            <div class="brand-name">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="BigBossizzz" style="height: 40px; width: auto; margin-right: 10px;">
-                BigBossizzz
+            <div class="brand-logo">
+                <div class="brand-name">BigBossizzz</div>
             </div>
             
-            <div class="stylish-loader">
-                <div class="loader-circle"></div>
-                <div class="loader-pulse"></div>
+            <div class="brand-tagline">Secure Examination Platform</div>
+            
+            <div class="professional-loader">
+                <div class="loader-ring"></div>
+                <div class="loader-ring"></div>
+                <div class="loader-ring"></div>
             </div>
             
-            <div class="loading-text">
-                Processing your request<span class="dots"></span>
-            </div>
+            <div class="loading-text">Initializing Secure Environment</div>
             
             <div class="loading-subtitle">
-                Please wait while we secure your session
+                Setting up your secure examination session with advanced proctoring
             </div>
             
-            <div class="progress-bar-container">
-                <div class="progress-fill"></div>
+            <div class="progress-container">
+                <div class="progress-bar-container">
+                    <div class="progress-fill"></div>
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b; text-align: center;">
+                    <i class="fas fa-shield-alt"></i> Secured by BigBossizzz
+                </div>
             </div>
         </div>
     </div>
@@ -259,15 +266,15 @@
                                 </a></li>
                                 {% if current_user.is_admin() %}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li class="dropdown-item-text">
-                                        <a class="text-decoration-none text-light d-flex justify-content-between align-items-center" 
-                                           data-bs-toggle="collapse" href="#systemManagementMenu" role="button" 
-                                           aria-expanded="false" aria-controls="systemManagementMenu">
+                                    <li class="dropdown-item-text p-0">
+                                        <button class="btn btn-link text-light text-decoration-none w-100 d-flex justify-content-between align-items-center p-2" 
+                                                type="button" data-bs-toggle="collapse" data-bs-target="#systemManagementMenu" 
+                                                aria-expanded="false" aria-controls="systemManagementMenu">
                                             <span><i class="fas fa-cogs"></i> System Management</span>
-                                            <i class="fas fa-chevron-down"></i>
-                                        </a>
+                                            <i class="fas fa-chevron-down" id="systemManagementChevron"></i>
+                                        </button>
                                     </li>
-                                    <div class="collapse" id="systemManagementMenu">
+                                    <div class="collapse ms-3" id="systemManagementMenu">
                                         <li><a class="dropdown-item" href="{{ url_for('admin_users') }}" 
                                                data-bs-toggle="tooltip" data-bs-placement="left" 
                                                title="Create, edit, and manage user accounts. View user statistics and permissions.">
@@ -490,6 +497,22 @@
                     container: 'body'
                 });
             });
+            
+            // Handle System Management menu toggle
+            const systemManagementMenu = document.getElementById('systemManagementMenu');
+            const systemManagementChevron = document.getElementById('systemManagementChevron');
+            
+            if (systemManagementMenu && systemManagementChevron) {
+                systemManagementMenu.addEventListener('show.bs.collapse', function () {
+                    systemManagementChevron.classList.remove('fa-chevron-down');
+                    systemManagementChevron.classList.add('fa-chevron-up');
+                });
+                
+                systemManagementMenu.addEventListener('hide.bs.collapse', function () {
+                    systemManagementChevron.classList.remove('fa-chevron-up');
+                    systemManagementChevron.classList.add('fa-chevron-down');
+                });
+            }
         });
     </script>
     
