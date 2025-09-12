@@ -4,6 +4,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch
+from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
+                            get_lti_provider, get_lti_grade_passback)
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -5800,3 +5802,352 @@ def not_found_error(error):
 def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), 500
+
+# ===== LTI (Learning Tools Interoperability) Integration =====
+
+@app.route('/lti/launch', methods=['POST'])
+def lti_launch():
+    """LTI 1.1 Launch endpoint - receives launches from LMS"""
+    try:
+        logging.info(f"LTI Launch request received from {request.remote_addr}")
+        logging.debug(f"LTI Launch parameters: {request.form.to_dict()}")
+        
+        # Get LTI provider instance
+        lti_provider = get_lti_provider()
+        
+        # Validate OAuth signature
+        if not lti_provider.validate_signature(request.form.to_dict()):
+            logging.warning("LTI signature validation failed")
+            flash('LTI authentication failed. Please contact your administrator.', 'error')
+            return redirect(url_for('home'))
+        
+        # Process launch request
+        success, lti_data = lti_provider.process_launch_request(request.form.to_dict())
+        
+        if not success:
+            logging.error(f"LTI launch processing failed: {lti_data.get('error')}")
+            flash(f'LTI launch failed: {lti_data.get("error")}', 'error')
+            return redirect(url_for('home'))
+        
+        # Create or update user from LTI data
+        user = LTIUser.create_or_update_user(lti_data)
+        
+        if not user:
+            logging.error("Failed to create/update LTI user")
+            flash('Failed to create user account from LTI launch.', 'error')
+            return redirect(url_for('home'))
+        
+        # Update user with LTI context information
+        context_info = lti_data.get('context_info', {})
+        grade_info = lti_data.get('grade_info', {})
+        
+        user.lti_consumer_key = request.form.get('oauth_consumer_key')
+        user.lti_context_id = context_info.get('course_id')
+        user.lti_resource_link_id = context_info.get('resource_link_id')
+        user.lti_grade_passback_url = grade_info.get('lis_outcome_service_url')
+        user.lti_result_sourcedid = grade_info.get('lis_result_sourcedid')
+        
+        db.session.commit()
+        
+        # Log the user in
+        login_user(user, remember=True)
+        session['lti_launch'] = True
+        session['lti_data'] = lti_data
+        
+        # Check for custom quiz parameter
+        custom_quiz_id = request.form.get('custom_quiz_id')
+        
+        if custom_quiz_id:
+            # Direct launch to specific quiz
+            try:
+                quiz_id = int(custom_quiz_id)
+                quiz = Quiz.query.get(quiz_id)
+                if quiz and quiz.is_active:
+                    return redirect(url_for('take_quiz', quiz_id=quiz_id))
+                else:
+                    flash('Requested quiz not found or inactive.', 'warning')
+            except (ValueError, TypeError):
+                flash('Invalid quiz identifier.', 'warning')
+        
+        # Redirect based on user role
+        if user.is_admin():
+            return redirect(url_for('admin_dashboard'))
+        elif user.is_host():
+            return redirect(url_for('host_dashboard'))
+        else:
+            return redirect(url_for('participant_dashboard'))
+        
+    except Exception as e:
+        logging.error(f"LTI launch error: {e}")
+        flash('An error occurred during LTI launch. Please try again.', 'error')
+        return redirect(url_for('home'))
+
+@app.route('/lti/config.xml')
+def lti_config_xml():
+    """LTI Tool Configuration XML for LMS setup"""
+    base_url = request.url_root.rstrip('/')
+    consumer_key = "bigbossizzz_lti_key"  # Should be configurable
+    
+    xml_config = LTIToolConfiguration.generate_xml_config(base_url, consumer_key)
+    
+    response = make_response(xml_config)
+    response.headers['Content-Type'] = 'application/xml'
+    response.headers['Content-Disposition'] = 'attachment; filename=bigbossizzz_lti_config.xml'
+    
+    return response
+
+@app.route('/lti/config.json')
+def lti_config_json():
+    """LTI 1.3 Tool Configuration JSON for LMS setup"""
+    base_url = request.url_root.rstrip('/')
+    consumer_key = "bigbossizzz_lti_key"
+    
+    json_config = LTIToolConfiguration.generate_json_config(base_url, consumer_key)
+    
+    return jsonify(json_config)
+
+@app.route('/lti/admin')
+@login_required
+def lti_admin():
+    """LTI Administration dashboard"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('home'))
+    
+    # Get LTI user statistics
+    lti_users = User.query.filter(User.lti_user_id.isnot(None)).all()
+    lti_stats = {
+        'total_lti_users': len(lti_users),
+        'lti_participants': len([u for u in lti_users if u.role == 'participant']),
+        'lti_hosts': len([u for u in lti_users if u.role == 'host']),
+        'lti_admins': len([u for u in lti_users if u.role == 'admin']),
+        'unique_contexts': len(set([u.lti_context_id for u in lti_users if u.lti_context_id])),
+        'unique_consumers': len(set([u.lti_consumer_key for u in lti_users if u.lti_consumer_key]))
+    }
+    
+    # Get recent LTI launches (from session logs)
+    recent_launches = []
+    try:
+        for user in lti_users[:10]:  # Show last 10 LTI users
+            recent_launches.append({
+                'user': user,
+                'context_id': user.lti_context_id,
+                'consumer_key': user.lti_consumer_key,
+                'last_login': user.last_login
+            })
+    except Exception as e:
+        logging.error(f"Error getting LTI launch data: {e}")
+    
+    return render_template('admin_lti.html', 
+                         lti_stats=lti_stats,
+                         recent_launches=recent_launches,
+                         base_url=request.url_root.rstrip('/'))
+
+@app.route('/api/lti/grade-passback', methods=['POST'])
+@login_required
+def lti_grade_passback():
+    """Send grade back to LMS for completed quiz attempts"""
+    try:
+        data = request.get_json()
+        attempt_id = data.get('attempt_id')
+        
+        if not attempt_id:
+            return jsonify({'success': False, 'error': 'Missing attempt_id'}), 400
+        
+        # Get quiz attempt
+        attempt = QuizAttempt.query.get(attempt_id)
+        if not attempt:
+            return jsonify({'success': False, 'error': 'Quiz attempt not found'}), 404
+        
+        # Check if user has LTI grade passback information
+        user = attempt.participant
+        if not user.lti_grade_passback_url or not user.lti_result_sourcedid:
+            return jsonify({'success': False, 'error': 'No LTI grade passback information available'}), 400
+        
+        # Calculate score
+        if attempt.score is None:
+            attempt.calculate_score()
+            db.session.commit()
+        
+        # Prepare grade information
+        grade_info = {
+            'lis_outcome_service_url': user.lti_grade_passback_url,
+            'lis_result_sourcedid': user.lti_result_sourcedid
+        }
+        
+        # Send grade back to LMS
+        grade_passback = get_lti_grade_passback()
+        success = grade_passback.send_grade(grade_info, attempt.score, 100.0)
+        
+        if success:
+            # Log successful grade passback
+            logging.info(f"Grade passback successful for attempt {attempt_id}: {attempt.score}%")
+            return jsonify({'success': True, 'message': 'Grade sent to LMS successfully'})
+        else:
+            logging.error(f"Grade passback failed for attempt {attempt_id}")
+            return jsonify({'success': False, 'error': 'Failed to send grade to LMS'}), 500
+        
+    except Exception as e:
+        logging.error(f"Grade passback error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/lti/quiz-selection')
+@login_required
+def lti_quiz_selection():
+    """Quiz selection page for LTI content selection"""
+    if not current_user.is_host() and not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('home'))
+    
+    # Get available quizzes for selection
+    if current_user.is_admin():
+        quizzes = Quiz.query.filter_by(is_active=True).all()
+    else:
+        quizzes = Quiz.query.filter_by(creator_id=current_user.id, is_active=True).all()
+    
+    # Check if this is a content selection request
+    is_content_selection = request.args.get('lti_message_type') == 'ContentItemSelectionRequest'
+    return_url = request.args.get('content_item_return_url')
+    
+    return render_template('lti_quiz_selection.html',
+                         quizzes=quizzes,
+                         is_content_selection=is_content_selection,
+                         return_url=return_url)
+
+@app.route('/api/lti/content-item', methods=['POST'])
+@login_required
+def lti_content_item():
+    """Return content item for LTI Deep Linking"""
+    try:
+        data = request.get_json()
+        quiz_id = data.get('quiz_id')
+        return_url = data.get('return_url')
+        
+        if not quiz_id or not return_url:
+            return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+        
+        quiz = Quiz.query.get(quiz_id)
+        if not quiz:
+            return jsonify({'success': False, 'error': 'Quiz not found'}), 404
+        
+        # Check permissions
+        if not current_user.is_admin() and quiz.creator_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        # Create content item response
+        base_url = request.url_root.rstrip('/')
+        content_item = {
+            "@context": "http://purl.imsglobal.org/ctx/lti/v1/ContentItem",
+            "@graph": [
+                {
+                    "@type": "LtiLinkItem",
+                    "url": f"{base_url}/lti/launch?custom_quiz_id={quiz_id}",
+                    "title": quiz.title,
+                    "text": quiz.description or f"Take the quiz: {quiz.title}",
+                    "mediaType": "application/vnd.ims.lti.v1.ltilink",
+                    "placementAdvice": {
+                        "presentationDocumentTarget": "window"
+                    },
+                    "custom": {
+                        "quiz_id": str(quiz_id)
+                    }
+                }
+            ]
+        }
+        
+        return jsonify({
+            'success': True,
+            'content_item': content_item,
+            'return_url': return_url
+        })
+        
+    except Exception as e:
+        logging.error(f"LTI content item error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/lti/1.3/login', methods=['POST', 'GET'])
+def lti_13_login():
+    """LTI 1.3 OIDC Login endpoint"""
+    # LTI 1.3 implementation placeholder
+    # This would require full OAuth 2.0 / OIDC implementation
+    return jsonify({
+        'error': 'LTI 1.3 not yet implemented',
+        'message': 'Please use LTI 1.1 endpoints for now'
+    }), 501
+
+@app.route('/lti/1.3/launch', methods=['POST'])
+def lti_13_launch():
+    """LTI 1.3 Launch endpoint"""
+    # LTI 1.3 implementation placeholder
+    return jsonify({
+        'error': 'LTI 1.3 not yet implemented',
+        'message': 'Please use LTI 1.1 endpoints for now'
+    }), 501
+
+@app.route('/lti/1.3/jwks')
+def lti_13_jwks():
+    """LTI 1.3 JSON Web Key Set endpoint"""
+    # LTI 1.3 JWKS implementation placeholder
+    return jsonify({
+        'keys': []
+    })
+
+# Helper route for testing LTI integration
+@app.route('/lti/test')
+def lti_test():
+    """LTI Integration test page (development only)"""
+    if not app.debug:
+        return "Not available in production", 404
+    
+    base_url = request.url_root.rstrip('/')
+    test_data = {
+        'launch_url': f"{base_url}/lti/launch",
+        'config_xml_url': f"{base_url}/lti/config.xml",
+        'config_json_url': f"{base_url}/lti/config.json",
+        'consumer_key': 'bigbossizzz_lti_key',
+        'consumer_secret': 'bigbossizzz_lti_secret_change_in_production'
+    }
+    
+    return render_template('lti_test.html', test_data=test_data)
+
+# Automatic grade passback on quiz completion
+@app.after_request
+def lti_grade_passback_trigger(response):
+    """Automatically trigger grade passback for LTI users after quiz completion"""
+    try:
+        # Only process for quiz submission routes
+        if (request.endpoint == 'submit_quiz' and 
+            response.status_code == 302 and  # Successful redirect
+            current_user.is_authenticated and 
+            hasattr(current_user, 'lti_user_id') and 
+            current_user.lti_user_id):
+            
+            # Get the most recent attempt for automatic grade passback
+            recent_attempt = QuizAttempt.query.filter_by(
+                participant_id=current_user.id,
+                status='completed'
+            ).order_by(QuizAttempt.completed_at.desc()).first()
+            
+            if (recent_attempt and 
+                current_user.lti_grade_passback_url and 
+                current_user.lti_result_sourcedid):
+                
+                # Trigger grade passback in background
+                try:
+                    grade_info = {
+                        'lis_outcome_service_url': current_user.lti_grade_passback_url,
+                        'lis_result_sourcedid': current_user.lti_result_sourcedid
+                    }
+                    
+                    grade_passback = get_lti_grade_passback()
+                    grade_passback.send_grade(grade_info, recent_attempt.score or 0, 100.0)
+                    
+                    logging.info(f"Automatic LTI grade passback completed for attempt {recent_attempt.id}")
+                    
+                except Exception as e:
+                    logging.error(f"Automatic LTI grade passback failed: {e}")
+                    
+    except Exception as e:
+        logging.error(f"LTI grade passback trigger error: {e}")
+    
+    return response
