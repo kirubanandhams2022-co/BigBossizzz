@@ -67,7 +67,7 @@ csrf.init_app(app)
 socketio.init_app(app, async_mode='eventlet', cors_allowed_origins="*", message_queue=f'redis://localhost:6379/0' if redis_client else None)
 
 # Configure login manager  
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
 
@@ -156,7 +156,7 @@ from routes import *
 def run_app():
     """Start the application server"""
     try:
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        app.run(host='0.0.0.0', port=5000, debug=True)  # type: ignore
     except Exception as e:
         logging.error(f"Failed to start application: {e}")
 
