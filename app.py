@@ -130,6 +130,24 @@ with app.app_context():
         db.session.add(participant)
     
     db.session.commit()
+    
+    # Initialize RBAC system with default roles and permissions
+    try:
+        from rbac_service import initialize_rbac_system
+        result = initialize_rbac_system()
+        print(f"✅ RBAC initialized: {result['permissions_created']} permissions, {result['roles_created']} roles created")
+    except ImportError:
+        print("⚠️ RBAC system not available - continuing without initialization")
+    except Exception as e:
+        print(f"⚠️ RBAC initialization error: {e}")
+    
+    # Add context processor for RBAC permissions
+    try:
+        from rbac_decorators import permission_context_processor
+        app.context_processor(permission_context_processor)
+        print("✅ RBAC context processor registered")
+    except ImportError:
+        print("⚠️ RBAC context processor not available")
 
 # Import routes
 from routes import *
