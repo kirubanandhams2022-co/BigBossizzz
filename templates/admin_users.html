@@ -15,6 +15,9 @@
         <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
             <i class="fas fa-file-excel"></i> Excel Upload
         </button>
+        <button type="button" class="btn btn-danger" id="bulkDeleteBtn" onclick="bulkDeleteUsers()" disabled>
+            <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+        </button>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left"></i> Dashboard
         </a>
@@ -30,6 +33,10 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
+                        <th>
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                            <label for="selectAll" class="ms-1">Select All</label>
+                        </th>
                         <th>#</th>
                         <th>Username</th>
                         <th>Email</th>
@@ -43,6 +50,13 @@
                 <tbody>
                     {% for user in users %}
                     <tr class="{% if not user.is_active %}table-secondary{% endif %}">
+                        <td>
+                            {% if user.id != current_user.id %}
+                            <input type="checkbox" class="user-checkbox" value="{{ user.id }}" onchange="updateBulkDeleteButton()">
+                            {% else %}
+                            <i class="fas fa-lock text-muted" title="Cannot select your own account"></i>
+                            {% endif %}
+                        </td>
                         <td><span class="badge bg-secondary">{{ loop.index }}</span></td>
                         <td>
                             <strong>{{ user.username }}</strong>
@@ -437,5 +451,119 @@ function togglePassword(inputId, button) {
         icon.classList.add('fa-eye');
     }
 }
+
+// Bulk Delete Functions
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateBulkDeleteButton();
+}
+
+function updateBulkDeleteButton() {
+    const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectedCount = document.getElementById('selectedCount');
+    
+    selectedCount.textContent = checkboxes.length;
+    bulkDeleteBtn.disabled = checkboxes.length === 0;
+    
+    // Update select all checkbox
+    const allCheckboxes = document.querySelectorAll('.user-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    
+    if (checkboxes.length === 0) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = false;
+    } else if (checkboxes.length === allCheckboxes.length) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = true;
+    } else {
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+function bulkDeleteUsers() {
+    const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select at least one user to delete.');
+        return;
+    }
+    
+    const userCount = selectedIds.length;
+    const confirmMessage = `Are you sure you want to delete ${userCount} user${userCount > 1 ? 's' : ''}? This action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
+        // Create a form to submit the deletion request
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("admin_bulk_delete_users") }}';
+        
+        // Add CSRF token
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrf_token';
+        csrfToken.value = '{{ csrf_token() }}';
+        form.appendChild(csrfToken);
+        
+        // Add selected user IDs
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'user_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Add long press functionality for mobile and desktop double-click
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    let pressTimer;
+    
+    checkboxes.forEach(checkbox => {
+        const row = checkbox.closest('tr');
+        
+        // Desktop: Double-click to toggle
+        row.addEventListener('dblclick', function(e) {
+            if (e.target.type !== 'checkbox' && !e.target.closest('button')) {
+                checkbox.checked = !checkbox.checked;
+                updateBulkDeleteButton();
+            }
+        });
+        
+        // Mobile: Long press to toggle
+        row.addEventListener('touchstart', function(e) {
+            if (e.target.type !== 'checkbox' && !e.target.closest('button')) {
+                pressTimer = window.setTimeout(function() {
+                    checkbox.checked = !checkbox.checked;
+                    updateBulkDeleteButton();
+                    
+                    // Add visual feedback
+                    row.classList.add('table-warning');
+                    setTimeout(() => row.classList.remove('table-warning'), 200);
+                }, 500);
+            }
+        });
+        
+        row.addEventListener('touchend', function() {
+            clearTimeout(pressTimer);
+        });
+        
+        row.addEventListener('touchmove', function() {
+            clearTimeout(pressTimer);
+        });
+    });
+});
 </script>
 {% endblock %}
