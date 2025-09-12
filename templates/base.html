@@ -191,6 +191,11 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
+    <!-- Skip link targets with proper focus handling -->
+    <div id="navigation" tabindex="-1" class="sr-only"></div>
+    <div id="main-content" tabindex="-1" class="sr-only"></div>
+    <div id="quiz-content" tabindex="-1" class="sr-only"></div>
+    <div id="footer" tabindex="-1" class="sr-only"></div>
     <!-- Professional Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-container">

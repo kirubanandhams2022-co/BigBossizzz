@@ -6504,10 +6504,15 @@ def save_theme_preference():
         logging.error(f"Error saving theme preference: {e}")
         return jsonify({'error': 'Failed to save preference'}), 500
 
+@app.route('/sw.js')
+def service_worker():
+    """Serve service worker from root path for proper scope"""
+    return app.send_static_file('../sw.js')
+
 @app.route('/api/connectivity-check', methods=['HEAD', 'GET'])
 def connectivity_check():
-    """Simple connectivity check for offline manager"""
-    return '', 200
+    """Fast connectivity check for offline manager"""
+    return '', 204
 
 @app.route('/api/quiz/sync-progress', methods=['POST'])
 @login_required
