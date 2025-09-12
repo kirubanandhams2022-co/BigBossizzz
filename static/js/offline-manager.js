@@ -51,8 +51,8 @@ class OfflineManager {
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
-                const registration = await navigator.serviceWorker.register('/static/js/offline-service-worker.js');
-                console.log('🔧 Service Worker registered for offline support');
+                const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+                console.log('🔧 Root Service Worker registered for offline support');
                 
                 registration.addEventListener('updatefound', () => {
                     console.log('🔄 Service Worker update found');
@@ -87,12 +87,17 @@ class OfflineManager {
     
     async checkConnectivity() {
         try {
-            // Try to fetch a small resource
+            // Try to fetch with proper timeout using AbortController
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
             const response = await fetch('/api/connectivity-check', {
                 method: 'HEAD',
                 cache: 'no-cache',
-                timeout: 5000
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             const wasOnline = this.isOnline;
             this.isOnline = response.ok;
