@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}RBAC Audit Logs - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-history me-2"></i>RBAC Audit Logs</h2>
+                <a href="{{ url_for('admin_rbac_dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Back to RBAC
+                </a>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="entity_type" class="form-label">Entity Type</label>
+                            <select class="form-select" id="entity_type" name="entity_type">
+                                <option value="">All Types</option>
+                                <option value="role" {{ 'selected' if entity_type == 'role' }}>Role</option>
+                                <option value="permission" {{ 'selected' if entity_type == 'permission' }}>Permission</option>
+                                <option value="user_role" {{ 'selected' if entity_type == 'user_role' }}>User Role</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="action" class="form-label">Action</label>
+                            <select class="form-select" id="action" name="action">
+                                <option value="">All Actions</option>
+                                <option value="create" {{ 'selected' if action == 'create' }}>Create</option>
+                                <option value="update" {{ 'selected' if action == 'update' }}>Update</option>
+                                <option value="delete" {{ 'selected' if action == 'delete' }}>Delete</option>
+                                <option value="assign" {{ 'selected' if action == 'assign' }}>Assign</option>
+                                <option value="revoke" {{ 'selected' if action == 'revoke' }}>Revoke</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter me-1"></i>Filter
+                                </button>
+                                <a href="{{ url_for('admin_rbac_audit_logs') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>Clear
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Audit Logs -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Audit Log Entries</h5>
+                </div>
+                <div class="card-body">
+                    {% if logs.items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Action</th>
+                                    <th>Entity Type</th>
+                                    <th>Entity ID</th>
+                                    <th>Performed By</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs.items %}
+                                <tr>
+                                    <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>
+                                        {% if log.action == 'create' %}
+                                        <span class="badge bg-success">{{ log.action|title }}</span>
+                                        {% elif log.action == 'update' %}
+                                        <span class="badge bg-primary">{{ log.action|title }}</span>
+                                        {% elif log.action == 'delete' %}
+                                        <span class="badge bg-danger">{{ log.action|title }}</span>
+                                        {% elif log.action == 'assign' %}
+                                        <span class="badge bg-info">{{ log.action|title }}</span>
+                                        {% elif log.action == 'revoke' %}
+                                        <span class="badge bg-warning">{{ log.action|title }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ log.action|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.entity_type|title }}</td>
+                                    <td>{{ log.entity_id }}</td>
+                                    <td>
+                                        {% if log.performed_by_user %}
+                                        {{ log.performed_by_user.username }}
+                                        {% else %}
+                                        <em>System</em>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.details %}
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#detailsModal" 
+                                                onclick="showDetails('{{ log.details|e }}')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if logs.pages > 1 %}
+                    <nav aria-label="Audit log pagination">
+                        <ul class="pagination justify-content-center">
+                            {% if logs.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_rbac_audit_logs', page=logs.prev_num, entity_type=entity_type, action=action) }}">Previous</a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in logs.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != logs.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin_rbac_audit_logs', page=page_num, entity_type=entity_type, action=action) }}">{{ page_num }}</a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if logs.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_rbac_audit_logs', page=logs.next_num, entity_type=entity_type, action=action) }}">Next</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <div class="text-center">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5>No Audit Logs Found</h5>
+                        <p class="text-muted">No RBAC activity has been logged yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Audit Log Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="detailsContent" class="bg-light p-3 rounded"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showDetails(details) {
+    try {
+        const parsed = JSON.parse(details);
+        document.getElementById('detailsContent').textContent = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+        document.getElementById('detailsContent').textContent = details;
+    }
+}
+</script>
+{% endblock %}
