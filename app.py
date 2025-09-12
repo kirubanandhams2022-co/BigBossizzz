@@ -1,11 +1,11 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, flash, redirect, url_for, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_socketio import SocketIO
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from sqlalchemy.orm import DeclarativeBase
 import redis
 # Simple ProxyFix implementation for compatibility
@@ -37,7 +37,7 @@ except:
 
 # Create the app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+app.secret_key = os.environ.get("SESSION_SECRET")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure the database with performance optimizations
@@ -70,6 +70,12 @@ socketio.init_app(app, async_mode='eventlet', cors_allowed_origins="*", message_
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
+
+# CSRF Error Handler
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    flash('Security token expired or missing. Please try again.', 'error')
+    return redirect(request.referrer or url_for('index'))
 
 @login_manager.user_loader
 def load_user(user_id):

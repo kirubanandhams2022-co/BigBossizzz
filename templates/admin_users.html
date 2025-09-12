@@ -88,6 +88,7 @@
                             <div class="btn-group btn-group-sm">
                                 <!-- Toggle Status -->
                                 <form method="POST" action="{{ url_for('admin_toggle_user_status', user_id=user.id) }}" style="display: inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-outline-{% if user.is_active %}warning{% else %}success{% endif %}" 
                                             onclick="return confirm('Are you sure?')">
                                         <i class="fas fa-{% if user.is_active %}pause{% else %}play{% endif %}"></i>
@@ -115,6 +116,7 @@
                                 <!-- Delete User -->
                                 <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}" style="display: inline;" 
                                       onsubmit="return confirm('Are you sure you want to permanently delete this user and all their data?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-outline-danger">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -141,6 +143,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('admin_create_user') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Username</label>
@@ -186,6 +189,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="roleForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <p>Change role for user: <strong id="roleUsername"></strong></p>
                     <div class="mb-3">
@@ -215,6 +219,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="credentialForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <p>Edit credentials for: <strong id="credentialUsername"></strong></p>
                     <div class="mb-3">
@@ -255,6 +260,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="passwordForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <p>Reset password for user: <strong id="passwordUsername"></strong></p>
                     <div class="mb-3">
@@ -285,6 +291,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('admin_bulk_create_users') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
@@ -359,6 +366,7 @@ admin1,admin1@example.com,adminpass,admin," required></textarea>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('admin_upload_users_excel') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>

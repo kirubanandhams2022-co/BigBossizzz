@@ -218,6 +218,7 @@
         </div>
         
         <form id="quizForm" method="POST" action="{{ url_for('submit_quiz', attempt_id=attempt.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="card-body">
                 {% if quiz.description %}
                     <div class="alert alert-light">
