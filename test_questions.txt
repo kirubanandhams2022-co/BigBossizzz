@@ -1,0 +1,17 @@
+1.	Cloud services are mainly categorized into:
+A) SaaS, DBaaS, DBMS
+B) *IaaS, PaaS, SaaS
+C) VPN, LAN, WAN
+D) Hadoop, Spark, Kafka
+
+2.	Which of the following is an example of Platform as a Service (PaaS)?
+A) *Google App Engine
+B) Amazon EC2
+C) Dropbox
+D) Microsoft Azure Storage
+
+3.	The main characteristic of cloud computing is:
+A) Manual resource allocation
+B) *On-demand self-service
+C) Centralized offline storage
+D) Single-user exclusive access
