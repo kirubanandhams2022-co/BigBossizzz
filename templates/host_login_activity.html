@@ -48,8 +48,16 @@
 
             <!-- Login Events -->
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Login Activity</h5>
+                    <div class="navigation-buttons">
+                        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="btn btn-outline-secondary btn-sm me-1" title="Go to Top">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                        <button onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})" class="btn btn-outline-secondary btn-sm" title="Go to Bottom">
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if login_events %}

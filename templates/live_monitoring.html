@@ -102,6 +102,12 @@
                             <p class="text-muted mb-0">Real-time proctoring alerts and violations</p>
                         </div>
                         <div class="d-flex align-items-center">
+                            <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="btn btn-outline-secondary btn-sm me-1" title="Go to Top">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                            <button onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})" class="btn btn-outline-secondary btn-sm me-2" title="Go to Bottom">
+                                <i class="fas fa-arrow-down"></i>
+                            </button>
                             <button class="btn btn-outline-primary me-2" onclick="toggleSound()">
                                 <i class="fas fa-volume-up" id="soundIcon"></i> Alerts
                             </button>

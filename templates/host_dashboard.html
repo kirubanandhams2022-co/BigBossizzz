@@ -4,11 +4,11 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-eye"></i> {{ greeting_icon }} {{ greeting }}, {{ current_user.username|title }}!</h1>
+    <h1>{{ greeting }}, {{ current_user.username|title }}!</h1>
     <p class="text-muted mb-0">BigBossizzz Host Control Center</p>
     <div class="dropdown">
         <button class="btn btn-primary dropdown-toggle" type="button" id="hostMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="fas fa-bars"></i> Host Menu
+            <i class="fas fa-bars"></i> Menu
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="hostMenuDropdown">
             <li>
