@@ -7,6 +7,8 @@ from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, Pr
 from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
                             get_lti_provider, get_lti_grade_passback)
 from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
+from analytics_engine import (AnalyticsEngine, PredictiveAnalytics, QuestionPerformanceAnalyzer, 
+                              CheatingPatternDetector, InstitutionalDashboard, get_analytics_engine)
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -6334,3 +6336,147 @@ def api_proctoring_analytics():
     except Exception as e:
         logging.error(f"Error generating proctoring analytics: {e}")
         return jsonify({'error': 'Failed to generate analytics'}), 500
+
+# ===== Enhanced Analytics & Insights System =====
+
+@app.route('/admin/analytics-dashboard')
+@login_required
+def admin_analytics_dashboard():
+    """Enhanced analytics dashboard for comprehensive insights"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('home'))
+    
+    try:
+        # Initialize analytics engine
+        analytics = get_analytics_engine()
+        
+        # Get comprehensive analytics report
+        comprehensive_report = analytics.generate_comprehensive_report()
+        
+        # Get real-time institutional metrics
+        institutional_metrics = analytics.dashboard.get_real_time_metrics()
+        
+        # Get live monitoring data
+        live_data = analytics.dashboard.get_live_monitoring_data()
+        
+        return render_template('admin_analytics_dashboard.html',
+                             comprehensive_report=comprehensive_report,
+                             institutional_metrics=institutional_metrics,
+                             live_data=live_data)
+        
+    except Exception as e:
+        logging.error(f"Error loading analytics dashboard: {e}")
+        flash('Error loading analytics dashboard. Please try again.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/api/predictive-analytics', methods=['GET'])
+@login_required
+def api_predictive_analytics():
+    """Get predictive analytics for student risk assessment"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        user_id = request.args.get('user_id', type=int)
+        course_id = request.args.get('course_id', type=int)
+        limit = request.args.get('limit', 50, type=int)
+        
+        # Initialize predictive analytics
+        predictor = PredictiveAnalytics()
+        
+        # Analyze student risk
+        risk_profiles = predictor.analyze_student_risk(user_id, course_id)
+        
+        # Limit results for performance
+        if limit and len(risk_profiles) > limit:
+            risk_profiles = risk_profiles[:limit]
+        
+        # Convert to serializable format
+        results = []
+        for profile in risk_profiles:
+            results.append({
+                'user_id': profile.user_id,
+                'username': profile.username,
+                'risk_score': profile.risk_score,
+                'risk_level': profile.risk_level,
+                'risk_factors': profile.risk_factors,
+                'intervention_recommendations': profile.intervention_recommendations,
+                'predicted_failure_probability': profile.predicted_failure_probability,
+                'engagement_score': profile.engagement_score,
+                'performance_trend': profile.performance_trend,
+                'last_activity': profile.last_activity.isoformat() if profile.last_activity else None,
+                'courses_enrolled': profile.courses_enrolled,
+                'avg_quiz_score': profile.avg_quiz_score,
+                'violation_count': profile.violation_count,
+                'proctoring_issues': profile.proctoring_issues
+            })
+        
+        # Calculate summary statistics
+        summary = {
+            'total_students': len(results),
+            'high_risk_count': len([r for r in results if r['risk_level'] in ['High', 'Critical']]),
+            'medium_risk_count': len([r for r in results if r['risk_level'] == 'Medium']),
+            'low_risk_count': len([r for r in results if r['risk_level'] in ['Low', 'Minimal']]),
+            'average_risk_score': round(sum(r['risk_score'] for r in results) / len(results), 2) if results else 0,
+            'most_common_risk_factors': {}
+        }
+        
+        # Count risk factors
+        all_factors = []
+        for r in results:
+            all_factors.extend(r['risk_factors'])
+        
+        from collections import Counter
+        factor_counts = Counter(all_factors)
+        summary['most_common_risk_factors'] = dict(factor_counts.most_common(10))
+        
+        return jsonify({
+            'success': True,
+            'students': results,
+            'summary': summary,
+            'generated_at': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in predictive analytics API: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/institutional-metrics', methods=['GET'])
+@login_required
+def api_institutional_metrics():
+    """Get real-time institutional dashboard metrics"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        # Initialize dashboard
+        dashboard = InstitutionalDashboard()
+        
+        # Get real-time metrics
+        metrics = dashboard.get_real_time_metrics()
+        
+        # Get live monitoring data
+        live_data = dashboard.get_live_monitoring_data()
+        
+        return jsonify({
+            'success': True,
+            'metrics': {
+                'total_students': metrics.total_students,
+                'active_students_today': metrics.active_students_today,
+                'quizzes_in_progress': metrics.quizzes_in_progress,
+                'completed_quizzes_today': metrics.completed_quizzes_today,
+                'average_performance': metrics.average_performance,
+                'high_risk_students': metrics.high_risk_students,
+                'security_alerts_today': metrics.security_alerts_today,
+                'system_uptime': metrics.system_uptime,
+                'concurrent_users': metrics.concurrent_users,
+                'violation_rate': metrics.violation_rate
+            },
+            'live_data': live_data,
+            'generated_at': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in institutional metrics API: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
