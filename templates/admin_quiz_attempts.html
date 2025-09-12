@@ -155,7 +155,7 @@
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 {% if attempt.proctoring_events %}
-                                <a href="{{ url_for('admin_proctoring_events', attempt_id=attempt.id) }}" class="btn btn-outline-warning" title="View Violations">
+                                <a href="{{ url_for('quiz_results', attempt_id=attempt.id) }}" class="btn btn-outline-warning" title="View Results & Violations">
                                     <i class="fas fa-exclamation-triangle"></i>
                                 </a>
                                 {% endif %}
