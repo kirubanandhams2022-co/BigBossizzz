@@ -3227,6 +3227,102 @@ def log_interaction_event():
         logging.error(f"Error logging interaction event: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'})
 
+@app.route('/api/heatmap/interaction/batch', methods=['POST'])
+@login_required
+def log_interaction_events_batch():
+    """Log multiple participant interaction events for heatmap generation"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'interactions' not in data:
+            return jsonify({'success': False, 'error': 'Interactions data required'})
+        
+        interactions_data = data['interactions']
+        attempt_id = data.get('attemptId')
+        
+        if not attempt_id:
+            return jsonify({'success': False, 'error': 'Attempt ID required'})
+        
+        # Verify the attempt belongs to current user
+        attempt = QuizAttempt.query.filter_by(
+            id=attempt_id,
+            participant_id=current_user.id,
+            status='in_progress'
+        ).first()
+        
+        if not attempt:
+            return jsonify({'success': False, 'error': 'Invalid or inactive quiz attempt'})
+        
+        successful_logs = 0
+        failed_logs = 0
+        
+        # Process each interaction in the batch
+        for interaction_data in interactions_data:
+            try:
+                # Extract event details
+                event_type = interaction_data.get('type', 'unknown')
+                question_id = interaction_data.get('questionId')
+                x_coord = interaction_data.get('x')
+                y_coord = interaction_data.get('y')
+                timestamp_ms = interaction_data.get('timestamp', time.time() * 1000)
+                
+                # Create interaction event
+                interaction = InteractionEvent(
+                    attempt_id=attempt_id,
+                    event_type=event_type,
+                    question_id=question_id,
+                    x_coordinate=x_coord,
+                    y_coordinate=y_coord,
+                    timestamp=datetime.fromtimestamp(timestamp_ms / 1000),
+                    event_details=json.dumps({
+                        'target': interaction_data.get('target'),
+                        'scrollTop': interaction_data.get('scrollTop'),
+                        'scrollLeft': interaction_data.get('scrollLeft'),
+                        'visibility': interaction_data.get('visibility'),
+                        'timeSpent': interaction_data.get('timeSpent'),
+                        'answerValue': interaction_data.get('answerValue'),
+                        'answerType': interaction_data.get('answerType'),
+                        'textLength': interaction_data.get('textLength')
+                    })
+                )
+                
+                db.session.add(interaction)
+                successful_logs += 1
+                
+            except Exception as e:
+                logging.warning(f"Failed to process individual interaction: {e}")
+                failed_logs += 1
+                continue
+        
+        # Commit all successful interactions
+        if successful_logs > 0:
+            db.session.commit()
+            
+            # Trigger heatmap data update and analysis for significant batches
+            if successful_logs >= 5:  # Only for meaningful batches
+                try:
+                    update_heatmap_data(attempt.quiz_id, None)
+                    
+                    # Trigger insights analysis for larger batches
+                    if successful_logs >= 10:
+                        from heatmap_analysis import trigger_analysis_for_quiz
+                        trigger_analysis_for_quiz(attempt.quiz_id)
+                        
+                except Exception as e:
+                    logging.warning(f"Failed to update heatmap data or trigger analysis: {e}")
+        
+        return jsonify({
+            'success': True, 
+            'processed': len(interactions_data),
+            'successful': successful_logs,
+            'failed': failed_logs
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error processing interaction batch: {e}")
+        return jsonify({'success': False, 'error': 'Failed to process interaction batch'})
+
 @app.route('/api/heatmap/data/<int:quiz_id>')
 @login_required
 def get_heatmap_data(quiz_id):
