@@ -191,24 +191,21 @@ class MobileAppManager {
             navItems = [
                 { icon: 'fas fa-tachometer-alt', label: 'Dashboard', href: '/admin/dashboard' },
                 { icon: 'fas fa-users', label: 'Users', href: '/admin/users' },
-                { icon: 'fas fa-clipboard-list', label: 'Quizzes', href: '/admin/quizzes' },
                 { icon: 'fas fa-chart-bar', label: 'Reports', href: '/admin/proctoring-reports' },
-                { icon: 'fas fa-cog', label: 'Settings', href: '/admin/settings' }
+                { icon: 'fas fa-user', label: 'Profile', href: '/profile' }
             ];
         } else if (userRole === 'host') {
             navItems = [
-                { icon: 'fas fa-home', label: 'Dashboard', href: '/host_dashboard' },
-                { icon: 'fas fa-book', label: 'Courses', href: '/host/courses' },
-                { icon: 'fas fa-plus-circle', label: 'Create', href: '/create_quiz' },
-                { icon: 'fas fa-chart-line', label: 'Analytics', href: '/host/analytics' },
+                { icon: 'fas fa-home', label: 'Dashboard', href: '/host/dashboard' },
+                { icon: 'fas fa-plus-circle', label: 'Create', href: '/quiz/create' },
+                { icon: 'fas fa-chart-line', label: 'Monitor', href: '/host/monitoring' },
                 { icon: 'fas fa-user', label: 'Profile', href: '/profile' }
             ];
         } else {
             navItems = [
-                { icon: 'fas fa-home', label: 'Dashboard', href: '/participant_dashboard' },
-                { icon: 'fas fa-play-circle', label: 'Quizzes', href: '/available_quizzes' },
-                { icon: 'fas fa-trophy', label: 'Results', href: '/quiz_results' },
-                { icon: 'fas fa-graduation-cap', label: 'Courses', href: '/enrolled_courses' },
+                { icon: 'fas fa-home', label: 'Dashboard', href: '/participant/dashboard' },
+                { icon: 'fas fa-play-circle', label: 'Quizzes', href: '/quiz_listing' },
+                { icon: 'fas fa-trophy', label: 'Results', href: '/participant/completed' },
                 { icon: 'fas fa-user', label: 'Profile', href: '/profile' }
             ];
         }
