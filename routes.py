@@ -4499,6 +4499,117 @@ def admin_quiz_management():
     quizzes = Quiz.query.order_by(Quiz.created_at.desc()).all()
     return render_template('admin_quiz_management.html', quizzes=quizzes)
 
+@app.route('/admin/analytics')
+@login_required
+def admin_analytics():
+    """Comprehensive system analytics dashboard"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Comprehensive analytics data
+    total_users = User.query.count()
+    total_hosts = User.query.filter_by(role='host').count()
+    total_participants = User.query.filter_by(role='participant').count()
+    total_quizzes = Quiz.query.count()
+    active_quizzes = Quiz.query.filter_by(is_active=True).count()
+    total_attempts = QuizAttempt.query.count()
+    completed_attempts = QuizAttempt.query.filter_by(status='completed').count()
+    total_violations = ProctoringEvent.query.count()
+    high_violations = ProctoringEvent.query.filter_by(severity='high').count()
+    total_courses = Course.query.count()
+    active_courses = Course.query.filter_by(is_active=True).count()
+    
+    # Recent activity analytics
+    today = datetime.utcnow().date()
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    month_ago = datetime.utcnow() - timedelta(days=30)
+    
+    today_attempts = QuizAttempt.query.filter(
+        func.date(QuizAttempt.started_at) == today
+    ).count()
+    
+    week_attempts = QuizAttempt.query.filter(
+        QuizAttempt.started_at >= week_ago
+    ).count()
+    
+    month_attempts = QuizAttempt.query.filter(
+        QuizAttempt.started_at >= month_ago
+    ).count()
+    
+    # Performance analytics
+    if completed_attempts > 0:
+        completed_attempts_with_scores = QuizAttempt.query.filter(
+            QuizAttempt.status == 'completed',
+            QuizAttempt.score.isnot(None)
+        ).all()
+        
+        if completed_attempts_with_scores:
+            avg_score = sum(attempt.score for attempt in completed_attempts_with_scores) / len(completed_attempts_with_scores)
+            highest_score = max(attempt.score for attempt in completed_attempts_with_scores)
+            lowest_score = min(attempt.score for attempt in completed_attempts_with_scores)
+        else:
+            avg_score = highest_score = lowest_score = 0
+    else:
+        avg_score = highest_score = lowest_score = 0
+    
+    # Top performing participants
+    top_participants = db.session.query(
+        User.username,
+        func.avg(QuizAttempt.score).label('avg_score'),
+        func.count(QuizAttempt.id).label('attempt_count')
+    ).join(QuizAttempt, User.id == QuizAttempt.participant_id).filter(
+        QuizAttempt.status == 'completed',
+        QuizAttempt.score.isnot(None)
+    ).group_by(User.id, User.username).order_by(
+        func.avg(QuizAttempt.score).desc()
+    ).limit(10).all()
+    
+    analytics_data = {
+        'total_users': total_users,
+        'total_hosts': total_hosts,
+        'total_participants': total_participants,
+        'total_quizzes': total_quizzes,
+        'active_quizzes': active_quizzes,
+        'total_attempts': total_attempts,
+        'completed_attempts': completed_attempts,
+        'total_violations': total_violations,
+        'high_violations': high_violations,
+        'total_courses': total_courses,
+        'active_courses': active_courses,
+        'today_attempts': today_attempts,
+        'week_attempts': week_attempts,
+        'month_attempts': month_attempts,
+        'avg_score': round(avg_score, 1),
+        'highest_score': highest_score,
+        'lowest_score': lowest_score,
+        'top_participants': top_participants
+    }
+    
+    return render_template('admin_analytics.html', analytics=analytics_data)
+
+@app.route('/admin/bulk-operations')
+@login_required
+def admin_bulk_users():
+    """Bulk operations management dashboard"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get recent bulk operation statistics
+    total_users = User.query.count()
+    recent_users = User.query.filter(
+        User.created_at >= datetime.utcnow() - timedelta(days=30)
+    ).count()
+    
+    # Get courses for bulk assignment
+    active_courses = Course.query.filter_by(is_active=True).all()
+    
+    return render_template('admin_bulk_users.html', 
+                         total_users=total_users,
+                         recent_users=recent_users,
+                         active_courses=active_courses)
+
 @app.route('/admin/system-settings')
 @login_required
 def admin_system_settings():
