@@ -2155,70 +2155,76 @@ def admin_bulk_delete_users():
     deleted_count = 0
     errors = []
     
-    for user_id in user_ids:
+    # Process users in smaller batches to avoid timeouts
+    batch_size = 10  # Process 10 users at a time
+    for i in range(0, len(user_ids), batch_size):
+        batch_ids = user_ids[i:i + batch_size]
+        
         try:
-            user = User.query.get(user_id)
-            if not user:
-                errors.append(f'User with ID {user_id} not found.')
-                continue
-            
-            username = user.username
-            
-            # Delete related data (similar to single user deletion)
-            # 1. Delete user's quiz attempts and answers
-            user_attempts = QuizAttempt.query.filter_by(participant_id=user.id).all()
-            for attempt in user_attempts:
-                Answer.query.filter_by(attempt_id=attempt.id).delete()
-                ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
-            QuizAttempt.query.filter_by(participant_id=user.id).delete()
-            
-            # 2. Delete user's login events and violations
-            LoginEvent.query.filter_by(user_id=user.id).delete()
-            UserViolation.query.filter_by(user_id=user.id).delete()
-            
-            # 3. Delete user-created quizzes and related data
-            user_quizzes = Quiz.query.filter_by(creator_id=user.id).all()
-            for quiz in user_quizzes:
-                # Delete all attempts for these quizzes first
-                quiz_attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).all()
-                for attempt in quiz_attempts:
-                    Answer.query.filter_by(attempt_id=attempt.id).delete()
-                    ProctoringEvent.query.filter_by(attempt_id=attempt.id).delete()
-                QuizAttempt.query.filter_by(quiz_id=quiz.id).delete()
+            for user_id in batch_ids:
+                user = User.query.get(user_id)
+                if not user:
+                    errors.append(f'User with ID {user_id} not found.')
+                    continue
                 
-                # Delete questions and options
-                for question in quiz.questions:
-                    QuestionOption.query.filter_by(question_id=question.id).delete()
-                Question.query.filter_by(quiz_id=quiz.id).delete()
+                username = user.username
                 
-                # Delete the quiz
-                db.session.delete(quiz)
+                # Delete related data efficiently with bulk operations
+                # 1. Delete answers and proctoring events for user's attempts
+                user_attempt_ids = [attempt.id for attempt in QuizAttempt.query.filter_by(participant_id=user.id).all()]
+                if user_attempt_ids:
+                    Answer.query.filter(Answer.attempt_id.in_(user_attempt_ids)).delete(synchronize_session=False)
+                    ProctoringEvent.query.filter(ProctoringEvent.attempt_id.in_(user_attempt_ids)).delete(synchronize_session=False)
+                
+                # 2. Delete user's quiz attempts
+                QuizAttempt.query.filter_by(participant_id=user.id).delete()
+                
+                # 3. Delete user's login events and violations
+                LoginEvent.query.filter_by(user_id=user.id).delete()
+                UserViolation.query.filter_by(user_id=user.id).delete()
+                
+                # 4. Delete user-created quizzes and related data (only for hosts)
+                if user.role == 'host':
+                    user_quiz_ids = [quiz.id for quiz in Quiz.query.filter_by(creator_id=user.id).all()]
+                    if user_quiz_ids:
+                        # Delete quiz attempts and related data for these quizzes
+                        quiz_attempt_ids = [attempt.id for attempt in QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(user_quiz_ids)).all()]
+                        if quiz_attempt_ids:
+                            Answer.query.filter(Answer.attempt_id.in_(quiz_attempt_ids)).delete(synchronize_session=False)
+                            ProctoringEvent.query.filter(ProctoringEvent.attempt_id.in_(quiz_attempt_ids)).delete(synchronize_session=False)
+                        QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(user_quiz_ids)).delete(synchronize_session=False)
+                        
+                        # Delete questions and options
+                        question_ids = [q.id for quiz in Quiz.query.filter_by(creator_id=user.id).all() for q in quiz.questions]
+                        if question_ids:
+                            QuestionOption.query.filter(QuestionOption.question_id.in_(question_ids)).delete(synchronize_session=False)
+                        Question.query.filter(Question.quiz_id.in_(user_quiz_ids)).delete(synchronize_session=False)
+                        
+                        # Delete the quizzes
+                        Quiz.query.filter_by(creator_id=user.id).delete()
+                
+                # 5. Delete course enrollments and assignments
+                ParticipantEnrollment.query.filter_by(participant_id=user.id).delete()
+                HostCourseAssignment.query.filter_by(host_id=user.id).delete()
+                
+                # 6. Finally delete the user
+                db.session.delete(user)
+                deleted_count += 1
             
-            # 4. Delete course enrollments and assignments
-            ParticipantEnrollment.query.filter_by(participant_id=user.id).delete()
-            HostCourseAssignment.query.filter_by(host_id=user.id).delete()
-            
-            # 5. Finally delete the user
-            db.session.delete(user)
-            deleted_count += 1
+            # Commit each batch
+            db.session.commit()
             
         except Exception as e:
-            errors.append(f'Error deleting user {username}: {str(e)}')
+            db.session.rollback()
+            errors.append(f'Error in batch starting at user {batch_ids[0]}: {str(e)}')
             continue
     
-    try:
-        db.session.commit()
-        
-        if deleted_count > 0:
-            flash(f'Successfully deleted {deleted_count} user(s).', 'success')
-        
-        if errors:
-            for error in errors:
-                flash(error, 'error')
-                
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error during bulk deletion: {str(e)}', 'error')
+    if deleted_count > 0:
+        flash(f'Successfully deleted {deleted_count} user(s).', 'success')
+    
+    if errors:
+        for error in errors:
+            flash(error, 'error')
     
     return redirect(url_for('admin_users'))
 
