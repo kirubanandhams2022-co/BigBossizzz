@@ -2968,33 +2968,28 @@ def take_quiz(quiz_id):
         flash('This quiz is not currently active.', 'error')
         return redirect(url_for('participant_dashboard'))
     
-    # SERVER-SIDE DEVICE POLICY ENFORCEMENT
+    # DEVICE DETECTION FOR MOBILE-SPECIFIC PROCTORING
     user_agent = request.headers.get('User-Agent', '').lower()
     mobile_keywords = ['mobile', 'android', 'iphone', 'ipod', 'blackberry', 'windows phone']
     tablet_keywords = ['tablet', 'ipad']
     
     is_mobile = any(keyword in user_agent for keyword in mobile_keywords)
     is_tablet = any(keyword in user_agent for keyword in tablet_keywords)
+    device_type = 'mobile' if is_mobile else ('tablet' if is_tablet else 'desktop')
     
-    if is_mobile or is_tablet:
-        device_type = 'Mobile Phone' if is_mobile else 'Tablet'
-        flash(f'❌ Access denied. Quiz access is restricted to desktop computers only. Device detected: {device_type}', 'error')
-        
-        # Log the blocked device attempt
-        try:
-            event = ProctoringEvent(
-                attempt_id=None,
-                event_type='mobile_device_blocked_server',
-                details=f'Server-side mobile device blocking: {user_agent}',
-                severity='critical',
-                timestamp=datetime.utcnow()
-            )
-            db.session.add(event)
-            db.session.commit()
-        except Exception as e:
-            logging.error(f"Failed to log mobile device blocking: {e}")
-        
-        return redirect(url_for('participant_dashboard'))
+    # Log device access for security monitoring
+    try:
+        event = ProctoringEvent(
+            attempt_id=None,
+            event_type=f'{device_type}_device_access',
+            details=f'Device access from {device_type}: {user_agent}',
+            severity='info',
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(event)
+        db.session.commit()
+    except Exception as e:
+        logging.error(f"Failed to log device access: {e}")
 
     # Check if user already has an active attempt
     existing_attempt = QuizAttempt.query.filter_by(
@@ -3015,6 +3010,7 @@ def take_quiz(quiz_id):
     db.session.add(attempt)
     db.session.commit()
     
+    # Pass device type to the template
     return redirect(url_for('continue_quiz', attempt_id=attempt.id))
 
 @app.route('/attempt/<int:attempt_id>')
@@ -3037,11 +3033,21 @@ def continue_quiz(attempt_id):
     # Get existing answers
     existing_answers = {answer.question_id: answer for answer in attempt.answers}
     
+    # Detect device type for mobile-specific proctoring
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile_keywords = ['mobile', 'android', 'iphone', 'ipod', 'blackberry', 'windows phone']
+    tablet_keywords = ['tablet', 'ipad']
+    
+    is_mobile = any(keyword in user_agent for keyword in mobile_keywords)
+    is_tablet = any(keyword in user_agent for keyword in tablet_keywords)
+    device_type = 'mobile' if is_mobile else ('tablet' if is_tablet else 'desktop')
+    
     return render_template('take_quiz.html', 
                          attempt=attempt, 
                          quiz=quiz, 
                          questions=questions,
-                         existing_answers=existing_answers)
+                         existing_answers=existing_answers,
+                         device_type=device_type)
 
 @app.route('/attempt/<int:attempt_id>/submit', methods=['POST'])
 @login_required

@@ -25,6 +25,101 @@
     right: 20px;
     z-index: 1000;
 }
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+    .quiz-container {
+        max-width: 100%;
+        padding: 10px;
+        margin: 0;
+    }
+    
+    .question-card {
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+    }
+    
+    .proctoring-status {
+        position: fixed;
+        top: 60px;
+        left: 10px;
+        right: 10px;
+        text-align: center;
+    }
+    
+    .proctoring-status .alert {
+        padding: 8px;
+        font-size: 0.9rem;
+    }
+    
+    /* Hide background to prevent distractions */
+    body {
+        background: #000 !important;
+    }
+    
+    .container, .quiz-container {
+        background: #fff;
+        border-radius: 0;
+    }
+    
+    /* Larger touch targets for mobile */
+    .form-check-input {
+        transform: scale(1.5);
+        margin-right: 15px;
+    }
+    
+    .form-check-label {
+        margin-left: 10px;
+        line-height: 1.6;
+    }
+    
+    .btn {
+        padding: 12px 20px;
+        font-size: 1.1rem;
+        border-radius: 8px;
+    }
+    
+    textarea.form-control {
+        font-size: 1.1rem;
+        padding: 15px;
+    }
+}
+
+/* Tablet-specific styles */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .quiz-container {
+        max-width: 90%;
+        padding: 15px;
+    }
+    
+    .question-card {
+        font-size: 1.05rem;
+    }
+}
+
+/* Security overlay styles */
+.mobile-security-warning {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #dc3545;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    z-index: 9999;
+    display: none;
+}
+
+.mobile-security-warning.show {
+    display: block;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
 </style>
 {% endblock %}
 
@@ -56,7 +151,7 @@
                             📷 Camera access granted and working
                         </label>
                     </div>
-                    <div class="form-check mb-3">
+                    <div class="form-check mb-3" id="microphone-check">
                         <input class="form-check-input" type="checkbox" id="check-microphone">
                         <label class="form-check-label" for="check-microphone">
                             🎤 Microphone access granted for environment monitoring
@@ -239,10 +334,16 @@
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
 {% if quiz.proctoring_enabled %}
+<!-- Load appropriate proctoring script based on device type -->
+{% if device_type == 'desktop' %}
 <script src="{{ url_for('static', filename='js/enhanced-proctoring.js') }}"></script>
+{% else %}
+<script src="{{ url_for('static', filename='js/mobile-proctoring.js') }}"></script>
+{% endif %}
 <script>
-// Enhanced Proctoring Integration
+// Proctoring Integration - Device Aware
 let enhancedProctoring = null;
+let mobileProctoringManager = null;
 let securityCheckPassed = false;
 
 // Security Check Modal Logic
@@ -253,6 +354,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Show security check modal on page load if proctoring is enabled
     {% if quiz.proctoring_enabled %}
+    // Customize security checks for mobile devices
+    const deviceType = '{{ device_type|default("desktop") }}';
+    if (deviceType === 'mobile' || deviceType === 'tablet') {
+        // Hide microphone check for mobile (we don't use audio recording)
+        const micCheck = document.getElementById('microphone-check');
+        if (micCheck) micCheck.style.display = 'none';
+    }
+    
     securityModal.show();
     {% endif %}
     
@@ -264,17 +373,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     checkboxes.forEach(cb => cb.addEventListener('change', updateStartButton));
     
-    // Start secure quiz process
+    // Start secure quiz process - device aware
     startButton.addEventListener('click', async function() {
         try {
-            // Initialize enhanced proctoring system
-            enhancedProctoring = new EnhancedProctoringSystem({{ attempt.id }}, {{ quiz.id }});
+            const deviceType = '{{ device_type|default("desktop") }}';
             
-            // Start camera monitoring
-            await enhancedProctoring.startLiveCameraMonitoring();
-            
-            // Activate do not disturb mode
-            enhancedProctoring.activateDoNotDisturbMode();
+            if (deviceType === 'mobile' || deviceType === 'tablet') {
+                // Initialize mobile proctoring system
+                if (typeof MobileProctoringManager !== 'undefined') {
+                    mobileProctoringManager = new MobileProctoringManager({{ attempt.id }}, deviceType);
+                } else {
+                    console.error('MobileProctoringManager not available');
+                }
+            } else {
+                // Initialize desktop enhanced proctoring system
+                if (typeof EnhancedProctoringSystem !== 'undefined') {
+                    enhancedProctoring = new EnhancedProctoringSystem({{ attempt.id }}, {{ quiz.id }});
+                    
+                    // Start camera monitoring
+                    await enhancedProctoring.startLiveCameraMonitoring();
+                    
+                    // Activate do not disturb mode
+                    enhancedProctoring.activateDoNotDisturbMode();
+                } else {
+                    console.error('EnhancedProctoringSystem not available');
+                }
+            }
             
             // Hide security modal
             securityModal.hide();
@@ -461,7 +585,38 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Auto-save every 30 seconds
     setInterval(saveDraft, 30000);
+    
+    // Initialize mobile proctoring warning but don't auto-start
+    const deviceType = '{{ device_type|default("desktop") }}';
+    if (deviceType === 'mobile' || deviceType === 'tablet') {
+        console.log('Mobile device detected:', deviceType);
+        showMobileSecurityWarning();
+    }
 });
+
+// Mobile security warning
+function showMobileSecurityWarning() {
+    const deviceType = '{{ device_type }}';
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'mobile-security-warning show';
+    warningDiv.innerHTML = `
+        <i class="fas fa-shield-alt"></i>
+        <strong>MOBILE SECURE MODE ACTIVE</strong>
+        - Camera enforced, Screenshots blocked, Background apps monitored
+    `;
+    
+    document.body.insertBefore(warningDiv, document.body.firstChild);
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+        warningDiv.classList.remove('show');
+        setTimeout(() => {
+            if (warningDiv.parentNode) {
+                warningDiv.parentNode.removeChild(warningDiv);
+            }
+        }, 300);
+    }, 5000);
+}
 
 // Warn before leaving page
 window.addEventListener('beforeunload', function(e) {
