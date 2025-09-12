@@ -4,7 +4,9 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_mail import Mail
+from flask_socketio import SocketIO
 from sqlalchemy.orm import DeclarativeBase
+import redis
 # Simple ProxyFix implementation for compatibility
 class ProxyFix:
     def __init__(self, app, x_proto=1, x_host=1):
@@ -22,6 +24,14 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
 mail = Mail()
+socketio = SocketIO()
+
+# Redis connection for real-time features
+try:
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_client.ping()  # Test connection
+except:
+    redis_client = None  # Fallback to in-memory storage
 
 # Create the app
 app = Flask(__name__)
@@ -51,6 +61,7 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER') or os.
 db.init_app(app)
 login_manager.init_app(app)
 mail.init_app(app)
+socketio.init_app(app, async_mode='eventlet', cors_allowed_origins="*", message_queue=f'redis://localhost:6379/0' if redis_client else None)
 
 # Configure login manager  
 login_manager.login_view = 'login'

@@ -323,3 +323,47 @@ class SecurityAlert(db.Model):
     
     def __repr__(self):
         return f'<SecurityAlert {self.alert_type}-{self.severity}>'
+
+class CollaborationSignal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    signal_type = db.Column(db.String(50), nullable=False)  # 'answer_similarity', 'simultaneous_answers', 'timing_correlation', 'shared_ip'
+    score = db.Column(db.Float, nullable=False)  # 0.0 to 1.0
+    severity = db.Column(db.String(20), default='info')  # 'info', 'warn', 'high'
+    participants = db.Column(db.JSON)  # Array of user_ids involved
+    window_start = db.Column(db.DateTime)
+    window_end = db.Column(db.DateTime)
+    details = db.Column(db.JSON)  # Additional signal details
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='open')  # 'open', 'acknowledged', 'resolved'
+    resolved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    resolved_at = db.Column(db.DateTime)
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    quiz = db.relationship('Quiz', backref='collaboration_signals')
+    resolver = db.relationship('User', foreign_keys=[resolved_by])
+    
+    def __repr__(self):
+        return f'<CollaborationSignal {self.signal_type} for quiz {self.quiz_id}>'
+
+class AttemptSimilarity(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    attempt_a_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'), nullable=False)
+    attempt_b_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'), nullable=False)
+    jaccard_score = db.Column(db.Float, default=0.0)
+    timing_correlation = db.Column(db.Float, default=0.0)
+    coanswer_count = db.Column(db.Integer, default=0)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    quiz = db.relationship('Quiz', backref='attempt_similarities')
+    attempt_a = db.relationship('QuizAttempt', foreign_keys=[attempt_a_id])
+    attempt_b = db.relationship('QuizAttempt', foreign_keys=[attempt_b_id])
+    
+    # Ensure unique combination
+    __table_args__ = (db.UniqueConstraint('quiz_id', 'attempt_a_id', 'attempt_b_id', name='uq_attempt_similarity'),)
+    
+    def __repr__(self):
+        return f'<AttemptSimilarity {self.attempt_a_id}-{self.attempt_b_id}: {self.jaccard_score}>'

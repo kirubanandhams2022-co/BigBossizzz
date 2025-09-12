@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Live Collaboration Monitoring - {{ quiz.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<style>
+    .collaboration-indicator {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .severity-high {
+        color: #dc3545;
+        animation: pulse-red 1s infinite;
+    }
+    
+    .severity-warn {
+        color: #ffc107;
+        animation: pulse-yellow 2s infinite;
+    }
+    
+    .severity-info {
+        color: #17a2b8;
+    }
+    
+    @keyframes pulse-red {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    @keyframes pulse-yellow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .participant-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #28a745;
+    }
+    
+    .participant-card.flagged {
+        border-left-color: #dc3545;
+        background-color: #fff5f5;
+    }
+    
+    .participant-card.suspicious {
+        border-left-color: #ffc107;
+        background-color: #fffbf0;
+    }
+    
+    .signal-feed {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .signal-item {
+        animation: slideIn 0.5s ease;
+    }
+    
+    @keyframes slideIn {
+        from { transform: translateX(-100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    .monitoring-stats {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .alert-sound {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-eye"></i> Live Collaboration Monitoring</h1>
+    <div class="btn-group">
+        <button id="toggleAlerts" class="btn btn-outline-warning">
+            <i class="fas fa-volume-up"></i> Alerts: <span id="alertStatus">ON</span>
+        </button>
+        <a href="{{ url_for('host_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Quiz Information -->
+<div class="card monitoring-stats mb-4">
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <h4><i class="fas fa-clipboard-list"></i></h4>
+                <h3>{{ quiz.title }}</h3>
+                <p class="mb-0">Quiz Being Monitored</p>
+            </div>
+            <div class="col-md-3">
+                <h4 id="activeParticipants">{{ active_attempts|length }}</h4>
+                <p class="mb-0">Active Participants</p>
+            </div>
+            <div class="col-md-3">
+                <h4 id="totalSignals">{{ recent_signals|length }}</h4>
+                <p class="mb-0">Collaboration Signals</p>
+            </div>
+            <div class="col-md-3">
+                <h4 id="connectionStatus" class="text-success">
+                    <i class="fas fa-wifi"></i> LIVE
+                </h4>
+                <p class="mb-0">Monitoring Status</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Participants Panel -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-users"></i> Active Participants</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="participantsGrid">
+                    {% for attempt in active_attempts %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card participant-card" data-user-id="{{ attempt.participant.id }}" data-attempt-id="{{ attempt.id }}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ attempt.participant.username }}</h6>
+                                        <small class="text-muted">{{ attempt.participant.email }}</small>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="collaboration-indicators">
+                                            <span class="similarity-indicator" title="Answer Similarity">
+                                                <i class="fas fa-copy"></i> <span class="score">0</span>
+                                            </span>
+                                            <span class="timing-indicator ms-2" title="Timing Correlation">
+                                                <i class="fas fa-clock"></i> <span class="score">0</span>
+                                            </span>
+                                        </div>
+                                        <div class="mt-1">
+                                            <small class="text-muted">Started: {{ attempt.started_at.strftime('%H:%M') }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not active_attempts %}
+                    <div class="col-12 text-center py-4">
+                        <i class="fas fa-user-slash fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Active Participants</h5>
+                        <p class="text-muted">Participants will appear here when they start taking the quiz.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Collaboration Signals Panel -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-exclamation-triangle"></i> Live Collaboration Signals</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="signal-feed" id="signalFeed">
+                    {% for signal in recent_signals %}
+                    <div class="signal-item p-3 border-bottom" data-signal-id="{{ signal.id }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge bg-{{ 'danger' if signal.severity == 'high' else 'warning' if signal.severity == 'warn' else 'info' }} mb-1">
+                                    {{ signal.severity.upper() }}
+                                </span>
+                                <h6 class="mb-1">{{ signal.signal_type.replace('_', ' ').title() }}</h6>
+                                <small class="text-muted">
+                                    Score: {{ "%.2f"|format(signal.score) }}
+                                    {% if signal.participants %}
+                                    | {{ signal.participants|length }} participants
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <small class="text-muted">{{ signal.created_at.strftime('%H:%M:%S') }}</small>
+                        </div>
+                        {% if signal.details %}
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                {% if signal.signal_type == 'answer_similarity' %}
+                                Similar answers on question {{ signal.details.get('question_id', 'N/A') }}
+                                {% elif signal.signal_type == 'simultaneous_answers' %}
+                                {{ signal.details.get('participants_count', 0) }} participants answered within {{ signal.details.get('time_difference_seconds', 0) }}s
+                                {% elif signal.signal_type == 'timing_correlation' %}
+                                Correlation coefficient: {{ "%.3f"|format(signal.details.get('correlation_coefficient', 0)) }}
+                                {% elif signal.signal_type == 'shared_ip' %}
+                                {{ signal.details.get('concurrent_users', 0) }} users from same network
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not recent_signals %}
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-shield-alt fa-2x mb-2"></i>
+                        <p class="mb-0">No collaboration signals detected</p>
+                        <small>Monitoring is active and will show alerts here</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-tools"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('admin_collaboration_signals') }}?quiz_id={{ quiz.id }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-list"></i> View All Signals
+                    </a>
+                    <button class="btn btn-sm btn-outline-warning" onclick="exportSignalsReport()">
+                        <i class="fas fa-download"></i> Export Report
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="terminateQuiz()" {% if not active_attempts %}disabled{% endif %}>
+                        <i class="fas fa-stop"></i> Emergency Stop
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Sound -->
+<audio id="alertSound" class="alert-sound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmMZBjyV2e/CeSkHKn3L9V12JggWYLfs54FNBwRJrObrt2UWBjiS2e/HeSgKKXPH9t2QQgwVXrPn68FYDwM+lN3ys2MaBtn74Oy+jjMFK4DG8dqhYxwFJnvH8t15JQcYZLfp66NVEwVMquXqumMZBy2AzPDakzYJF2C09N18NQocYrfq63hODAZEouLovGcYCDeW1/LNeSsFJXfJ9d2QRQwRXbTn7cxWEgNNr+PrtGIaB0KH4d6h52XQAAFaqSFyDx26Iy4XDAE=" type="audio/wav">
+</audio>
+
+<script>
+let socket;
+let alertsEnabled = true;
+let signalCount = {{ recent_signals|length }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeWebSocket();
+    setupEventHandlers();
+    
+    // Update connection status every 30 seconds
+    setInterval(updateConnectionStatus, 30000);
+});
+
+function initializeWebSocket() {
+    socket = io('/collab');
+    
+    socket.on('connect', function() {
+        console.log('Connected to collaboration monitoring');
+        updateConnectionStatus(true);
+        
+        // Join monitoring room for this quiz
+        socket.emit('join_monitoring', {
+            quiz_id: {{ quiz.id }}
+        });
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('Disconnected from collaboration monitoring');
+        updateConnectionStatus(false);
+    });
+    
+    socket.on('monitoring_joined', function(data) {
+        console.log('Joined monitoring room:', data.message);
+    });
+    
+    socket.on('collaboration_signal', function(data) {
+        console.log('New collaboration signal:', data);
+        addNewSignal(data);
+        
+        // Play alert sound if enabled
+        if (alertsEnabled && data.severity === 'high') {
+            playAlertSound();
+        }
+        
+        // Update participant indicators
+        updateParticipantIndicators(data);
+        
+        // Update signal count
+        signalCount++;
+        document.getElementById('totalSignals').textContent = signalCount;
+    });
+    
+    socket.on('aggregate_update', function(data) {
+        // Update aggregate statistics if needed
+        console.log('Aggregate update:', data);
+    });
+}
+
+function setupEventHandlers() {
+    // Toggle alerts
+    document.getElementById('toggleAlerts').addEventListener('click', function() {
+        alertsEnabled = !alertsEnabled;
+        const status = document.getElementById('alertStatus');
+        const button = this;
+        
+        if (alertsEnabled) {
+            status.textContent = 'ON';
+            button.className = 'btn btn-outline-warning';
+        } else {
+            status.textContent = 'OFF';
+            button.className = 'btn btn-outline-secondary';
+        }
+    });
+}
+
+function addNewSignal(data) {
+    const signalFeed = document.getElementById('signalFeed');
+    
+    // Remove "no signals" message if present
+    const noSignalsMsg = signalFeed.querySelector('.text-muted');
+    if (noSignalsMsg && noSignalsMsg.textContent.includes('No collaboration signals')) {
+        noSignalsMsg.parentElement.remove();
+    }
+    
+    const severityClass = data.severity === 'high' ? 'danger' : 
+                         data.severity === 'warn' ? 'warning' : 'info';
+    
+    const signalHtml = `
+        <div class="signal-item p-3 border-bottom" data-signal-id="${data.signal_id}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="badge bg-${severityClass} mb-1">${data.severity.toUpperCase()}</span>
+                    <h6 class="mb-1">${data.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</h6>
+                    <small class="text-muted">
+                        Score: ${data.score.toFixed(2)}
+                        ${data.participants ? `| ${data.participants.length} participants` : ''}
+                    </small>
+                </div>
+                <small class="text-muted">${new Date().toLocaleTimeString()}</small>
+            </div>
+            ${data.details ? getSignalDetails(data.type, data.details) : ''}
+        </div>
+    `;
+    
+    signalFeed.insertAdjacentHTML('afterbegin', signalHtml);
+    
+    // Limit number of signals shown
+    const signals = signalFeed.querySelectorAll('.signal-item');
+    if (signals.length > 20) {
+        signals[signals.length - 1].remove();
+    }
+}
+
+function getSignalDetails(type, details) {
+    let detailText = '';
+    
+    switch(type) {
+        case 'answer_similarity':
+            detailText = `Similar answers on question ${details.question_id || 'N/A'}`;
+            break;
+        case 'simultaneous_answers':
+            detailText = `${details.participants_count || 0} participants answered within ${details.time_difference_seconds || 0}s`;
+            break;
+        case 'timing_correlation':
+            detailText = `Correlation coefficient: ${(details.correlation_coefficient || 0).toFixed(3)}`;
+            break;
+        case 'shared_ip':
+            detailText = `${details.concurrent_users || 0} users from same network`;
+            break;
+    }
+    
+    return detailText ? `
+        <div class="mt-2">
+            <small class="text-muted">${detailText}</small>
+        </div>
+    ` : '';
+}
+
+function updateParticipantIndicators(data) {
+    if (!data.participants) return;
+    
+    data.participants.forEach(userId => {
+        const participantCard = document.querySelector(`[data-user-id="${userId}"]`);
+        if (participantCard) {
+            // Add visual indicators based on signal type and severity
+            if (data.severity === 'high') {
+                participantCard.classList.add('flagged');
+            } else if (data.severity === 'warn') {
+                participantCard.classList.add('suspicious');
+            }
+            
+            // Update specific indicators
+            if (data.type === 'answer_similarity') {
+                const indicator = participantCard.querySelector('.similarity-indicator .score');
+                if (indicator) {
+                    indicator.textContent = data.score.toFixed(2);
+                    indicator.parentElement.classList.add(`severity-${data.severity}`);
+                }
+            } else if (data.type === 'timing_correlation') {
+                const indicator = participantCard.querySelector('.timing-indicator .score');
+                if (indicator) {
+                    indicator.textContent = data.score.toFixed(2);
+                    indicator.parentElement.classList.add(`severity-${data.severity}`);
+                }
+            }
+        }
+    });
+}
+
+function updateConnectionStatus(connected = true) {
+    const status = document.getElementById('connectionStatus');
+    if (connected) {
+        status.innerHTML = '<i class="fas fa-wifi"></i> LIVE';
+        status.className = 'text-success';
+    } else {
+        status.innerHTML = '<i class="fas fa-wifi"></i> OFFLINE';
+        status.className = 'text-danger';
+    }
+}
+
+function playAlertSound() {
+    const audio = document.getElementById('alertSound');
+    audio.currentTime = 0;
+    audio.play().catch(e => console.log('Could not play alert sound:', e));
+}
+
+function exportSignalsReport() {
+    window.open(`/admin/collaboration-signals?quiz_id={{ quiz.id }}&export=excel`, '_blank');
+}
+
+function terminateQuiz() {
+    if (confirm('Are you sure you want to terminate this quiz for all participants? This action cannot be undone.')) {
+        fetch(`/admin/quiz/{{ quiz.id }}/terminate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Quiz terminated successfully');
+                location.reload();
+            } else {
+                alert('Error terminating quiz: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error terminating quiz');
+        });
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (socket) {
+        socket.emit('leave_monitoring', {quiz_id: {{ quiz.id }}});
+        socket.disconnect();
+    }
+});
+</script>
+{% endblock %}
