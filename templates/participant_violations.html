@@ -32,8 +32,7 @@
         <div class="col-md-3 col-6 mb-3">
             <div class="card bg-warning text-white">
                 <div class="card-body text-center">
-                    {% set critical_violations = violations_by_attempt.values()|map(attribute='violations')|flatten|selectattr('severity', 'equalto', 'critical')|list|length %}
-                    <h3 class="mb-1">{{ critical_violations }}</h3>
+                    <h3 class="mb-1">{{ critical_count }}</h3>
                     <small>Critical</small>
                 </div>
             </div>
@@ -41,8 +40,7 @@
         <div class="col-md-3 col-6 mb-3">
             <div class="card bg-info text-white">
                 <div class="card-body text-center">
-                    {% set high_violations = violations_by_attempt.values()|map(attribute='violations')|flatten|selectattr('severity', 'equalto', 'high')|list|length %}
-                    <h3 class="mb-1">{{ high_violations }}</h3>
+                    <h3 class="mb-1">{{ high_count }}</h3>
                     <small>High</small>
                 </div>
             </div>

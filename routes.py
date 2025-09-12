@@ -470,14 +470,23 @@ def participant_completed():
         flash('Access denied. Participants only.', 'error')
         return redirect(url_for('index'))
     
-    # Get completed quiz attempts
+    # Get completed quiz attempts with eager loading
     completed_attempts = QuizAttempt.query.filter_by(
         participant_id=current_user.id, 
         status='completed'
+    ).options(
+        db.joinedload(QuizAttempt.quiz).joinedload(Quiz.questions),
+        db.joinedload(QuizAttempt.answers)
     ).order_by(QuizAttempt.completed_at.desc()).all()
+    
+    # Calculate total questions answered
+    total_questions_answered = 0
+    for attempt in completed_attempts:
+        total_questions_answered += len(attempt.quiz.questions)
     
     return render_template('participant_completed.html', 
                          completed_attempts=completed_attempts,
+                         total_questions_answered=total_questions_answered,
                          greeting=get_time_greeting(),
                          greeting_icon=get_greeting_icon())
 
@@ -489,11 +498,25 @@ def participant_in_progress():
         flash('Access denied. Participants only.', 'error')
         return redirect(url_for('index'))
     
-    # Get in-progress quiz attempts
+    # Get in-progress quiz attempts with eager loading
     in_progress_attempts = QuizAttempt.query.filter_by(
         participant_id=current_user.id, 
         status='in_progress'
+    ).options(
+        db.joinedload(QuizAttempt.quiz).joinedload(Quiz.questions),
+        db.joinedload(QuizAttempt.answers)
     ).order_by(QuizAttempt.started_at.desc()).all()
+    
+    # Calculate time remaining for each attempt
+    from datetime import datetime, timedelta
+    for attempt in in_progress_attempts:
+        if attempt.quiz.time_limit and attempt.started_at:
+            time_elapsed = datetime.utcnow() - attempt.started_at
+            time_elapsed_minutes = time_elapsed.total_seconds() / 60
+            time_remaining = attempt.quiz.time_limit - time_elapsed_minutes
+            attempt.time_remaining = max(0, int(time_remaining))
+        else:
+            attempt.time_remaining = None
     
     return render_template('participant_in_progress.html', 
                          in_progress_attempts=in_progress_attempts,
@@ -508,11 +531,14 @@ def participant_average_score():
         flash('Access denied. Participants only.', 'error')
         return redirect(url_for('index'))
     
-    # Get completed quiz attempts with scores
+    # Get completed quiz attempts with scores and eager loading
     scored_attempts = QuizAttempt.query.filter_by(
         participant_id=current_user.id, 
         status='completed'
-    ).filter(QuizAttempt.score.is_not(None)).order_by(QuizAttempt.completed_at.desc()).all()
+    ).filter(QuizAttempt.score.is_not(None)).options(
+        db.joinedload(QuizAttempt.quiz),
+        db.joinedload(QuizAttempt.answers)
+    ).order_by(QuizAttempt.completed_at.desc()).all()
     
     # Calculate score statistics
     if scored_attempts:
@@ -520,9 +546,20 @@ def participant_average_score():
         avg_score = sum(scores) / len(scores)
         highest_score = max(scores)
         lowest_score = min(scores)
+        
+        # Calculate performance breakdown
+        excellent_count = len([s for s in scores if s >= 80])
+        good_count = len([s for s in scores if 60 <= s < 80])
+        needs_improvement_count = len([s for s in scores if s < 60])
     else:
         avg_score = highest_score = lowest_score = 0
-        scores = []
+        excellent_count = good_count = needs_improvement_count = 0
+    
+    performance_breakdown = {
+        'excellent': excellent_count,
+        'good': good_count,
+        'needs_improvement': needs_improvement_count
+    }
     
     return render_template('participant_average_score.html', 
                          scored_attempts=scored_attempts,
@@ -530,6 +567,7 @@ def participant_average_score():
                          highest_score=highest_score,
                          lowest_score=lowest_score,
                          total_quizzes=len(scored_attempts),
+                         performance_breakdown=performance_breakdown,
                          greeting=get_time_greeting(),
                          greeting_icon=get_greeting_icon())
 
@@ -541,14 +579,26 @@ def participant_violations():
         flash('Access denied. Participants only.', 'error')
         return redirect(url_for('index'))
     
-    # Get all proctoring events for this participant
+    # Get all proctoring events for this participant with eager loading
     violations = ProctoringEvent.query.join(QuizAttempt).filter(
         QuizAttempt.participant_id == current_user.id
+    ).options(
+        db.joinedload(ProctoringEvent.attempt).joinedload(QuizAttempt.quiz)
     ).order_by(ProctoringEvent.timestamp.desc()).all()
     
-    # Group violations by quiz attempt
+    # Group violations by quiz attempt and count by severity
     violations_by_attempt = {}
+    critical_count = 0
+    high_count = 0
+    
     for violation in violations:
+        # Count by severity
+        if violation.severity == 'critical':
+            critical_count += 1
+        elif violation.severity == 'high':
+            high_count += 1
+            
+        # Group by attempt
         attempt_id = violation.attempt_id
         if attempt_id not in violations_by_attempt:
             violations_by_attempt[attempt_id] = {
@@ -560,6 +610,8 @@ def participant_violations():
     return render_template('participant_violations.html', 
                          violations_by_attempt=violations_by_attempt,
                          total_violations=len(violations),
+                         critical_count=critical_count,
+                         high_count=high_count,
                          greeting=get_time_greeting(),
                          greeting_icon=get_greeting_icon())
 
