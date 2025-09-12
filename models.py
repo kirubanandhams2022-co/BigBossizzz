@@ -13,6 +13,7 @@ class Course(db.Model):
     max_participants = db.Column(db.Integer, default=100)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
+    display_order = db.Column(db.Integer, default=0)  # For drag-and-drop ordering
     
     # Relationships
     host_assignments = db.relationship('HostCourseAssignment', backref='course', lazy=True, cascade='all, delete-orphan')
@@ -119,6 +120,9 @@ class Quiz(db.Model):
     face_detection_required = db.Column(db.Boolean, default=True)
     screen_recording_required = db.Column(db.Boolean, default=False)
     browser_lockdown = db.Column(db.Boolean, default=True)
+    
+    # Ordering for drag-and-drop
+    display_order = db.Column(db.Integer, default=0)  # For course-level quiz ordering
     
     # Relationships
     questions = db.relationship('Question', backref='quiz', lazy=True, cascade='all, delete-orphan')
