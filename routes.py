@@ -3946,7 +3946,7 @@ def create_question_from_comprehensive_data(quiz, question_data):
                     question_id=question.id,
                     option_text=option_text,
                     is_correct=(i == correct_index),
-                    option_order=i
+                    order=i
                 )
                 db.session.add(option)
     
