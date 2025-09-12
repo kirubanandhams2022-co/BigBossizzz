@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}RBAC Management - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-shield-alt me-2"></i>Role & Permission Management</h2>
+                <div>
+                    <button class="btn btn-primary" onclick="initializeRBAC()">
+                        <i class="fas fa-sync-alt me-1"></i>Initialize RBAC
+                    </button>
+                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Admin
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4>{{ stats.total_roles }}</h4>
+                                    <p class="mb-0">Total Roles</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-users fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4>{{ stats.total_permissions }}</h4>
+                                    <p class="mb-0">Permissions</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-key fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4>{{ stats.active_roles }}</h4>
+                                    <p class="mb-0">Active Roles</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4>{{ stats.total_users_with_roles }}</h4>
+                                    <p class="mb-0">Assigned Users</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-user-check fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-users fa-3x text-primary mb-3"></i>
+                            <h5>Manage Roles</h5>
+                            <p class="text-muted">Create, edit, and delete roles</p>
+                            <a href="{{ url_for('admin_rbac_roles') }}" class="btn btn-primary">
+                                Manage Roles
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-key fa-3x text-success mb-3"></i>
+                            <h5>Manage Permissions</h5>
+                            <p class="text-muted">Configure system permissions</p>
+                            <a href="{{ url_for('admin_rbac_permissions') }}" class="btn btn-success">
+                                Manage Permissions
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-tag fa-3x text-info mb-3"></i>
+                            <h5>User Assignments</h5>
+                            <p class="text-muted">Assign roles to users</p>
+                            <a href="{{ url_for('admin_rbac_user_assignments') }}" class="btn btn-info">
+                                Assign Roles
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-history fa-3x text-warning mb-3"></i>
+                            <h5>Audit Logs</h5>
+                            <p class="text-muted">View role changes history</p>
+                            <a href="{{ url_for('admin_rbac_audit_logs') }}" class="btn btn-warning">
+                                View Logs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Audit Logs -->
+            {% if recent_logs %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                    <th>Entity</th>
+                                    <th>User</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in recent_logs %}
+                                <tr>
+                                    <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ log.action }}</span>
+                                    </td>
+                                    <td>{{ log.entity_type|title }}</td>
+                                    <td>{{ log.performed_by_user.username if log.performed_by_user else 'System' }}</td>
+                                    <td>{{ log.details[:50] + '...' if log.details and log.details|length > 50 else log.details or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function initializeRBAC() {
+    if (confirm('This will initialize the RBAC system with default roles and permissions. Continue?')) {
+        fetch('/api/rbac/initialize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('RBAC system initialized successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Error initializing RBAC system');
+            console.error(error);
+        });
+    }
+}
+</script>
+{% endblock %}
