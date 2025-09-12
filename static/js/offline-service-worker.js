@@ -125,7 +125,7 @@ async function handleStaticAsset(request) {
         return networkResponse;
         
     } catch (error) {
-        console.error('❌ Failed to handle static asset:', error);
+        console.error('? Failed to handle static asset:', error);
         
         // Return cached version if available
         const cache = await caches.open(STATIC_CACHE);
@@ -165,7 +165,7 @@ async function handleQuizRequest(request) {
         return getOfflineQuizPage();
         
     } catch (error) {
-        console.error('❌ Network error for quiz request:', error);
+        console.error('? Network error for quiz request:', error);
         
         // Try to serve from cache
         const cache = await caches.open(DYNAMIC_CACHE);
@@ -193,7 +193,7 @@ async function handleAPIRequest(request) {
         return networkResponse;
         
     } catch (error) {
-        console.error('❌ API request failed:', error);
+        console.error('? API request failed:', error);
         
         // For quiz-related APIs in offline mode
         if (url.pathname.includes('/quiz/') || url.pathname.includes('/api/quiz/')) {
@@ -241,7 +241,7 @@ async function handleOtherRequests(request) {
         return networkResponse;
         
     } catch (error) {
-        console.error('❌ Request failed:', error);
+        console.error('? Request failed:', error);
         
         // Try cache one more time
         const cache = await caches.open(DYNAMIC_CACHE);
@@ -323,7 +323,7 @@ function getOfflineQuizPage() {
     </head>
     <body>
         <div class="container">
-            <div class="offline-icon">📡</div>
+            <div class="offline-icon">?</div>
             <h1>Offline Mode Active</h1>
             <div class="message">
                 <p>You're currently offline, but don't worry! BigBossizzz has you covered.</p>
@@ -338,16 +338,16 @@ function getOfflineQuizPage() {
             <div class="features">
                 <h3>Offline Features Available:</h3>
                 <div class="feature">
-                    ✅ Continue taking your current quiz
+                    ? Continue taking your current quiz
                 </div>
                 <div class="feature">
-                    ✅ All answers are saved locally
+                    ? All answers are saved locally
                 </div>
                 <div class="feature">
-                    ✅ Automatic sync when connection returns
+                    ? Automatic sync when connection returns
                 </div>
                 <div class="feature">
-                    ✅ Theme and accessibility preferences maintained
+                    ? Theme and accessibility preferences maintained
                 </div>
             </div>
         </div>
@@ -409,7 +409,7 @@ function getOfflinePage() {
     </head>
     <body>
         <div class="container">
-            <div class="offline-icon">🌐</div>
+            <div class="offline-icon">?</div>
             <h1>You're Offline</h1>
             <p>This page isn't available offline. Please check your connection and try again.</p>
             <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 20px;">Try Again</button>
@@ -485,10 +485,10 @@ async function cacheQuizData(quizData) {
         });
         
         await cache.put(`/api/quiz/${quizData.id}/offline`, response);
-        console.log('📦 Quiz data cached for offline use:', quizData.id);
+        console.log('? Quiz data cached for offline use:', quizData.id);
         
     } catch (error) {
-        console.error('❌ Failed to cache quiz data:', error);
+        console.error('? Failed to cache quiz data:', error);
     }
 }
 
@@ -516,9 +516,9 @@ async function getCacheInfo() {
         return info;
         
     } catch (error) {
-        console.error('❌ Failed to get cache info:', error);
+        console.error('? Failed to get cache info:', error);
         return { error: 'Failed to get cache info' };
     }
 }
 
-console.log('🔧 BigBossizzz Service Worker loaded');
+console.log('? BigBossizzz Service Worker loaded');
