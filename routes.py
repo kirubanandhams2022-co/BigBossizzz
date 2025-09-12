@@ -6,6 +6,7 @@ from app import app, db, mail, socketio
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch
 from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
                             get_lti_provider, get_lti_grade_passback)
+from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -6151,3 +6152,185 @@ def lti_grade_passback_trigger(response):
         logging.error(f"LTI grade passback trigger error: {e}")
     
     return response
+
+# ===== Automated Proctoring Reports System =====
+
+@app.route('/admin/proctoring-reports')
+@login_required
+def admin_proctoring_reports():
+    """Proctoring reports dashboard for administrators"""
+    if not current_user.is_admin():
+        flash('Access denied.', 'error')
+        return redirect(url_for('home'))
+    
+    try:
+        # Get recent report summary
+        generator = ProctoringReportGenerator()
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=7)  # Last 7 days
+        
+        # Generate quick summary for dashboard
+        recent_report = generator.generate_comprehensive_report(start_date, end_date)
+        
+        # Get available quizzes for filtering
+        quizzes = Quiz.query.filter_by(is_active=True).all()
+        
+        # Get report statistics
+        report_stats = {
+            'total_attempts_last_week': len(recent_report.get('detailed_findings', {}).get('high_risk_attempts', {}).get('details', [])),
+            'integrity_score': recent_report.get('ai_analysis', {}).get('overall_integrity_score', {}).get('score', 0),
+            'critical_violations': len(recent_report.get('detailed_findings', {}).get('critical_violations', {}).get('details', [])),
+            'security_events': len(recent_report.get('detailed_findings', {}).get('security_events', {}).get('details', []))
+        }
+        
+        return render_template('admin_proctoring_reports.html',
+                             recent_report=recent_report,
+                             report_stats=report_stats,
+                             quizzes=quizzes)
+        
+    except Exception as e:
+        logging.error(f"Error loading proctoring reports dashboard: {e}")
+        flash('Error loading proctoring reports. Please try again.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/api/generate-proctoring-report', methods=['POST'])
+@login_required
+def api_generate_proctoring_report():
+    """Generate custom proctoring report via API"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        # Parse date parameters
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        quiz_ids = data.get('quiz_ids', [])
+        user_ids = data.get('user_ids', [])
+        
+        if not start_date_str or not end_date_str:
+            return jsonify({'error': 'Start and end dates are required'}), 400
+        
+        # Parse dates
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+        
+        # Validate date range
+        if start_date >= end_date:
+            return jsonify({'error': 'Start date must be before end date'}), 400
+        
+        if (end_date - start_date).days > 90:
+            return jsonify({'error': 'Date range cannot exceed 90 days'}), 400
+        
+        # Generate report
+        generator = ProctoringReportGenerator()
+        report = generator.generate_comprehensive_report(
+            start_date, end_date, quiz_ids if quiz_ids else None, user_ids if user_ids else None
+        )
+        
+        if 'error' in report:
+            return jsonify({'error': f'Report generation failed: {report["error"]}'}), 500
+        
+        return jsonify({
+            'success': True,
+            'report': report,
+            'download_url': f'/api/download-report/{report["report_id"]}'
+        })
+        
+    except ValueError as e:
+        return jsonify({'error': f'Invalid date format: {str(e)}'}), 400
+    except Exception as e:
+        logging.error(f"Error generating proctoring report: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/proctoring-analytics', methods=['GET'])
+@login_required
+def api_proctoring_analytics():
+    """Get proctoring analytics data for charts and graphs"""
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        # Get date range from query parameters
+        days = request.args.get('days', 30, type=int)
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+        
+        # Get violation trends
+        violations_by_day = db.session.query(
+            func.date(UserViolation.flagged_at).label('date'),
+            func.count(UserViolation.id).label('count')
+        ).filter(
+            UserViolation.flagged_at >= start_date,
+            UserViolation.flagged_at <= end_date
+        ).group_by(func.date(UserViolation.flagged_at)).all()
+        
+        # Get proctoring events by type
+        events_by_type = db.session.query(
+            ProctoringEvent.event_type,
+            func.count(ProctoringEvent.id).label('count')
+        ).filter(
+            ProctoringEvent.timestamp >= start_date,
+            ProctoringEvent.timestamp <= end_date
+        ).group_by(ProctoringEvent.event_type).all()
+        
+        # Get security alerts by severity
+        alerts_by_severity = db.session.query(
+            SecurityAlert.severity,
+            func.count(SecurityAlert.id).label('count')
+        ).filter(
+            SecurityAlert.created_at >= start_date,
+            SecurityAlert.created_at <= end_date
+        ).group_by(SecurityAlert.severity).all()
+        
+        # Get quiz completion rates
+        total_attempts = db.session.query(QuizAttempt).filter(
+            QuizAttempt.started_at >= start_date,
+            QuizAttempt.started_at <= end_date
+        ).count()
+        
+        completed_attempts = db.session.query(QuizAttempt).filter(
+            QuizAttempt.started_at >= start_date,
+            QuizAttempt.started_at <= end_date,
+            QuizAttempt.status == 'completed'
+        ).count()
+        
+        flagged_attempts = db.session.query(QuizAttempt).filter(
+            QuizAttempt.started_at >= start_date,
+            QuizAttempt.started_at <= end_date,
+            QuizAttempt.is_flagged == True
+        ).count()
+        
+        analytics_data = {
+            'violation_trends': [
+                {'date': str(row.date), 'count': row.count} 
+                for row in violations_by_day
+            ],
+            'events_by_type': [
+                {'type': row.event_type, 'count': row.count} 
+                for row in events_by_type
+            ],
+            'alerts_by_severity': [
+                {'severity': row.severity, 'count': row.count} 
+                for row in alerts_by_severity
+            ],
+            'completion_stats': {
+                'total_attempts': total_attempts,
+                'completed_attempts': completed_attempts,
+                'flagged_attempts': flagged_attempts,
+                'completion_rate': round((completed_attempts / total_attempts * 100) if total_attempts > 0 else 0, 2),
+                'flag_rate': round((flagged_attempts / total_attempts * 100) if total_attempts > 0 else 0, 2)
+            },
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'days': days
+            }
+        }
+        
+        return jsonify(analytics_data)
+        
+    except Exception as e:
+        logging.error(f"Error generating proctoring analytics: {e}")
+        return jsonify({'error': 'Failed to generate analytics'}), 500
