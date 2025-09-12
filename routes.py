@@ -2089,7 +2089,11 @@ def admin_delete_user(user_id):
             # Delete the quiz
             db.session.delete(quiz)
         
-        # 4. Finally delete the user
+        # 4. Delete course enrollments and assignments
+        ParticipantEnrollment.query.filter_by(participant_id=user.id).delete()
+        HostCourseAssignment.query.filter_by(host_id=user.id).delete()
+        
+        # 5. Finally delete the user
         username = user.username
         db.session.delete(user)
         db.session.commit()
@@ -2191,7 +2195,7 @@ def admin_bulk_delete_users():
                 db.session.delete(quiz)
             
             # 4. Delete course enrollments and assignments
-            ParticipantEnrollment.query.filter_by(user_id=user.id).delete()
+            ParticipantEnrollment.query.filter_by(participant_id=user.id).delete()
             HostCourseAssignment.query.filter_by(host_id=user.id).delete()
             
             # 5. Finally delete the user
