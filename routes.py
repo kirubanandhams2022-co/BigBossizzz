@@ -5505,6 +5505,18 @@ def admin_bulk_enroll_participants(course_id):
     course = Course.query.get_or_404(course_id)
     participant_ids = request.form.getlist('participant_ids')
     
+    # DEBUG: Log what we're receiving
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger(__name__)
+    logger.debug(f"🔍 BULK ENROLL DEBUG - Course: {course.name} (ID: {course_id})")
+    logger.debug(f"🔍 Form data keys: {list(request.form.keys())}")
+    logger.debug(f"🔍 All form data: {dict(request.form)}")
+    logger.debug(f"🔍 participant_ids received: {participant_ids}")
+    logger.debug(f"🔍 Number of participant_ids: {len(participant_ids)}")
+    
+    print(f"🔍 BULK ENROLL - Course: {course.name}, participant_ids: {participant_ids}, count: {len(participant_ids)}")
+    
     if not participant_ids:
         flash('Please select participants to enroll.', 'error')
         return redirect(url_for('admin_course_management'))
