@@ -335,16 +335,6 @@
                                                title="Manage user flags and review flagged accounts.">
                                             <i class="fas fa-flag"></i> User Flags
                                         </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_analytics') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="View comprehensive system analytics and performance metrics.">
-                                            <i class="fas fa-chart-line"></i> System Analytics
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="{{ url_for('admin_bulk_users') }}" 
-                                               data-bs-toggle="tooltip" data-bs-placement="left" 
-                                               title="Perform bulk operations on user accounts and data management.">
-                                            <i class="fas fa-users-cog"></i> Bulk Operations
-                                        </a></li>
                                     </div>
                                 {% endif %}
                                 {% if current_user.is_host() %}
