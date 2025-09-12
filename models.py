@@ -225,6 +225,97 @@ class ProctoringEvent(db.Model):
     def __repr__(self):
         return f'<ProctoringEvent {self.event_type}>'
 
+class AlertThreshold(db.Model):
+    """Model to store customizable alert thresholds for proctoring events"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # Human readable name
+    event_type = db.Column(db.String(50), nullable=False)  # 'tab_switch', 'window_blur', etc.
+    
+    # Threshold settings
+    low_threshold = db.Column(db.Integer, default=5)     # Count for low severity
+    medium_threshold = db.Column(db.Integer, default=3)  # Count for medium severity  
+    high_threshold = db.Column(db.Integer, default=1)    # Count for high severity
+    
+    # Time window for counting events (in minutes)
+    time_window = db.Column(db.Integer, default=10)
+    
+    # Actions to take when threshold is exceeded
+    send_alert = db.Column(db.Boolean, default=True)
+    notify_proctor = db.Column(db.Boolean, default=True)
+    auto_flag_attempt = db.Column(db.Boolean, default=False)
+    auto_terminate = db.Column(db.Boolean, default=False)
+    
+    # Scope settings
+    is_global = db.Column(db.Boolean, default=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Relationships
+    creator = db.relationship('User', backref='created_thresholds')
+    quiz_overrides = db.relationship('QuizThresholdOverride', backref='threshold', cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<AlertThreshold {self.name}>'
+
+class QuizThresholdOverride(db.Model):
+    """Model to override global thresholds for specific quizzes"""
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    threshold_id = db.Column(db.Integer, db.ForeignKey('alert_threshold.id'), nullable=False)
+    
+    # Override values (NULL means use global threshold)
+    low_threshold = db.Column(db.Integer, nullable=True)
+    medium_threshold = db.Column(db.Integer, nullable=True)
+    high_threshold = db.Column(db.Integer, nullable=True)
+    time_window = db.Column(db.Integer, nullable=True)
+    
+    # Action overrides
+    send_alert = db.Column(db.Boolean, nullable=True)
+    notify_proctor = db.Column(db.Boolean, nullable=True)
+    auto_flag_attempt = db.Column(db.Boolean, nullable=True)
+    auto_terminate = db.Column(db.Boolean, nullable=True)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    quiz = db.relationship('Quiz', backref='threshold_overrides')
+    
+    def __repr__(self):
+        return f'<QuizThresholdOverride Quiz:{self.quiz_id} Threshold:{self.threshold_id}>'
+
+class AlertTrigger(db.Model):
+    """Model to log when alert thresholds are exceeded"""
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'), nullable=False)
+    threshold_id = db.Column(db.Integer, db.ForeignKey('alert_threshold.id'), nullable=False)
+    
+    # Event details
+    event_type = db.Column(db.String(50), nullable=False)
+    trigger_count = db.Column(db.Integer, nullable=False)  # Number of events that triggered this
+    severity_level = db.Column(db.String(20), nullable=False)  # 'low', 'medium', 'high'
+    
+    # Actions taken
+    alert_sent = db.Column(db.Boolean, default=False)
+    proctor_notified = db.Column(db.Boolean, default=False)
+    attempt_flagged = db.Column(db.Boolean, default=False)
+    attempt_terminated = db.Column(db.Boolean, default=False)
+    
+    # Metadata
+    triggered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    attempt = db.relationship('QuizAttempt', backref='alert_triggers')
+    threshold = db.relationship('AlertThreshold', backref='triggered_alerts')
+    resolver = db.relationship('User', foreign_keys=[resolved_by])
+    
+    def __repr__(self):
+        return f'<AlertTrigger {self.event_type} - {self.severity_level}>'
+
 class LoginEvent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

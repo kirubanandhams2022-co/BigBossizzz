@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Alert Threshold{% endblock %}
+
+{% block extra_css %}
+<style>
+    .threshold-form {
+        background: #1c2938;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 30px;
+        margin-bottom: 25px;
+    }
+    
+    .section-header {
+        color: #3b82f6;
+        border-bottom: 2px solid #334155;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .threshold-preview {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+    
+    .preview-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #334155;
+    }
+    
+    .preview-item:last-child {
+        border-bottom: none;
+    }
+    
+    .severity-example {
+        margin-top: 15px;
+        padding: 15px;
+        background: #0f172a;
+        border-radius: 6px;
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .action-card {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .form-switch {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .form-switch input[type="checkbox"] {
+        width: 50px;
+        height: 25px;
+    }
+    
+    .threshold-info {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 25px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="text-light mb-1">Edit Alert Threshold</h2>
+                    <p class="text-muted mb-0">Modify threshold settings for {{ threshold.event_type.replace('_', ' ').title() }}</p>
+                </div>
+                <a href="{{ url_for('admin_alert_thresholds') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Thresholds
+                </a>
+            </div>
+
+            <!-- Current Threshold Info -->
+            <div class="threshold-info">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-light mb-1">Current Threshold</h6>
+                        <p class="text-muted mb-2">{{ threshold.name }}</p>
+                        <small class="text-muted">
+                            Event Type: <span class="text-light">{{ threshold.event_type.replace('_', ' ').title() }}</span>
+                        </small>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-light mb-1">Last Updated</h6>
+                        <p class="text-muted mb-2">{{ threshold.updated_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                        <small class="text-muted">
+                            Created by: <span class="text-light">{{ threshold.creator.username }}</span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <form method="POST" action="{{ url_for('admin_edit_alert_threshold', threshold_id=threshold.id) }}">
+                <div class="threshold-form">
+                    <!-- Basic Information -->
+                    <h4 class="section-header"><i class="fas fa-info-circle"></i> Basic Information</h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label text-light">Threshold Name *</label>
+                            <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                   id="name" name="name" required value="{{ threshold.name }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="event_type" class="form-label text-light">Event Type</label>
+                            <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                   value="{{ threshold.event_type.replace('_', ' ').title() }}" disabled>
+                            <small class="text-muted">Event type cannot be changed after creation</small>
+                        </div>
+                    </div>
+
+                    <!-- Threshold Settings -->
+                    <h4 class="section-header"><i class="fas fa-sliders-h"></i> Threshold Settings</h4>
+                    
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="low_threshold" class="form-label text-light">Low Severity Count *</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="low_threshold" name="low_threshold" required min="1" 
+                                   value="{{ threshold.low_threshold }}">
+                            <small class="text-muted">Events needed to trigger low severity alert</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="medium_threshold" class="form-label text-light">Medium Severity Count *</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="medium_threshold" name="medium_threshold" required min="1" 
+                                   value="{{ threshold.medium_threshold }}">
+                            <small class="text-muted">Events needed to trigger medium severity alert</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="high_threshold" class="form-label text-light">High Severity Count *</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="high_threshold" name="high_threshold" required min="1" 
+                                   value="{{ threshold.high_threshold }}">
+                            <small class="text-muted">Events needed to trigger high severity alert</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="time_window" class="form-label text-light">Time Window (minutes) *</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="time_window" name="time_window" required min="1" 
+                                   value="{{ threshold.time_window }}">
+                            <small class="text-muted">Time window for counting events</small>
+                        </div>
+                    </div>
+
+                    <div class="severity-example">
+                        <h6 class="text-light mb-2"><i class="fas fa-lightbulb"></i> How It Works</h6>
+                        <p class="text-muted mb-0">
+                            If a participant triggers the specified number of events within the time window, 
+                            the corresponding severity level alert will be generated with its configured actions.
+                        </p>
+                    </div>
+
+                    <!-- Action Settings -->
+                    <h4 class="section-header"><i class="fas fa-cogs"></i> Actions</h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="action-card">
+                                <div class="form-switch">
+                                    <input type="checkbox" class="form-check-input" id="send_alert" name="send_alert" 
+                                           {% if threshold.send_alert %}checked{% endif %}>
+                                    <div>
+                                        <label for="send_alert" class="form-label text-light mb-1">Send Alert</label>
+                                        <small class="text-muted d-block">Send notification when threshold is exceeded</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="action-card">
+                                <div class="form-switch">
+                                    <input type="checkbox" class="form-check-input" id="notify_proctor" name="notify_proctor" 
+                                           {% if threshold.notify_proctor %}checked{% endif %}>
+                                    <div>
+                                        <label for="notify_proctor" class="form-label text-light mb-1">Notify Proctor</label>
+                                        <small class="text-muted d-block">Notify proctors about the violation</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="action-card">
+                                <div class="form-switch">
+                                    <input type="checkbox" class="form-check-input" id="auto_flag_attempt" name="auto_flag_attempt" 
+                                           {% if threshold.auto_flag_attempt %}checked{% endif %}>
+                                    <div>
+                                        <label for="auto_flag_attempt" class="form-label text-light mb-1">Auto Flag Attempt</label>
+                                        <small class="text-muted d-block">Automatically flag the quiz attempt</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="action-card">
+                                <div class="form-switch">
+                                    <input type="checkbox" class="form-check-input" id="auto_terminate" name="auto_terminate" 
+                                           {% if threshold.auto_terminate %}checked{% endif %}>
+                                    <div>
+                                        <label for="auto_terminate" class="form-label text-light mb-1">Auto Terminate</label>
+                                        <small class="text-muted d-block">Automatically terminate the quiz session</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Preview -->
+                    <div class="threshold-preview" id="thresholdPreview">
+                        <h5 class="text-light mb-3"><i class="fas fa-eye"></i> Configuration Preview</h5>
+                        <div class="preview-item">
+                            <span class="text-muted">Event Type:</span>
+                            <span class="text-light">{{ threshold.event_type.replace('_', ' ').title() }}</span>
+                        </div>
+                        <div class="preview-item">
+                            <span class="text-muted">Low Severity:</span>
+                            <span class="text-light" id="previewLow">{{ threshold.low_threshold }} events in {{ threshold.time_window }} minutes</span>
+                        </div>
+                        <div class="preview-item">
+                            <span class="text-muted">Medium Severity:</span>
+                            <span class="text-light" id="previewMedium">{{ threshold.medium_threshold }} events in {{ threshold.time_window }} minutes</span>
+                        </div>
+                        <div class="preview-item">
+                            <span class="text-muted">High Severity:</span>
+                            <span class="text-light" id="previewHigh">{{ threshold.high_threshold }} events in {{ threshold.time_window }} minutes</span>
+                        </div>
+                        <div class="preview-item">
+                            <span class="text-muted">Actions:</span>
+                            <span class="text-light" id="previewActions">
+                                {% set actions = [] %}
+                                {% if threshold.send_alert %}{% set _ = actions.append('Send Alert') %}{% endif %}
+                                {% if threshold.notify_proctor %}{% set _ = actions.append('Notify Proctor') %}{% endif %}
+                                {% if threshold.auto_flag_attempt %}{% set _ = actions.append('Auto Flag') %}{% endif %}
+                                {% if threshold.auto_terminate %}{% set _ = actions.append('Auto Terminate') %}{% endif %}
+                                {{ actions|join(', ') if actions else 'No actions selected' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('admin_alert_thresholds') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Update Threshold
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update preview when form values change
+    function updatePreview() {
+        // Thresholds
+        const lowThreshold = document.getElementById('low_threshold').value || '{{ threshold.low_threshold }}';
+        const mediumThreshold = document.getElementById('medium_threshold').value || '{{ threshold.medium_threshold }}';
+        const highThreshold = document.getElementById('high_threshold').value || '{{ threshold.high_threshold }}';
+        const timeWindow = document.getElementById('time_window').value || '{{ threshold.time_window }}';
+        
+        document.getElementById('previewLow').textContent = `${lowThreshold} events in ${timeWindow} minutes`;
+        document.getElementById('previewMedium').textContent = `${mediumThreshold} events in ${timeWindow} minutes`;
+        document.getElementById('previewHigh').textContent = `${highThreshold} events in ${timeWindow} minutes`;
+        
+        // Actions
+        const actions = [];
+        if (document.getElementById('send_alert').checked) actions.push('Send Alert');
+        if (document.getElementById('notify_proctor').checked) actions.push('Notify Proctor');
+        if (document.getElementById('auto_flag_attempt').checked) actions.push('Auto Flag');
+        if (document.getElementById('auto_terminate').checked) actions.push('Auto Terminate');
+        
+        document.getElementById('previewActions').textContent = 
+            actions.length > 0 ? actions.join(', ') : 'No actions selected';
+    }
+    
+    // Add event listeners
+    document.getElementById('low_threshold').addEventListener('input', updatePreview);
+    document.getElementById('medium_threshold').addEventListener('input', updatePreview);
+    document.getElementById('high_threshold').addEventListener('input', updatePreview);
+    document.getElementById('time_window').addEventListener('input', updatePreview);
+    document.getElementById('send_alert').addEventListener('change', updatePreview);
+    document.getElementById('notify_proctor').addEventListener('change', updatePreview);
+    document.getElementById('auto_flag_attempt').addEventListener('change', updatePreview);
+    document.getElementById('auto_terminate').addEventListener('change', updatePreview);
+});
+</script>
+
+{% endblock %}

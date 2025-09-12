@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
-from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity
+from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -2100,6 +2100,199 @@ def admin_hosts():
                          host_stats=host_stats,
                          current_status=status,
                          search_query=search)
+
+# Alert Threshold Management Routes
+@app.route('/admin/alert-thresholds')
+@login_required
+def admin_alert_thresholds():
+    """Admin page to manage alert thresholds"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '').strip()
+    event_type = request.args.get('event_type', 'all')
+    
+    query = AlertThreshold.query.filter_by(is_active=True)
+    
+    if search:
+        query = query.filter(
+            (AlertThreshold.name.ilike(f'%{search}%')) |
+            (AlertThreshold.event_type.ilike(f'%{search}%'))
+        )
+    
+    if event_type != 'all':
+        query = query.filter(AlertThreshold.event_type == event_type)
+    
+    thresholds = query.order_by(AlertThreshold.created_at.desc()).paginate(
+        page=page, per_page=15, error_out=False
+    )
+    
+    # Get distinct event types for filter dropdown
+    event_types = db.session.query(AlertThreshold.event_type).distinct().all()
+    event_types = [et[0] for et in event_types]
+    
+    return render_template('admin_alert_thresholds.html',
+                         thresholds=thresholds,
+                         event_types=event_types,
+                         current_event_type=event_type,
+                         search_query=search)
+
+@app.route('/admin/alert-threshold/create', methods=['GET', 'POST'])
+@login_required
+def admin_create_alert_threshold():
+    """Create new alert threshold"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        event_type = request.form.get('event_type')
+        low_threshold = request.form.get('low_threshold', type=int)
+        medium_threshold = request.form.get('medium_threshold', type=int)
+        high_threshold = request.form.get('high_threshold', type=int)
+        time_window = request.form.get('time_window', type=int)
+        
+        # Action settings
+        send_alert = request.form.get('send_alert') == 'on'
+        notify_proctor = request.form.get('notify_proctor') == 'on'
+        auto_flag_attempt = request.form.get('auto_flag_attempt') == 'on'
+        auto_terminate = request.form.get('auto_terminate') == 'on'
+        
+        # Validation
+        if not name or not event_type:
+            flash('Name and event type are required.', 'error')
+            return redirect(url_for('admin_create_alert_threshold'))
+        
+        if low_threshold < 1 or medium_threshold < 1 or high_threshold < 1:
+            flash('Thresholds must be at least 1.', 'error')
+            return redirect(url_for('admin_create_alert_threshold'))
+        
+        if time_window < 1:
+            flash('Time window must be at least 1 minute.', 'error')
+            return redirect(url_for('admin_create_alert_threshold'))
+        
+        # Check if threshold already exists for this event type
+        existing = AlertThreshold.query.filter_by(
+            event_type=event_type, 
+            is_global=True, 
+            is_active=True
+        ).first()
+        
+        if existing:
+            flash(f'A global threshold for {event_type} already exists. Please edit the existing one.', 'error')
+            return redirect(url_for('admin_alert_thresholds'))
+        
+        try:
+            threshold = AlertThreshold(
+                name=name,
+                event_type=event_type,
+                low_threshold=low_threshold,
+                medium_threshold=medium_threshold,
+                high_threshold=high_threshold,
+                time_window=time_window,
+                send_alert=send_alert,
+                notify_proctor=notify_proctor,
+                auto_flag_attempt=auto_flag_attempt,
+                auto_terminate=auto_terminate,
+                is_global=True,
+                created_by=current_user.id
+            )
+            
+            db.session.add(threshold)
+            db.session.commit()
+            
+            flash(f'Alert threshold "{name}" created successfully.', 'success')
+            return redirect(url_for('admin_alert_thresholds'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating threshold: {str(e)}', 'error')
+            return redirect(url_for('admin_create_alert_threshold'))
+    
+    # Define available event types
+    event_types = [
+        'tab_switch', 'window_blur', 'multiple_faces', 'face_not_detected',
+        'mouse_leave', 'keyboard_shortcut', 'copy_paste', 'right_click',
+        'screen_share', 'suspicious_movement', 'audio_detected', 'browser_resize'
+    ]
+    
+    return render_template('admin_create_alert_threshold.html', event_types=event_types)
+
+@app.route('/admin/alert-threshold/<int:threshold_id>/edit', methods=['GET', 'POST'])
+@login_required
+def admin_edit_alert_threshold(threshold_id):
+    """Edit alert threshold"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    threshold = AlertThreshold.query.get_or_404(threshold_id)
+    
+    if request.method == 'POST':
+        threshold.name = request.form.get('name')
+        threshold.low_threshold = request.form.get('low_threshold', type=int)
+        threshold.medium_threshold = request.form.get('medium_threshold', type=int)
+        threshold.high_threshold = request.form.get('high_threshold', type=int)
+        threshold.time_window = request.form.get('time_window', type=int)
+        
+        # Action settings
+        threshold.send_alert = request.form.get('send_alert') == 'on'
+        threshold.notify_proctor = request.form.get('notify_proctor') == 'on'
+        threshold.auto_flag_attempt = request.form.get('auto_flag_attempt') == 'on'
+        threshold.auto_terminate = request.form.get('auto_terminate') == 'on'
+        
+        # Validation
+        if not threshold.name:
+            flash('Name is required.', 'error')
+            return redirect(url_for('admin_edit_alert_threshold', threshold_id=threshold_id))
+        
+        if threshold.low_threshold < 1 or threshold.medium_threshold < 1 or threshold.high_threshold < 1:
+            flash('Thresholds must be at least 1.', 'error')
+            return redirect(url_for('admin_edit_alert_threshold', threshold_id=threshold_id))
+        
+        if threshold.time_window < 1:
+            flash('Time window must be at least 1 minute.', 'error')
+            return redirect(url_for('admin_edit_alert_threshold', threshold_id=threshold_id))
+        
+        try:
+            threshold.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            flash(f'Alert threshold "{threshold.name}" updated successfully.', 'success')
+            return redirect(url_for('admin_alert_thresholds'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating threshold: {str(e)}', 'error')
+    
+    return render_template('admin_edit_alert_threshold.html', threshold=threshold)
+
+@app.route('/admin/alert-threshold/<int:threshold_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_alert_threshold(threshold_id):
+    """Delete alert threshold"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    threshold = AlertThreshold.query.get_or_404(threshold_id)
+    
+    try:
+        # Soft delete by setting is_active to False
+        threshold.is_active = False
+        threshold.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash(f'Alert threshold "{threshold.name}" deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting threshold: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_alert_thresholds'))
 
 @app.route('/admin/create-user', methods=['POST'])
 @login_required
