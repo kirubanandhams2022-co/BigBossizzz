@@ -116,8 +116,7 @@
                                     {% set duration = (attempt.completed_at - attempt.started_at).total_seconds() / 60 %}
                                     {{ duration|round(0)|int }} min
                                 {% elif attempt.status == 'in_progress' %}
-                                    {% set duration = (moment.utcnow() - attempt.started_at).total_seconds() / 60 %}
-                                    <span class="text-warning">{{ duration|round(0)|int }} min</span>
+                                    <span class="text-warning">In progress</span>
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
