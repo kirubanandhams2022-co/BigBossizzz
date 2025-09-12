@@ -3776,6 +3776,7 @@ def create_quiz():
             description=form.description.data,
             time_limit=form.time_limit.data,
             proctoring_enabled=form.proctoring_enabled.data,
+            shuffle_questions=form.shuffle_questions.data,
             creator_id=current_user.id
         )
         
@@ -4248,7 +4249,12 @@ def continue_quiz(attempt_id):
         return redirect(url_for('quiz_results', attempt_id=attempt_id))
     
     quiz = attempt.quiz
-    questions = quiz.questions
+    
+    # Get questions - shuffle them if enabled
+    questions = list(quiz.questions)
+    if quiz.shuffle_questions:
+        import random
+        random.shuffle(questions)
     
     # Get existing answers
     existing_answers = {answer.question_id: answer for answer in attempt.answers}
