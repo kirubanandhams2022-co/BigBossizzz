@@ -796,6 +796,8 @@ def admin_dashboard():
     total_participants = User.query.filter_by(role='participant').count()
     total_quizzes = Quiz.query.count()
     total_attempts = QuizAttempt.query.count()
+    total_courses = Course.query.count()
+    total_violation_appeals = db.session.query(UserViolation).filter_by(is_flagged=True).count()
     
     # Recent registrations
     recent_users = User.query.order_by(User.created_at.desc()).limit(10).all()
@@ -805,7 +807,9 @@ def admin_dashboard():
         'total_hosts': total_hosts,
         'total_participants': total_participants,
         'total_quizzes': total_quizzes,
-        'total_attempts': total_attempts
+        'total_attempts': total_attempts,
+        'total_courses': total_courses,
+        'total_violation_appeals': total_violation_appeals
     }
     
     return render_template('admin_dashboard.html', 
