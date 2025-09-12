@@ -472,7 +472,7 @@ class InteractionEvent(db.Model):
     viewport_height = db.Column(db.Integer)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     duration = db.Column(db.Float)  # For focus/hover events - time spent
-    metadata = db.Column(db.Text)  # JSON metadata for additional context
+    event_metadata = db.Column(db.Text)  # JSON metadata for additional context
     
     # Relationships
     attempt = db.relationship('QuizAttempt', backref='interaction_events')
