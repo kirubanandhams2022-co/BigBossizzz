@@ -4588,9 +4588,9 @@ def admin_analytics():
     
     return render_template('admin_analytics.html', analytics=analytics_data)
 
-@app.route('/admin/bulk-operations')
+@app.route('/admin/bulk-operations', endpoint='admin_bulk_users')
 @login_required
-def admin_bulk_users():
+def admin_bulk_operations():
     """Bulk operations management dashboard"""
     if not current_user.is_admin():
         flash('Access denied. Administrator privileges required.', 'error')
