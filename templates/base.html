@@ -19,6 +19,30 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     
+    <!-- Mobile App Enhancements -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-enhancements.css') }}">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
+    <!-- Mobile Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="BigBossizzz">
+    <meta name="theme-color" content="#3182ce">
+    <meta name="msapplication-TileColor" content="#4a5568">
+    <meta name="msapplication-navbutton-color" content="#3182ce">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="{{ url_for('static', filename='images/icon-152x152.png') }}">
+    <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='images/icon-192x192.png') }}">
+    
+    <!-- Mobile Optimization -->
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
     <!-- Professional Loading Screen Styles -->
     <style>
         .loading-screen {
@@ -443,6 +467,9 @@
     
     <!-- Loading Manager -->
     <script src="{{ url_for('static', filename='js/loading.js') }}"></script>
+    
+    <!-- Mobile App Enhancement -->
+    <script src="{{ url_for('static', filename='js/mobile-app.js') }}"></script>
     
     <!-- Scroll to Top Functionality -->
     <script>
