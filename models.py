@@ -169,24 +169,33 @@ class User(UserMixin, db.Model):
     
     # Legacy role methods for backward compatibility with safety checks
     def is_admin(self):
+        # First check RBAC system
         try:
-            return self.has_role('admin') if hasattr(self, 'user_roles') and self.user_roles else False
+            if hasattr(self, 'user_roles') and self.user_roles:
+                return self.has_role('admin')
         except:
             pass
+        # Fallback to simple role column
         return self.role == 'admin'
     
     def is_host(self):
+        # First check RBAC system
         try:
-            return self.has_role('host') if hasattr(self, 'user_roles') and self.user_roles else False
+            if hasattr(self, 'user_roles') and self.user_roles:
+                return self.has_role('host')
         except:
             pass
+        # Fallback to simple role column
         return self.role == 'host'
     
     def is_participant(self):
+        # First check RBAC system  
         try:
-            return self.has_role('participant') if hasattr(self, 'user_roles') and self.user_roles else False
+            if hasattr(self, 'user_roles') and self.user_roles:
+                return self.has_role('participant')
         except:
             pass
+        # Fallback to simple role column
         return self.role == 'participant'
     
     def __repr__(self):
