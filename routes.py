@@ -4911,11 +4911,21 @@ def admin_analytics():
         func.avg(QuizAttempt.score).desc()
     ).limit(10).all()
     
+    # Calculate additional user metrics
+    active_users = User.query.filter(
+        User.last_login >= datetime.utcnow() - timedelta(days=30)
+    ).count()
+    recent_users = User.query.filter(
+        User.created_at >= datetime.utcnow() - timedelta(days=30)
+    ).count()
+    
     analytics_data = {
         'users': {
             'total': total_users,
             'hosts': total_hosts,
-            'participants': total_participants
+            'participants': total_participants,
+            'active': active_users,
+            'recent': recent_users
         },
         'quizzes': {
             'total': total_quizzes,
