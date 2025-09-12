@@ -4634,7 +4634,6 @@ def admin_plagiarism_analysis_detail(analysis_id):
 
 @app.route('/admin/plagiarism-analysis/<int:analysis_id>/review', methods=['POST'])
 @login_required
-@validate_csrf_token  
 def admin_review_plagiarism(analysis_id):
     """Review and make decision on plagiarism analysis"""
     if not current_user.is_admin():
