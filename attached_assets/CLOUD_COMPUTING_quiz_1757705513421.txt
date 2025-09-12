@@ -1,0 +1,19 @@
+CLOUD:
+
+Q: Which of the following is a service model of Cloud Computing?
+A) SaaS
+B) PaaS
+C) IaaS
+D) *All of the above 
+
+Q: Which cloud deployment model provides dedicated infrastructure for a single organization?
+A) Public Cloud
+B) *Private Cloud 
+C) Hybrid Cloud
+D) Community Cloud
+
+Q: The process of distributing workloads across multiple servers in the cloud is called:
+A) Virtualization
+B) *Load Balancing 
+C) Elasticity
+D) Replication
