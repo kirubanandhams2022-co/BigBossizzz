@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}BigBossizzz{% endblock %}</title>
     
     <!-- Favicon -->
@@ -503,6 +504,35 @@
             }
         }
         
+        // CSRF Token Helper for AJAX requests
+        function getCSRFToken() {
+            const token = document.querySelector('meta[name="csrf-token"]');
+            return token ? token.getAttribute('content') : '';
+        }
+        
+        // Auto-attach CSRF token to all fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+            if (options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())) {
+                options.headers = options.headers || {};
+                if (!options.headers['X-CSRFToken'] && !options.headers['X-CSRF-Token']) {
+                    options.headers['X-CSRFToken'] = getCSRFToken();
+                }
+            }
+            return originalFetch.call(this, url, options);
+        };
+        
+        // Auto-attach CSRF token to all jQuery AJAX requests (if jQuery is available)
+        if (typeof $ !== 'undefined') {
+            $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(settings.type.toUpperCase())) {
+                        xhr.setRequestHeader('X-CSRFToken', getCSRFToken());
+                    }
+                }
+            });
+        }
+
         // Update time immediately and then every second
         document.addEventListener('DOMContentLoaded', function() {
             updateDateTime();
