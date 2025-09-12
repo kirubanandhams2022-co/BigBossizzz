@@ -2842,8 +2842,10 @@ def admin_manage_flags():
         flash('Access denied. Administrator privileges required.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Get all flagged users
-    flagged_users = db.session.query(UserViolation, User).join(User).filter(
+    # Get all flagged users - specify which foreign key to use for join
+    flagged_users = db.session.query(UserViolation, User).join(
+        User, UserViolation.user_id == User.id
+    ).filter(
         UserViolation.is_flagged == True
     ).order_by(UserViolation.flagged_at.desc()).all()
     
@@ -4910,23 +4912,35 @@ def admin_analytics():
     ).limit(10).all()
     
     analytics_data = {
-        'total_users': total_users,
-        'total_hosts': total_hosts,
-        'total_participants': total_participants,
-        'total_quizzes': total_quizzes,
-        'active_quizzes': active_quizzes,
-        'total_attempts': total_attempts,
-        'completed_attempts': completed_attempts,
-        'total_violations': total_violations,
-        'high_violations': high_violations,
-        'total_courses': total_courses,
-        'active_courses': active_courses,
-        'today_attempts': today_attempts,
-        'week_attempts': week_attempts,
-        'month_attempts': month_attempts,
-        'avg_score': round(avg_score, 1),
-        'highest_score': highest_score,
-        'lowest_score': lowest_score,
+        'users': {
+            'total': total_users,
+            'hosts': total_hosts,
+            'participants': total_participants
+        },
+        'quizzes': {
+            'total': total_quizzes,
+            'active': active_quizzes
+        },
+        'attempts': {
+            'total': total_attempts,
+            'completed': completed_attempts,
+            'today': today_attempts,
+            'week': week_attempts,
+            'month': month_attempts
+        },
+        'violations': {
+            'total': total_violations,
+            'high': high_violations
+        },
+        'courses': {
+            'total': total_courses,
+            'active': active_courses
+        },
+        'scores': {
+            'average': round(avg_score, 1),
+            'highest': highest_score,
+            'lowest': lowest_score
+        },
         'top_participants': top_participants
     }
     
