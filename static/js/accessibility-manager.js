@@ -15,7 +15,7 @@ class AccessibilityManager {
     }
     
     init() {
-        console.log('? Initializing Accessibility Manager...');
+        console.log('[INFO] Initializing Accessibility Manager...');
         
         // Create skip links
         this.createSkipLinks();
@@ -44,7 +44,7 @@ class AccessibilityManager {
         // Setup landmark navigation
         this.setupLandmarkNavigation();
         
-        console.log('? Accessibility Manager initialized successfully');
+        console.log('[INFO] Accessibility Manager initialized successfully');
     }
     
     createSkipLinks() {

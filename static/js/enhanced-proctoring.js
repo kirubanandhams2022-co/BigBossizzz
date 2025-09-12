@@ -1043,7 +1043,7 @@ class EnhancedProctoringSystem {
             this.canvas = null;
         }
         
-        console.log('? All monitoring systems stopped and cleaned up');
+        console.log('[INFO] All monitoring systems stopped and cleaned up');
     }
     
     removeMonitoringUI() {
@@ -1578,7 +1578,7 @@ class EnhancedProctoringSystem {
     // ============== ENHANCED BACKGROUND NOISE & SPEECH DETECTION ==============
     
     async setupEnhancedAudioMonitoring() {
-        console.log('? Audio monitoring disabled per user request');
+        console.log('[INFO] Audio monitoring disabled per user request');
         
         try {
             // Request enhanced audio permissions
@@ -1617,7 +1617,7 @@ class EnhancedProctoringSystem {
             // Start continuous enhanced audio analysis
             this.startEnhancedAudioAnalysis();
             
-            console.log('? Camera monitoring activated (audio disabled)');
+            console.log('[INFO] Camera monitoring activated (audio disabled)');
             this.showAudioMonitoringIndicator();
 
         } catch (error) {
@@ -1627,7 +1627,7 @@ class EnhancedProctoringSystem {
     }
 
     async calibrateEnvironmentBaseline() {
-        console.log('? Calibrating environment baseline for speech detection...');
+        console.log('[INFO] Calibrating environment baseline for speech detection...');
         
         const calibrationSamples = [];
         const calibrationDuration = 8000; // 8 seconds
@@ -1664,7 +1664,7 @@ class EnhancedProctoringSystem {
                     this.baselineNoiseLevel = this.calculateBaselineMetrics(calibrationSamples);
                     this.environmentAnalysis.baselineCalibrated = true;
                     
-                    console.log('? Environment baseline calibrated:', this.baselineNoiseLevel);
+                    console.log('[INFO] Environment baseline calibrated:', this.baselineNoiseLevel);
                     resolve();
                 }
             }, sampleInterval);
@@ -1802,7 +1802,7 @@ class EnhancedProctoringSystem {
                 this.handleConversationDetection();
             }
             
-            console.log('? Sustained speech pattern detected');
+            console.log('[WARN] Sustained speech pattern detected');
             this.recordViolation('sustained_speech', 'medium', 
                 `Sustained speech detected (${recentSpeech.length} segments in 3s)`);
         }
@@ -1968,7 +1968,7 @@ class EnhancedProctoringSystem {
     // ============== SMART SECURITY MONITORING ==============
     
     activateStrongEnforcement() {
-        console.log('? Activating smart security monitoring');
+        console.log('[INFO] Activating smart security monitoring');
         this.enforcementActive = true;
         
         try {
@@ -1993,7 +1993,7 @@ class EnhancedProctoringSystem {
             // Smart focus monitoring
             this.startSmartFocusMonitoring();
             
-            console.log('? Smart security monitoring activated');
+            console.log('[INFO] Smart security monitoring activated');
         } catch (error) {
             console.error('Security monitoring setup failed:', error);
             this.handleSecuritySetupFailure(error);
@@ -2003,7 +2003,7 @@ class EnhancedProctoringSystem {
     deactivateStrongEnforcement() {
         if (!this.enforcementActive) return;
         
-        console.log('? Deactivating security monitoring');
+        console.log('[INFO] Deactivating security monitoring');
         this.enforcementActive = false;
         this.blockingActive = false;
         
@@ -2035,7 +2035,7 @@ class EnhancedProctoringSystem {
                 });
             }
             
-            console.log('? Security monitoring deactivated');
+            console.log('[INFO] Security monitoring deactivated');
         } catch (error) {
             console.error('Error during security monitoring deactivation:', error);
         }
@@ -2054,7 +2054,7 @@ class EnhancedProctoringSystem {
         // Monitor fullscreen changes (detection only)
         const fullscreenMonitor = () => {
             if (this.enforcementActive && !document.fullscreenElement) {
-                console.log('? Fullscreen exited - monitoring only');
+                console.log('[WARN] Fullscreen exited - monitoring only');
                 this.recordViolation('fullscreen_exited', 'medium', 'Exited fullscreen mode');
                 // Don't try to force back - just detect and record
             }
@@ -2068,7 +2068,7 @@ class EnhancedProctoringSystem {
             if (e.key === 'Escape' && this.enforcementActive && document.fullscreenElement) {
                 // Just record the attempt, don't block it
                 this.recordViolation('escape_pressed', 'low', 'Escape key pressed in fullscreen mode');
-                console.log('? Escape key usage detected');
+                console.log('[WARN] Escape key usage detected');
             }
         };
         
@@ -2085,7 +2085,7 @@ class EnhancedProctoringSystem {
             if (e.altKey && e.key === 'Tab') {
                 this.tabSwitchCount++;
                 this.recordViolation('alt_tab_detected', 'medium', 'Alt+Tab key combination detected');
-                console.log('? Alt+Tab detected');
+                console.log('[WARN] Alt+Tab detected');
                 // Don't prevent - OS handles this, we just detect
             }
         };
@@ -2143,7 +2143,7 @@ class EnhancedProctoringSystem {
                 this.screenshotAttempts++;
                 
                 this.recordViolation('screenshot_attempt_detected', 'medium', `Screenshot key detected: ${e.key}`);
-                console.log('? Screenshot-related key detected:', e.key);
+                console.log('[WARN] Screenshot-related key detected:', e.key);
                 
                 if (this.screenshotAttempts === 1) {
                     this.showSingleWarning('?? Screenshot attempts are monitored and logged');
@@ -2160,7 +2160,7 @@ class EnhancedProctoringSystem {
         const contextMonitor = (e) => {
             if (this.enforcementActive) {
                 this.recordViolation('right_click_detected', 'low', 'Right-click menu accessed');
-                console.log('? Right-click detected');
+                console.log('[WARN] Right-click detected');
                 // Don't block - just monitor
             }
         };
@@ -2182,13 +2182,13 @@ class EnhancedProctoringSystem {
                 if (window.outerHeight <= 100 || window.outerWidth <= 100) {
                     this.minimizeAttempts++;
                     this.recordViolation('window_resized_small', 'medium', `Window resized very small (${this.minimizeAttempts} times)`);
-                    console.log('? Small window size detected');
+                    console.log('[WARN] Small window size detected');
                 }
                 
                 // Detect if window is hidden (visibility API)
                 if (document.visibilityState === 'hidden') {
                     this.recordViolation('window_hidden', 'medium', 'Window became hidden');
-                    console.log('? Window hidden detected');
+                    console.log('[WARN] Window hidden detected');
                 }
             }
         };
@@ -2203,7 +2203,7 @@ class EnhancedProctoringSystem {
             // Monitor Windows+D (show desktop), Windows+M (minimize all)
             if (e.metaKey && (e.key === 'd' || e.key === 'm')) {
                 this.recordViolation('minimize_shortcut_detected', 'low', `Minimize shortcut detected: ${this.getKeyCombo(e)}`);
-                console.log('? Minimize shortcut detected:', this.getKeyCombo(e));
+                console.log('[WARN] Minimize shortcut detected:', this.getKeyCombo(e));
                 // Don't block - just detect and log
             }
         };
@@ -2228,7 +2228,7 @@ class EnhancedProctoringSystem {
             for (const combo of systemShortcuts) {
                 if (this.matchesKeyCombo(e, combo)) {
                     this.recordViolation('system_shortcut_detected', 'high', `System shortcut detected: ${this.getKeyCombo(e)}`);
-                    console.log('? System shortcut detected:', this.getKeyCombo(e));
+                    console.log('[WARN] System shortcut detected:', this.getKeyCombo(e));
                     
                     // Note: We can't actually block these at OS level, just detect and log
                     this.showSingleWarning('?? System shortcut detected and logged');
@@ -2280,7 +2280,7 @@ class EnhancedProctoringSystem {
                     e.preventDefault();
                     e.stopPropagation();
                     this.recordViolation('suspicious_shortcut_blocked', 'high', `Blocked: ${this.getKeyCombo(e)}`);
-                    console.log('? Blocked suspicious shortcut:', this.getKeyCombo(e));
+                    console.log('[WARN] Blocked suspicious shortcut:', this.getKeyCombo(e));
                     return false;
                 }
             }
@@ -2289,7 +2289,7 @@ class EnhancedProctoringSystem {
             for (const combo of monitoredShortcuts) {
                 if (this.matchesKeyCombo(e, combo)) {
                     this.recordViolation('shortcut_used', 'low', `Used: ${this.getKeyCombo(e)}`);
-                    console.log('? Monitored shortcut used:', this.getKeyCombo(e));
+                    console.log('[INFO] Monitored shortcut used:', this.getKeyCombo(e));
                     // Don't prevent - just log for awareness
                 }
             }
@@ -2307,7 +2307,7 @@ class EnhancedProctoringSystem {
                 // More reasonable focus loss detection
                 if (timeSinceLastFocus > 30000 && document.hidden) { // 30 seconds instead of 2
                     this.recordViolation('extended_focus_loss', 'medium', 'Window out of focus for extended period');
-                    console.log('? Extended focus loss detected');
+                    console.log('[WARN] Extended focus loss detected');
                     
                     // Don't automatically try to regain focus - let user control their browser
                     

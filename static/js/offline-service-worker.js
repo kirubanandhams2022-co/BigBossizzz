@@ -485,7 +485,7 @@ async function cacheQuizData(quizData) {
         });
         
         await cache.put(`/api/quiz/${quizData.id}/offline`, response);
-        console.log('? Quiz data cached for offline use:', quizData.id);
+        console.log('[INFO] Quiz data cached for offline use:', quizData.id);
         
     } catch (error) {
         console.error('? Failed to cache quiz data:', error);
@@ -521,4 +521,4 @@ async function getCacheInfo() {
     }
 }
 
-console.log('? BigBossizzz Service Worker loaded');
+console.log('[INFO] BigBossizzz Service Worker loaded');

@@ -22,7 +22,7 @@ class OfflineManager {
     }
     
     async init() {
-        console.log('? Initializing Offline Manager...');
+        console.log('[INFO] Initializing Offline Manager...');
         
         // Register service worker
         await this.registerServiceWorker();
@@ -45,17 +45,17 @@ class OfflineManager {
         // Restore sync queue
         await this.restoreSyncQueue();
         
-        console.log('? Offline Manager initialized successfully');
+        console.log('[INFO] Offline Manager initialized successfully');
     }
     
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
                 const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-                console.log('? Root Service Worker registered for offline support');
+                console.log('[INFO] Root Service Worker registered for offline support');
                 
                 registration.addEventListener('updatefound', () => {
-                    console.log('? Service Worker update found');
+                    console.log('[INFO] Service Worker update found');
                 });
                 
                 // Wait for service worker to be ready

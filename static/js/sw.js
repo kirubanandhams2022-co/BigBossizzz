@@ -39,26 +39,26 @@ const NETWORK_FIRST_URLS = [
 ];
 
 self.addEventListener('install', (event) => {
-    console.log('? Service Worker installing...');
+    console.log('[INFO] Service Worker installing...');
     
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('? Caching static assets...');
+                console.log('[INFO] Caching static assets...');
                 return cache.addAll(STATIC_CACHE_URLS);
             })
             .then(() => {
-                console.log('? Static assets cached successfully');
+                console.log('[INFO] Static assets cached successfully');
                 return self.skipWaiting();
             })
             .catch((error) => {
-                console.error('? Cache installation failed:', error);
+                console.error('[ERROR] Cache installation failed:', error);
             })
     );
 });
 
 self.addEventListener('activate', (event) => {
-    console.log('? Service Worker activating...');
+    console.log('[INFO] Service Worker activating...');
     
     event.waitUntil(
         caches.keys()
@@ -66,14 +66,14 @@ self.addEventListener('activate', (event) => {
                 return Promise.all(
                     cacheNames.map((cacheName) => {
                         if (cacheName !== CACHE_NAME) {
-                            console.log('?? Deleting old cache:', cacheName);
+                            console.log('[DEBUG] Deleting old cache:', cacheName);
                             return caches.delete(cacheName);
                         }
                     })
                 );
             })
             .then(() => {
-                console.log('? Service Worker activated');
+                console.log('[INFO] Service Worker activated');
                 return self.clients.claim();
             })
     );
@@ -111,7 +111,7 @@ async function networkFirst(request) {
         
         return networkResponse;
     } catch (error) {
-        console.log('? Network failed, trying cache:', request.url);
+        console.log('[WARN] Network failed, trying cache:', request.url);
         
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
@@ -159,7 +159,7 @@ async function staleWhileRevalidate(request) {
         }
         return networkResponse;
     }).catch((error) => {
-        console.log('? Network failed for:', request.url);
+        console.log('[WARN] Network failed for:', request.url);
         return cachedResponse;
     });
     
@@ -197,10 +197,10 @@ async function syncQuizSubmissions() {
                 const response = await fetch(request);
                 if (response.ok) {
                     await cache.delete(request);
-                    console.log('? Quiz submission synced:', request.url);
+                    console.log('[INFO] Quiz submission synced:', request.url);
                 }
             } catch (error) {
-                console.log('? Failed to sync quiz submission:', error);
+                console.log('[ERROR] Failed to sync quiz submission:', error);
             }
         }
     } catch (error) {
@@ -296,7 +296,7 @@ self.addEventListener('periodicsync', (event) => {
 async function syncQuizData() {
     try {
         // Sync quiz data, results, and user progress
-        console.log('? Syncing quiz data...');
+        console.log('[INFO] Syncing quiz data...');
         
         const response = await fetch('/api/sync-quiz-data', {
             method: 'POST',
@@ -306,7 +306,7 @@ async function syncQuizData() {
         });
         
         if (response.ok) {
-            console.log('? Quiz data synced successfully');
+            console.log('[INFO] Quiz data synced successfully');
         }
     } catch (error) {
         console.error('? Quiz data sync failed:', error);
@@ -322,4 +322,5 @@ self.addEventListener('unhandledrejection', (event) => {
     console.error('? Service Worker unhandled rejection:', event.reason);
 });
 
-console.log('? BigBossizzz Service Worker loaded successfully');
+console.log('[INFO] BigBossizzz Service Worker loaded successfully');
+// Cache cleared at 1757693624
