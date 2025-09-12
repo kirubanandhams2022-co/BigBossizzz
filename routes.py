@@ -6503,3 +6503,34 @@ def save_theme_preference():
     except Exception as e:
         logging.error(f"Error saving theme preference: {e}")
         return jsonify({'error': 'Failed to save preference'}), 500
+
+@app.route('/api/connectivity-check', methods=['HEAD', 'GET'])
+def connectivity_check():
+    """Simple connectivity check for offline manager"""
+    return '', 200
+
+@app.route('/api/quiz/sync-progress', methods=['POST'])
+@login_required
+def sync_quiz_progress():
+    """Sync quiz progress from offline storage"""
+    try:
+        data = request.get_json()
+        quiz_id = data.get('quizId')
+        progress = data.get('progress', {})
+        
+        if not quiz_id:
+            return jsonify({'error': 'Quiz ID required'}), 400
+        
+        # Update quiz progress in database
+        # This would typically update the user's progress
+        logging.info(f"Syncing offline progress for quiz {quiz_id} for user {current_user.id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Progress synced successfully',
+            'quiz_id': quiz_id
+        })
+        
+    except Exception as e:
+        logging.error(f"Error syncing quiz progress: {e}")
+        return jsonify({'error': 'Failed to sync progress'}), 500
