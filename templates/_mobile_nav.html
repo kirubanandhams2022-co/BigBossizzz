@@ -1,0 +1,76 @@
+<!-- Mobile Bottom Navigation -->
+{% if current_user.is_authenticated %}
+<nav class="mobile-bottom-nav d-md-none" id="mobileBottomNav">
+    {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('admin_dashboard') }}" class="mobile-nav-item">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('admin_users') }}" class="mobile-nav-item">
+            <i class="fas fa-users"></i>
+            <span>Users</span>
+        </a>
+        <a href="{{ url_for('admin_proctoring_reports') }}" class="mobile-nav-item">
+            <i class="fas fa-chart-bar"></i>
+            <span>Reports</span>
+        </a>
+        <a href="{{ url_for('profile') }}" class="mobile-nav-item">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </a>
+    {% elif current_user.role == 'host' %}
+        <a href="{{ url_for('host_dashboard') }}" class="mobile-nav-item">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('create_quiz') }}" class="mobile-nav-item">
+            <i class="fas fa-plus-circle"></i>
+            <span>Create</span>
+        </a>
+        <a href="{{ url_for('host_monitoring') }}" class="mobile-nav-item">
+            <i class="fas fa-chart-line"></i>
+            <span>Monitor</span>
+        </a>
+        <a href="{{ url_for('profile') }}" class="mobile-nav-item">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </a>
+    {% else %}
+        <a href="{{ url_for('participant_dashboard') }}" class="mobile-nav-item">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('quiz_listing') }}" class="mobile-nav-item">
+            <i class="fas fa-play-circle"></i>
+            <span>Quizzes</span>
+        </a>
+        <a href="{{ url_for('participant_completed') }}" class="mobile-nav-item">
+            <i class="fas fa-trophy"></i>
+            <span>Results</span>
+        </a>
+        <a href="{{ url_for('profile') }}" class="mobile-nav-item">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </a>
+    {% endif %}
+</nav>
+
+<script>
+// Simple active state management for server-rendered nav
+document.addEventListener('DOMContentLoaded', function() {
+    const currentPath = window.location.pathname;
+    const navItems = document.querySelectorAll('.mobile-nav-item');
+    
+    navItems.forEach(item => {
+        if (item.getAttribute('href') === currentPath) {
+            item.classList.add('active');
+        }
+        
+        item.addEventListener('click', function() {
+            navItems.forEach(nav => nav.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+});
+</script>
+{% endif %}
