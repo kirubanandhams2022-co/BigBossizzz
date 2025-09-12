@@ -513,7 +513,12 @@ function bulkDeleteUsers() {
         form.method = 'POST';
         form.action = '{{ url_for("admin_bulk_delete_users") }}';
         
-        // CSRF token will be added when Flask-WTF is properly configured
+        // Add CSRF token
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrf_token';
+        csrfToken.value = '{{ csrf_token() }}';
+        form.appendChild(csrfToken);
         
         // Add selected user IDs
         selectedIds.forEach(id => {
