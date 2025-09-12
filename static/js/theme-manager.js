@@ -28,7 +28,7 @@ class ThemeManager {
     }
     
     init() {
-        console.log('? Initializing Theme Manager...');
+        console.log('[INFO] Initializing Theme Manager...');
         
         // Load saved theme preference
         this.loadThemePreference();
@@ -45,7 +45,7 @@ class ThemeManager {
         // Save preference to user profile if logged in
         this.saveThemeToProfile();
         
-        console.log('? Theme Manager initialized successfully');
+        console.log('[INFO] Theme Manager initialized successfully');
     }
     
     loadThemePreference() {
@@ -74,7 +74,7 @@ class ThemeManager {
     }
     
     applyTheme(theme) {
-        console.log(`? Applying theme: ${theme}`);
+        console.log(`[INFO] Applying theme: ${theme}`);
         
         // Remove existing theme classes
         document.documentElement.removeAttribute('data-theme');
@@ -276,7 +276,7 @@ class ThemeManager {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         mediaQuery.addEventListener('change', (e) => {
             if (this.currentTheme === 'auto') {
-                console.log('? System theme changed, updating...');
+                console.log('[INFO] System theme changed, updating...');
                 this.announceThemeChange('auto');
                 window.dispatchEvent(new CustomEvent('themeChanged', {
                     detail: { theme: 'auto', effectiveTheme: e.matches ? 'dark' : 'light' }
@@ -321,10 +321,10 @@ class ThemeManager {
             });
             
             if (response.ok) {
-                console.log('? Theme preference saved to profile');
+                console.log('[INFO] Theme preference saved to profile');
             }
         } catch (error) {
-            console.log('?? Could not save theme preference:', error);
+            console.error('[ERROR] Could not save theme preference:', error);
             // Silent fail - user not logged in or network issue
         }
     }

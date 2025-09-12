@@ -19,13 +19,13 @@ class VoiceCommandsManager {
     }
     
     init() {
-        console.log('? Initializing Voice Commands Manager...');
+        console.log('[INFO] Initializing Voice Commands Manager...');
         
         // Check browser support
         this.checkSupport();
         
         if (!this.isSupported) {
-            console.log('? Voice commands not supported in this browser');
+            console.log('[WARN] Voice commands not supported in this browser');
             return;
         }
         
@@ -44,7 +44,7 @@ class VoiceCommandsManager {
         // Setup context detection
         this.setupContextDetection();
         
-        console.log('? Voice Commands Manager initialized successfully');
+        console.log('[INFO] Voice Commands Manager initialized successfully');
     }
     
     checkSupport() {
