@@ -1,0 +1,498 @@
+/*
+BigBossizzz Theme System
+Complete dark/light theme implementation with user preferences
+*/
+
+:root {
+    /* Light Theme Variables (Default) */
+    --primary-bg: #ffffff;
+    --secondary-bg: #f8f9fa;
+    --tertiary-bg: #e9ecef;
+    --card-bg: #ffffff;
+    --modal-bg: #ffffff;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #868e96;
+    --text-inverse: #ffffff;
+    --border-color: #dee2e6;
+    --border-light: #e9ecef;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --shadow-hover: rgba(0, 0, 0, 0.15);
+    
+    /* Button Colors */
+    --btn-primary-bg: #0d6efd;
+    --btn-primary-hover: #0b5ed7;
+    --btn-secondary-bg: #6c757d;
+    --btn-secondary-hover: #5c636a;
+    --btn-success-bg: #198754;
+    --btn-success-hover: #157347;
+    --btn-danger-bg: #dc3545;
+    --btn-danger-hover: #bb2d3b;
+    --btn-warning-bg: #ffc107;
+    --btn-warning-hover: #ffca2c;
+    --btn-info-bg: #0dcaf0;
+    --btn-info-hover: #31d2f2;
+    
+    /* Form Elements */
+    --input-bg: #ffffff;
+    --input-border: #ced4da;
+    --input-focus: #86b7fe;
+    --input-placeholder: #6c757d;
+    
+    /* Navigation */
+    --navbar-bg: #ffffff;
+    --navbar-text: #212529;
+    --navbar-brand: #0d6efd;
+    --navbar-hover: #f8f9fa;
+    
+    /* Status Colors */
+    --success-bg: #d1edff;
+    --success-text: #0f5132;
+    --error-bg: #f8d7da;
+    --error-text: #721c24;
+    --warning-bg: #fff3cd;
+    --warning-text: #664d03;
+    --info-bg: #cff4fc;
+    --info-text: #055160;
+    
+    /* Quiz Specific */
+    --quiz-bg: #ffffff;
+    --quiz-question-bg: #f8f9fa;
+    --quiz-option-bg: #ffffff;
+    --quiz-option-hover: #e9ecef;
+    --quiz-option-selected: #cfe2ff;
+    --quiz-timer-bg: #ffc107;
+    --quiz-timer-text: #664d03;
+    
+    /* Proctoring */
+    --proctoring-safe: #d4edda;
+    --proctoring-warning: #fff3cd;
+    --proctoring-danger: #f8d7da;
+    --camera-bg: #000000;
+    --violation-bg: #f8d7da;
+    
+    /* Accessibility */
+    --focus-ring: #0d6efd;
+    --focus-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Dark Theme Variables */
+[data-theme="dark"] {
+    --primary-bg: #121212;
+    --secondary-bg: #1e1e1e;
+    --tertiary-bg: #2d2d2d;
+    --card-bg: #1e1e1e;
+    --modal-bg: #2d2d2d;
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-muted: #8a8a8a;
+    --text-inverse: #121212;
+    --border-color: #404040;
+    --border-light: #353535;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --shadow-hover: rgba(0, 0, 0, 0.4);
+    
+    /* Button Colors - Adjusted for dark theme */
+    --btn-primary-bg: #0d6efd;
+    --btn-primary-hover: #3d8bfd;
+    --btn-secondary-bg: #6c757d;
+    --btn-secondary-hover: #858b93;
+    --btn-success-bg: #198754;
+    --btn-success-hover: #20c997;
+    --btn-danger-bg: #dc3545;
+    --btn-danger-hover: #e55763;
+    --btn-warning-bg: #ffc107;
+    --btn-warning-hover: #ffca2c;
+    --btn-info-bg: #0dcaf0;
+    --btn-info-hover: #31d2f2;
+    
+    /* Form Elements */
+    --input-bg: #2d2d2d;
+    --input-border: #404040;
+    --input-focus: #86b7fe;
+    --input-placeholder: #8a8a8a;
+    
+    /* Navigation */
+    --navbar-bg: #1e1e1e;
+    --navbar-text: #ffffff;
+    --navbar-brand: #3d8bfd;
+    --navbar-hover: #2d2d2d;
+    
+    /* Status Colors - Dark theme variants */
+    --success-bg: #0f2419;
+    --success-text: #75dd99;
+    --error-bg: #2c0b0e;
+    --error-text: #f1aeb5;
+    --warning-bg: #332701;
+    --warning-text: #ffda6a;
+    --info-bg: #032830;
+    --info-text: #6edff6;
+    
+    /* Quiz Specific */
+    --quiz-bg: #1e1e1e;
+    --quiz-question-bg: #2d2d2d;
+    --quiz-option-bg: #2d2d2d;
+    --quiz-option-hover: #404040;
+    --quiz-option-selected: #1a365d;
+    --quiz-timer-bg: #332701;
+    --quiz-timer-text: #ffda6a;
+    
+    /* Proctoring */
+    --proctoring-safe: #0f2419;
+    --proctoring-warning: #332701;
+    --proctoring-danger: #2c0b0e;
+    --camera-bg: #000000;
+    --violation-bg: #2c0b0e;
+    
+    /* Accessibility */
+    --focus-ring: #3d8bfd;
+    --focus-shadow: 0 0 0 0.25rem rgba(61, 139, 253, 0.25);
+}
+
+/* Auto Theme (System Preference) */
+@media (prefers-color-scheme: dark) {
+    [data-theme="auto"] {
+        --primary-bg: #121212;
+        --secondary-bg: #1e1e1e;
+        --tertiary-bg: #2d2d2d;
+        --card-bg: #1e1e1e;
+        --modal-bg: #2d2d2d;
+        --text-primary: #ffffff;
+        --text-secondary: #b3b3b3;
+        --text-muted: #8a8a8a;
+        --text-inverse: #121212;
+        --border-color: #404040;
+        --border-light: #353535;
+        --shadow-color: rgba(0, 0, 0, 0.3);
+        --shadow-hover: rgba(0, 0, 0, 0.4);
+        
+        --btn-primary-bg: #0d6efd;
+        --btn-primary-hover: #3d8bfd;
+        --btn-secondary-bg: #6c757d;
+        --btn-secondary-hover: #858b93;
+        --btn-success-bg: #198754;
+        --btn-success-hover: #20c997;
+        --btn-danger-bg: #dc3545;
+        --btn-danger-hover: #e55763;
+        --btn-warning-bg: #ffc107;
+        --btn-warning-hover: #ffca2c;
+        --btn-info-bg: #0dcaf0;
+        --btn-info-hover: #31d2f2;
+        
+        --input-bg: #2d2d2d;
+        --input-border: #404040;
+        --input-focus: #86b7fe;
+        --input-placeholder: #8a8a8a;
+        
+        --navbar-bg: #1e1e1e;
+        --navbar-text: #ffffff;
+        --navbar-brand: #3d8bfd;
+        --navbar-hover: #2d2d2d;
+        
+        --success-bg: #0f2419;
+        --success-text: #75dd99;
+        --error-bg: #2c0b0e;
+        --error-text: #f1aeb5;
+        --warning-bg: #332701;
+        --warning-text: #ffda6a;
+        --info-bg: #032830;
+        --info-text: #6edff6;
+        
+        --quiz-bg: #1e1e1e;
+        --quiz-question-bg: #2d2d2d;
+        --quiz-option-bg: #2d2d2d;
+        --quiz-option-hover: #404040;
+        --quiz-option-selected: #1a365d;
+        --quiz-timer-bg: #332701;
+        --quiz-timer-text: #ffda6a;
+        
+        --proctoring-safe: #0f2419;
+        --proctoring-warning: #332701;
+        --proctoring-danger: #2c0b0e;
+        --camera-bg: #000000;
+        --violation-bg: #2c0b0e;
+        
+        --focus-ring: #3d8bfd;
+        --focus-shadow: 0 0 0 0.25rem rgba(61, 139, 253, 0.25);
+    }
+}
+
+/* Theme Application */
+body {
+    background-color: var(--primary-bg);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Cards and Containers */
+.card, .modal-content, .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.bg-light {
+    background-color: var(--secondary-bg) !important;
+}
+
+.bg-white {
+    background-color: var(--card-bg) !important;
+}
+
+/* Text Colors */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+/* Forms */
+.form-control, .form-select {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: var(--input-bg);
+    border-color: var(--input-focus);
+    box-shadow: var(--focus-shadow);
+    color: var(--text-primary);
+}
+
+.form-control::placeholder {
+    color: var(--input-placeholder);
+}
+
+/* Navigation */
+.navbar {
+    background-color: var(--navbar-bg) !important;
+}
+
+.navbar-brand, .navbar-nav .nav-link {
+    color: var(--navbar-text) !important;
+}
+
+.navbar-brand:hover, .navbar-nav .nav-link:hover {
+    background-color: var(--navbar-hover);
+}
+
+/* Buttons */
+.btn-outline-primary {
+    color: var(--btn-primary-bg);
+    border-color: var(--btn-primary-bg);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--btn-primary-bg);
+    border-color: var(--btn-primary-hover);
+}
+
+/* Tables */
+.table {
+    color: var(--text-primary);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--secondary-bg);
+}
+
+/* Alerts */
+.alert-success {
+    background-color: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-text);
+}
+
+.alert-danger {
+    background-color: var(--error-bg);
+    color: var(--error-text);
+    border-color: var(--error-text);
+}
+
+.alert-warning {
+    background-color: var(--warning-bg);
+    color: var(--warning-text);
+    border-color: var(--warning-text);
+}
+
+.alert-info {
+    background-color: var(--info-bg);
+    color: var(--info-text);
+    border-color: var(--info-text);
+}
+
+/* Quiz Specific Styling */
+.quiz-container {
+    background-color: var(--quiz-bg);
+}
+
+.question-card {
+    background-color: var(--quiz-question-bg);
+    border-color: var(--border-color);
+}
+
+.quiz-option {
+    background-color: var(--quiz-option-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.quiz-option:hover {
+    background-color: var(--quiz-option-hover);
+}
+
+.quiz-option.selected {
+    background-color: var(--quiz-option-selected);
+    border-color: var(--btn-primary-bg);
+}
+
+.quiz-timer {
+    background-color: var(--quiz-timer-bg);
+    color: var(--quiz-timer-text);
+}
+
+/* Proctoring Interface */
+.proctoring-status.safe {
+    background-color: var(--proctoring-safe);
+    color: var(--success-text);
+}
+
+.proctoring-status.warning {
+    background-color: var(--proctoring-warning);
+    color: var(--warning-text);
+}
+
+.proctoring-status.danger {
+    background-color: var(--proctoring-danger);
+    color: var(--error-text);
+}
+
+.camera-preview {
+    background-color: var(--camera-bg);
+    border-color: var(--border-color);
+}
+
+.violation-alert {
+    background-color: var(--violation-bg);
+    color: var(--error-text);
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    z-index: 1050;
+    background-color: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 50px;
+    padding: 8px 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px var(--shadow-color);
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px var(--shadow-hover);
+}
+
+.theme-toggle i {
+    font-size: 1.2em;
+    color: var(--text-primary);
+    transition: color 0.3s ease;
+}
+
+.theme-toggle-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 5px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+    padding: 8px 0;
+    min-width: 120px;
+    display: none;
+}
+
+.theme-toggle-dropdown.show {
+    display: block;
+}
+
+.theme-option {
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.theme-option:hover {
+    background-color: var(--navbar-hover);
+}
+
+.theme-option.active {
+    background-color: var(--btn-primary-bg);
+    color: var(--text-inverse);
+}
+
+.theme-option i {
+    width: 16px;
+    text-align: center;
+}
+
+/* Accessibility Focus Improvements */
+.btn:focus, .form-control:focus, .form-select:focus,
+.nav-link:focus, .dropdown-item:focus {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    box-shadow: var(--focus-shadow);
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    :root {
+        --border-color: #000000;
+        --text-primary: #000000;
+        --text-secondary: #333333;
+    }
+    
+    [data-theme="dark"] {
+        --border-color: #ffffff;
+        --text-primary: #ffffff;
+        --text-secondary: #cccccc;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Print Styles */
+@media print {
+    body {
+        background-color: white !important;
+        color: black !important;
+    }
+    
+    .theme-toggle, .navbar, .footer {
+        display: none !important;
+    }
+}
+
+/* Smooth Theme Transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

@@ -6480,3 +6480,26 @@ def api_institutional_metrics():
     except Exception as e:
         logging.error(f"Error in institutional metrics API: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/user/theme-preference', methods=['POST'])
+@login_required
+def save_theme_preference():
+    """Save user theme preference"""
+    try:
+        data = request.get_json()
+        theme = data.get('theme', 'auto')
+        
+        # Validate theme
+        valid_themes = ['auto', 'light', 'dark']
+        if theme not in valid_themes:
+            return jsonify({'error': 'Invalid theme'}), 400
+        
+        # Save to user model (assuming we add theme_preference field)
+        current_user.theme_preference = theme
+        db.session.commit()
+        
+        return jsonify({'success': True, 'theme': theme})
+        
+    except Exception as e:
+        logging.error(f"Error saving theme preference: {e}")
+        return jsonify({'error': 'Failed to save preference'}), 500
