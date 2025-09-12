@@ -1,4 +1,382 @@
-// Quiz.js - Enhanced quiz functionality with proctoring integration
+// Quiz.js - Enhanced quiz functionality with proctoring integration and heatmap tracking
+
+class HeatmapTracker {
+    constructor(attemptId) {
+        this.attemptId = attemptId;
+        this.questionStartTimes = new Map();
+        this.interactionQueue = [];
+        this.isTracking = true;
+        this.flushInterval = null;
+        this.currentQuestionId = null;
+        
+        this.initializeTracking();
+    }
+    
+    initializeTracking() {
+        if (!this.isTracking) return;
+        
+        // Store event listeners for cleanup
+        this.eventListeners = [];
+        
+        // Start periodic data flushing
+        this.flushInterval = setInterval(() => {
+            this.flushInteractions();
+        }, 5000); // Flush every 5 seconds
+        
+        // Track mouse clicks
+        this.clickHandler = (e) => this.trackInteraction('click', e);
+        document.addEventListener('click', this.clickHandler);
+        this.eventListeners.push(['document', 'click', this.clickHandler]);
+        
+        // Track mouse movement (throttled)
+        this.setupMouseMovementTracking();
+        
+        // Track mouse hovers on question elements
+        document.querySelectorAll('.question-card, .question-input, .form-check').forEach(element => {
+            const enterHandler = (e) => this.trackInteraction('hover_start', e);
+            const leaveHandler = (e) => this.trackInteraction('hover_end', e);
+            
+            element.addEventListener('mouseenter', enterHandler);
+            element.addEventListener('mouseleave', leaveHandler);
+            
+            this.eventListeners.push(['element', element, 'mouseenter', enterHandler]);
+            this.eventListeners.push(['element', element, 'mouseleave', leaveHandler]);
+        });
+        
+        // Track question focus/visibility changes
+        this.setupQuestionVisibilityTracking();
+        
+        // Track scroll behavior
+        this.setupScrollTracking();
+        
+        // Track window focus/blur
+        this.focusHandler = () => this.trackInteraction('window_focus');
+        this.blurHandler = () => this.trackInteraction('window_blur');
+        
+        window.addEventListener('focus', this.focusHandler);
+        window.addEventListener('blur', this.blurHandler);
+        
+        this.eventListeners.push(['window', 'focus', this.focusHandler]);
+        this.eventListeners.push(['window', 'blur', this.blurHandler]);
+        
+        // Setup final data delivery on page unload
+        this.setupFinalDelivery();
+    }
+    
+    setupMouseMovementTracking() {
+        let lastMouseTime = 0;
+        let lastX = -1, lastY = -1;
+        const MOUSE_THROTTLE = 100; // Limit to ~10 Hz
+        
+        this.mouseMoveHandler = (e) => {
+            const now = Date.now();
+            
+            // Throttle mouse movement events
+            if (now - lastMouseTime < MOUSE_THROTTLE) return;
+            
+            // Skip if mouse hasn't moved significantly
+            const deltaX = Math.abs(e.clientX - lastX);
+            const deltaY = Math.abs(e.clientY - lastY);
+            if (deltaX < 5 && deltaY < 5) return;
+            
+            lastMouseTime = now;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            
+            this.trackInteraction('mouse_move', e);
+        };
+        
+        document.addEventListener('mousemove', this.mouseMoveHandler);
+        this.eventListeners.push(['document', 'mousemove', this.mouseMoveHandler]);
+    }
+    
+    setupScrollTracking() {
+        let scrollTimeout;
+        this.scrollHandler = () => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                this.trackInteraction('scroll', null, {
+                    scrollTop: window.pageYOffset,
+                    scrollLeft: window.pageXOffset
+                });
+            }, 150); // Debounce scroll events
+        };
+        
+        document.addEventListener('scroll', this.scrollHandler);
+        this.eventListeners.push(['document', 'scroll', this.scrollHandler]);
+    }
+    
+    setupFinalDelivery() {
+        // Use beforeunload and visibilitychange for final data delivery
+        this.beforeUnloadHandler = (e) => {
+            this.sendFinalBatch();
+        };
+        
+        this.visibilityChangeHandler = () => {
+            if (document.visibilityState === 'hidden') {
+                this.sendFinalBatch();
+            }
+        };
+        
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
+        document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+        
+        this.eventListeners.push(['window', 'beforeunload', this.beforeUnloadHandler]);
+        this.eventListeners.push(['document', 'visibilitychange', this.visibilityChangeHandler]);
+    }
+    
+    setupQuestionVisibilityTracking() {
+        // Use Intersection Observer to track which questions are visible
+        this.visibilityObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const questionCard = entry.target;
+                const questionId = this.getQuestionIdFromElement(questionCard);
+                
+                if (entry.isIntersecting) {
+                    // Question came into view - only start timing if not already tracking
+                    if (!this.questionStartTimes.has(questionId)) {
+                        this.startQuestionTiming(questionId);
+                        this.trackInteraction('question_view_start', null, {
+                            questionId: questionId,
+                            visibility: entry.intersectionRatio
+                        });
+                    }
+                } else {
+                    // Question left view - only end timing if we were tracking
+                    if (this.questionStartTimes.has(questionId)) {
+                        this.endQuestionTiming(questionId);
+                        this.trackInteraction('question_view_end', null, {
+                            questionId: questionId
+                        });
+                    }
+                }
+            });
+        }, {
+            threshold: [0.1, 0.5, 0.9] // Track partial visibility
+        });
+        
+        // Observe all question cards
+        document.querySelectorAll('.question-card').forEach(card => {
+            this.visibilityObserver.observe(card);
+        });
+    }
+    
+    getQuestionIdFromElement(element) {
+        // Extract question ID from element attributes or content
+        const questionIdAttr = element.getAttribute('data-question-id');
+        if (questionIdAttr) return parseInt(questionIdAttr);
+        
+        // Try to find from input names
+        const inputs = element.querySelectorAll('.question-input');
+        if (inputs.length > 0) {
+            const name = inputs[0].name;
+            const match = name.match(/question_(\d+)/);
+            if (match) return parseInt(match[1]);
+        }
+        
+        // Fallback: use element position
+        const allQuestions = document.querySelectorAll('.question-card');
+        const index = Array.from(allQuestions).indexOf(element);
+        return index >= 0 ? index + 1 : null;
+    }
+    
+    startQuestionTiming(questionId) {
+        if (questionId && !this.questionStartTimes.has(questionId)) {
+            this.questionStartTimes.set(questionId, Date.now());
+        }
+    }
+    
+    endQuestionTiming(questionId) {
+        if (questionId && this.questionStartTimes.has(questionId)) {
+            const startTime = this.questionStartTimes.get(questionId);
+            const timeSpent = Date.now() - startTime;
+            
+            this.trackInteraction('question_time', null, {
+                questionId: questionId,
+                timeSpent: timeSpent
+            });
+            
+            this.questionStartTimes.delete(questionId);
+        }
+    }
+    
+    trackInteraction(type, event = null, additionalData = {}) {
+        if (!this.isTracking) return;
+        
+        const interaction = {
+            type: type,
+            timestamp: Date.now(),
+            attemptId: this.attemptId,
+            ...additionalData
+        };
+        
+        // Add event-specific data
+        if (event) {
+            interaction.x = event.clientX;
+            interaction.y = event.clientY;
+            interaction.target = this.getElementInfo(event.target);
+            
+            // Get question context
+            const questionElement = event.target.closest('.question-card');
+            if (questionElement) {
+                interaction.questionId = this.getQuestionIdFromElement(questionElement);
+            }
+        }
+        
+        // Add to queue
+        this.interactionQueue.push(interaction);
+        
+        // If queue is getting large, flush immediately
+        if (this.interactionQueue.length >= 50) {
+            this.flushInteractions();
+        }
+    }
+    
+    getElementInfo(element) {
+        if (!element) return null;
+        
+        return {
+            tagName: element.tagName,
+            className: element.className,
+            id: element.id,
+            type: element.type || null,
+            name: element.name || null,
+            value: element.type === 'radio' ? element.value : null
+        };
+    }
+    
+    async flushInteractions() {
+        if (this.interactionQueue.length === 0) return;
+        
+        const batch = [...this.interactionQueue];
+        this.interactionQueue = [];
+        
+        try {
+            // Send as single batched request
+            await this.sendInteractionBatch(batch);
+        } catch (error) {
+            console.warn('Failed to send interaction batch:', error);
+            // Re-queue failed interactions (up to a limit) 
+            if (this.interactionQueue.length < 100) {
+                this.interactionQueue.unshift(...batch);
+            }
+        }
+    }
+    
+    async sendInteractionBatch(interactions) {
+        if (interactions.length === 0) return;
+        
+        try {
+            const response = await fetch('/api/heatmap/interaction/batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    interactions: interactions,
+                    attemptId: this.attemptId
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.warn('Failed to send interaction batch:', error);
+            throw error;
+        }
+    }
+    
+    sendFinalBatch() {
+        // Use sendBeacon for guaranteed delivery on page unload
+        if (this.interactionQueue.length === 0) return;
+        
+        const batch = [...this.interactionQueue];
+        this.interactionQueue = [];
+        
+        try {
+            if (navigator.sendBeacon) {
+                const data = JSON.stringify({
+                    interactions: batch,
+                    attemptId: this.attemptId,
+                    final: true
+                });
+                
+                navigator.sendBeacon('/api/heatmap/interaction/batch', data);
+            } else {
+                // Fallback for browsers without sendBeacon
+                this.sendInteractionBatch(batch).catch(() => {
+                    // Silent failure on unload
+                });
+            }
+        } catch (error) {
+            console.warn('Failed to send final batch:', error);
+        }
+    }
+    
+    trackAnswerChange(questionId, answerValue, answerType) {
+        this.trackInteraction('answer_change', null, {
+            questionId: questionId,
+            answerValue: answerValue,
+            answerType: answerType,
+            timestamp: Date.now()
+        });
+    }
+    
+    trackQuestionFocus(questionId) {
+        this.currentQuestionId = questionId;
+        this.startQuestionTiming(questionId);
+        this.trackInteraction('question_focus', null, {
+            questionId: questionId
+        });
+    }
+    
+    trackQuestionBlur(questionId) {
+        if (this.currentQuestionId === questionId) {
+            this.endQuestionTiming(questionId);
+            this.currentQuestionId = null;
+        }
+        this.trackInteraction('question_blur', null, {
+            questionId: questionId
+        });
+    }
+    
+    destroy() {
+        this.isTracking = false;
+        
+        // Send final batch
+        this.sendFinalBatch();
+        
+        // Clear intervals
+        if (this.flushInterval) {
+            clearInterval(this.flushInterval);
+            this.flushInterval = null;
+        }
+        
+        // Remove all event listeners
+        this.eventListeners.forEach(([target, eventOrElement, typeOrHandler, handler]) => {
+            if (target === 'document') {
+                document.removeEventListener(eventOrElement, typeOrHandler);
+            } else if (target === 'window') {
+                window.removeEventListener(eventOrElement, typeOrHandler);
+            } else if (target === 'element') {
+                eventOrElement.removeEventListener(typeOrHandler, handler);
+            }
+        });
+        this.eventListeners = [];
+        
+        // Disconnect intersection observer
+        if (this.visibilityObserver) {
+            this.visibilityObserver.disconnect();
+            this.visibilityObserver = null;
+        }
+        
+        // Clear question timing
+        this.questionStartTimes.clear();
+    }
+}
 
 class QuizManager {
     constructor(timeLimit, attemptId) {
@@ -9,6 +387,9 @@ class QuizManager {
         this.autoSaveInterval = null;
         this.answers = new Map();
         this.isSubmitted = false;
+        
+        // Initialize heatmap tracking
+        this.heatmapTracker = new HeatmapTracker(attemptId);
         
         this.init();
     }
@@ -64,15 +445,60 @@ class QuizManager {
     }
 
     setupEventListeners() {
-        // Answer change listeners
+        // Answer change listeners with enhanced tracking
         document.querySelectorAll('.question-input').forEach(input => {
             if (input.type === 'radio') {
                 input.addEventListener('change', (e) => {
                     this.handleAnswerChange(e.target.name, e.target.value, 'radio');
                 });
+                
+                // Track focus events for questions
+                input.addEventListener('focus', (e) => {
+                    const questionId = this.extractQuestionId(e.target.name);
+                    if (questionId && this.heatmapTracker) {
+                        this.heatmapTracker.trackQuestionFocus(questionId);
+                    }
+                });
+                
+                input.addEventListener('blur', (e) => {
+                    const questionId = this.extractQuestionId(e.target.name);
+                    if (questionId && this.heatmapTracker) {
+                        this.heatmapTracker.trackQuestionBlur(questionId);
+                    }
+                });
+                
             } else if (input.tagName === 'TEXTAREA') {
                 input.addEventListener('input', (e) => {
                     this.handleAnswerChange(e.target.name, e.target.value, 'text');
+                });
+                
+                // Enhanced tracking for text inputs
+                input.addEventListener('focus', (e) => {
+                    const questionId = this.extractQuestionId(e.target.name);
+                    if (questionId && this.heatmapTracker) {
+                        this.heatmapTracker.trackQuestionFocus(questionId);
+                    }
+                });
+                
+                input.addEventListener('blur', (e) => {
+                    const questionId = this.extractQuestionId(e.target.name);
+                    if (questionId && this.heatmapTracker) {
+                        this.heatmapTracker.trackQuestionBlur(questionId);
+                    }
+                });
+                
+                // Track typing patterns
+                let typingTimer;
+                input.addEventListener('keydown', (e) => {
+                    clearTimeout(typingTimer);
+                    typingTimer = setTimeout(() => {
+                        if (this.heatmapTracker) {
+                            this.heatmapTracker.trackInteraction('typing_pause', null, {
+                                questionId: this.extractQuestionId(e.target.name),
+                                textLength: e.target.value.length
+                            });
+                        }
+                    }, 1000); // 1 second pause indicates end of typing burst
                 });
             }
         });
@@ -116,11 +542,23 @@ class QuizManager {
         this.answers.set(questionName, { value, type, timestamp: new Date() });
         this.updateProgress();
         
+        // Track answer change for heatmap
+        const questionId = this.extractQuestionId(questionName);
+        if (questionId && this.heatmapTracker) {
+            this.heatmapTracker.trackAnswerChange(questionId, value, type);
+        }
+        
         // Auto-save after answer change (debounced)
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
             this.saveDraft(false); // Silent save
         }, 2000);
+    }
+    
+    extractQuestionId(questionName) {
+        // Extract question ID from question name (e.g., "question_5" -> 5)
+        const match = questionName.match(/question_(\d+)/);
+        return match ? parseInt(match[1]) : null;
     }
 
     updateProgress() {
@@ -303,6 +741,12 @@ class QuizManager {
             clearTimeout(this.autoSaveTimeout);
             this.autoSaveTimeout = null;
         }
+        
+        // Clean up heatmap tracking
+        if (this.heatmapTracker) {
+            this.heatmapTracker.destroy();
+            this.heatmapTracker = null;
+        }
     }
 
     preventUnload() {
@@ -321,6 +765,16 @@ class QuizManager {
                 // Log potential proctoring violation
                 if (window.proctoringManager) {
                     window.proctoringManager.logEvent('tab_switch', 'User switched away from quiz tab');
+                }
+                
+                // Track tab switch in heatmap
+                if (this.heatmapTracker) {
+                    this.heatmapTracker.trackInteraction('tab_hidden');
+                }
+            } else if (!this.isSubmitted) {
+                // Track return to tab
+                if (this.heatmapTracker) {
+                    this.heatmapTracker.trackInteraction('tab_visible');
                 }
             }
         });
