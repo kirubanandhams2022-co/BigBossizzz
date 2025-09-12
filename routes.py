@@ -1482,93 +1482,137 @@ def extract_questions_from_text(text):
         return questions
     
     try:
-        # Clean and normalize text
-        text = re.sub(r'\s+', ' ', text.strip())
+        # Split text into lines for better processing
+        lines = text.strip().split('\n')
+        current_question = None
+        current_options = []
+        correct_index = 0
         
-        # Enhanced patterns for different question formats
-        patterns = [
-            # Pattern 1: Numbered questions with options (1. Question? A) option B) option)
-            r'(\d+\.?\s*)(.*?\?)\s*((?:[A-Da-d][\)\.].*?)(?=[A-Da-d][\)\.]|$))',
-            # Pattern 2: Questions with options on new lines
-            r'(Question\s*\d*:?\s*)(.*?\?)\s*((?:[A-Da-d][\)\.].*?)(?=Question|\d+\.|$))',
-            # Pattern 3: Simple question-answer pairs
-            r'([^.!]*\?)\s*((?:[A-Da-d][\)\.].*?)(?=[^.!]*\?|$))'
-        ]
-        
-        # Try each pattern to extract questions
-        for pattern in patterns:
-            matches = re.finditer(pattern, text, re.MULTILINE | re.DOTALL)
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
             
-            for match in matches:
-                try:
-                    if len(match.groups()) >= 2:
-                        question_text = match.group(-2).strip()  # Second to last group
-                        options_text = match.group(-1).strip()   # Last group
-                        
-                        if len(question_text) > 10:  # Meaningful question
-                            question_data = {
-                                'question': question_text,
-                                'type': 'multiple_choice',
-                                'options': [],
-                                'correct_option_index': 0,
-                                'confidence': 0.7
-                            }
-                            
-                            # Extract individual options
-                            option_parts = re.findall(r'[A-Da-d][\)\.]([^A-Da-d\)\.]*)(?=[A-Da-d][\)\.]|$)', options_text)
-                            question_data['options'] = [opt.strip() for opt in option_parts if opt.strip()]
-                            
-                            if len(question_data['options']) >= 2:
-                                questions.append(question_data)
-                                
-                except Exception as e:
-                    continue  # Skip malformed questions
+            # Skip empty lines
+            if not line:
+                i += 1
+                continue
+            
+            # Check for numbered question format (1. Question text)
+            question_match = re.match(r'^(\d+)\.?\s*(.+)', line)
+            if question_match:
+                # Save previous question if exists
+                if current_question and len(current_options) >= 2:
+                    questions.append({
+                        'question': current_question,
+                        'type': 'multiple_choice',
+                        'options': current_options,
+                        'correct_option_index': correct_index,
+                        'confidence': 0.9
+                    })
+                
+                # Start new question
+                current_question = question_match.group(2).strip()
+                current_options = []
+                correct_index = 0
+                
+            # Check for option format (A) Option text, *A) Option text, or A) *Option text)
+            elif re.match(r'^[\*]?[A-Da-d]\)\s*', line):
+                # Handle asterisk before label: "*A) Option"  
+                leading_star = line.startswith('*')
+                tmp = line[1:].lstrip() if leading_star else line
+                
+                # Extract the option body (everything after "A) ")
+                option_match = re.match(r'^[A-Da-d][\)\.]\s*(.+)', tmp)
+                if option_match:
+                    body = option_match.group(1)
                     
+                    # Handle asterisk after label: "A) *Option"
+                    post_star = body.lstrip().startswith('*')
+                    if post_star:
+                        body = body.lstrip()[1:].lstrip()
+                    
+                    is_correct = leading_star or post_star
+                    clean_option = body.strip()
+                    
+                    if is_correct:
+                        correct_index = len(current_options)
+                    
+                    current_options.append(clean_option)
+            
+            # Check for alternative question formats
+            elif line.startswith('Q:') or line.startswith('Question:'):
+                if current_question and len(current_options) >= 2:
+                    questions.append({
+                        'question': current_question,
+                        'type': 'multiple_choice',
+                        'options': current_options,
+                        'correct_option_index': correct_index,
+                        'confidence': 0.9
+                    })
+                
+                current_question = line.split(':', 1)[1].strip()
+                current_options = []
+                correct_index = 0
+            
+            i += 1
+        
+        # Add the last question if exists
+        if current_question and len(current_options) >= 2:
+            questions.append({
+                'question': current_question,
+                'type': 'multiple_choice',
+                'options': current_options,
+                'correct_option_index': correct_index,
+                'confidence': 0.9
+            })
+        
+        # If no questions found with structured approach, try regex fallback
+        if not questions:
+            # Clean and normalize text for regex patterns
+            text_normalized = re.sub(r'\s+', ' ', text.strip())
+            
+            # Enhanced patterns for different question formats
+            patterns = [
+                # Pattern 1: Numbered questions with options (1. Question A) option B) option)
+                r'(\d+\.?\s*)(.*?)\s*((?:[A-Da-d][\)\.].*?)(?=\d+\.|$))',
+                # Pattern 2: Questions with options on new lines
+                r'(Question\s*\d*:?\s*)(.*?)\s*((?:[A-Da-d][\)\.].*?)(?=Question|\d+\.|$))',
+            ]
+            
+            # Try each pattern to extract questions
+            for pattern in patterns:
+                matches = re.finditer(pattern, text_normalized, re.MULTILINE | re.DOTALL)
+                
+                for match in matches:
+                    try:
+                        if len(match.groups()) >= 2:
+                            question_text = match.group(-2).strip()
+                            options_text = match.group(-1).strip()
+                            
+                            if len(question_text) > 10:
+                                question_data = {
+                                    'question': question_text,
+                                    'type': 'multiple_choice',
+                                    'options': [],
+                                    'correct_option_index': 0,
+                                    'confidence': 0.7
+                                }
+                                
+                                # Extract individual options
+                                option_parts = re.findall(r'[A-Da-d][\)\.]([^A-Da-d\)\.]*)(?=[A-Da-d][\)\.]|$)', options_text)
+                                question_data['options'] = [opt.strip() for opt in option_parts if opt.strip()]
+                                
+                                if len(question_data['options']) >= 2:
+                                    questions.append(question_data)
+                                    
+                    except Exception as e:
+                        continue
+                        
         return questions[:20]  # Limit to 20 questions max
         
     except Exception as e:
         logging.error(f"Text extraction error: {e}")
         return []
-    
-    for match in matches:
-        question_text = match.group(2).strip()
-        options_text = match.group(3).strip()
-        
-        if question_text:
-            # Extract options
-            option_pattern = r'([A-D]\)|[A-D]\.|\([A-D]\)|[1-4]\.|[1-4]\))\s*(.*?)(?=\n[A-D]\)|\n[A-D]\.|\n\([A-D]\)|\n[1-4]\.|\n[1-4]\)|$)'
-            option_matches = re.finditer(option_pattern, options_text, re.MULTILINE | re.DOTALL)
-            
-            options = []
-            for opt_match in option_matches:
-                option_text = opt_match.group(2).strip()
-                if option_text:
-                    options.append(option_text)
-            
-            if len(options) >= 2:
-                # Look for answer indicators
-                answer_pattern = r'(?:Answer|Ans|Correct)[:\s]*([A-D]|[1-4])'
-                answer_match = re.search(answer_pattern, text[match.end():match.end()+200], re.IGNORECASE)
-                
-                correct_index = 0
-                if answer_match:
-                    answer_letter = answer_match.group(1).upper()
-                    if answer_letter in 'ABCD':
-                        correct_index = ord(answer_letter) - ord('A')
-                    elif answer_letter in '1234':
-                        correct_index = int(answer_letter) - 1
-                
-                question_data = {
-                    'question': question_text,
-                    'type': 'multiple_choice',
-                    'options': options,
-                    'correct_option_index': min(correct_index, len(options) - 1),
-                    'confidence': 0.7 if answer_match else 0.5
-                }
-                
-                questions.append(question_data)
-    
-    return questions
 
 def select_top_questions(candidate_questions, num_questions):
     """Select top N questions based on confidence and completeness"""
