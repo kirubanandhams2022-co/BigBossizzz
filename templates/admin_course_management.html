@@ -288,22 +288,75 @@
                 <!-- Enroll Participant Section -->
                 <div class="row mb-4">
                     <div class="col-12">
-                        <h6><i class="fas fa-user-graduate me-2"></i>Enroll Participant</h6>
+                        <h6><i class="fas fa-user-graduate me-2"></i>Enroll Participants</h6>
                         {% if course_stats[course.id].total_participants < course.max_participants %}
-                            <form method="post" action="{{ url_for('admin_enroll_participant_in_course', course_id=course.id) }}" class="d-flex">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <select name="participant_id" class="form-select me-2" required>
-                                    <option value="">Select Participant...</option>
-                                    {% for participant in participants %}
-                                        {% if participant not in course.participant_enrollments|map(attribute='participant') %}
-                                            <option value="{{ participant.id }}">{{ participant.username }} ({{ participant.email }})</option>
-                                        {% endif %}
-                                    {% endfor %}
-                                </select>
-                                <button type="submit" class="btn btn-success">
-                                    <i class="fas fa-plus"></i> Enroll
-                                </button>
-                            </form>
+                            <!-- Single Participant Enrollment -->
+                            <div class="mb-3">
+                                <small class="text-muted mb-2 d-block">Single Enrollment:</small>
+                                <form method="post" action="{{ url_for('admin_enroll_participant_in_course', course_id=course.id) }}" class="d-flex">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <select name="participant_id" class="form-select me-2" required>
+                                        <option value="">Select Participant...</option>
+                                        {% for participant in participants %}
+                                            {% if participant not in course.participant_enrollments|map(attribute='participant') %}
+                                                <option value="{{ participant.id }}">{{ participant.username }} ({{ participant.email }})</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-plus"></i> Enroll
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Bulk Participant Enrollment -->
+                            {% set available_participants = [] %}
+                            {% for participant in participants %}
+                                {% if participant not in course.participant_enrollments|map(attribute='participant') %}
+                                    {% set _ = available_participants.append(participant) %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if available_participants|length > 1 %}
+                                <div class="border-top pt-3">
+                                    <small class="text-muted mb-2 d-block">Bulk Enrollment (Select Multiple Students):</small>
+                                    <form method="post" action="{{ url_for('admin_bulk_enroll_participants', course_id=course.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="form-label mb-0">Select Participants to Enroll:</label>
+                                                <div>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllParticipants{{ course.id }}()">Select All</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAllParticipants{{ course.id }}()">Clear All</button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                                {% for participant in available_participants %}
+                                                    <div class="form-check">
+                                                        <input class="form-check-input participant-checkbox-{{ course.id }}" type="checkbox" name="participant_ids" value="{{ participant.id }}" id="participant_{{ course.id }}_{{ participant.id }}">
+                                                        <label class="form-check-label" for="participant_{{ course.id }}_{{ participant.id }}">
+                                                            <strong>{{ participant.username }}</strong> ({{ participant.email }})
+                                                        </label>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                            
+                                            <small class="form-text text-muted mt-1">
+                                                Available spots: {{ course.max_participants - course_stats[course.id].total_participants }} / {{ course.max_participants }}
+                                            </small>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span id="selectedCount{{ course.id }}" class="text-muted small">0 participants selected</span>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-users"></i> Enroll Selected Participants
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            {% endif %}
                         {% else %}
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
@@ -348,5 +401,38 @@
 document.getElementById('courseCode').addEventListener('input', function() {
     this.value = this.value.toUpperCase();
 });
+
+// Bulk enrollment functionality
+{% for course in courses %}
+// Functions for course {{ course.id }}
+function selectAllParticipants{{ course.id }}() {
+    const checkboxes = document.querySelectorAll('.participant-checkbox-{{ course.id }}');
+    checkboxes.forEach(checkbox => checkbox.checked = true);
+    updateSelectedCount{{ course.id }}();
+}
+
+function clearAllParticipants{{ course.id }}() {
+    const checkboxes = document.querySelectorAll('.participant-checkbox-{{ course.id }}');
+    checkboxes.forEach(checkbox => checkbox.checked = false);
+    updateSelectedCount{{ course.id }}();
+}
+
+function updateSelectedCount{{ course.id }}() {
+    const checkboxes = document.querySelectorAll('.participant-checkbox-{{ course.id }}:checked');
+    const count = checkboxes.length;
+    const countElement = document.getElementById('selectedCount{{ course.id }}');
+    if (countElement) {
+        countElement.textContent = count + (count === 1 ? ' participant selected' : ' participants selected');
+    }
+}
+
+// Add event listeners for checkboxes
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.participant-checkbox-{{ course.id }}');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount{{ course.id }});
+    });
+});
+{% endfor %}
 </script>
 {% endblock %}

@@ -5494,6 +5494,108 @@ def admin_enroll_participant_in_course(course_id):
     flash(f'Participant {participant.username} enrolled in course {course.name} successfully.', 'success')
     return redirect(url_for('admin_course_management'))
 
+@app.route('/admin/course/<int:course_id>/bulk-enroll-participants', methods=['POST'])
+@login_required
+def admin_bulk_enroll_participants(course_id):
+    """Bulk enroll multiple participants in course"""
+    if not current_user.is_admin():
+        flash('Access denied. Administrator privileges required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    course = Course.query.get_or_404(course_id)
+    participant_ids = request.form.getlist('participant_ids')
+    
+    if not participant_ids:
+        flash('Please select participants to enroll.', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    # Check current enrollment count
+    current_enrollments = len(course.participant_enrollments)
+    available_spots = course.max_participants - current_enrollments
+    
+    if available_spots <= 0:
+        flash(f'Course {course.name} has reached maximum participant limit ({course.max_participants}).', 'error')
+        return redirect(url_for('admin_course_management'))
+    
+    # Limit enrollments to available spots
+    if len(participant_ids) > available_spots:
+        flash(f'Only {available_spots} spots available in course {course.name}. Limiting enrollment to first {available_spots} selected participants.', 'warning')
+        participant_ids = participant_ids[:available_spots]
+    
+    enrolled_count = 0
+    errors = []
+    
+    # Process participants in small batches to prevent timeouts
+    batch_size = 5  # Process 5 participants at a time
+    total_participants = len(participant_ids)
+    
+    for batch_start in range(0, total_participants, batch_size):
+        batch_end = min(batch_start + batch_size, total_participants)
+        batch_ids = participant_ids[batch_start:batch_end]
+        
+        try:
+            # Process current batch
+            for participant_id in batch_ids:
+                try:
+                    participant_id = int(participant_id)
+                    participant = User.query.get(participant_id)
+                    
+                    if not participant:
+                        errors.append(f'Participant with ID {participant_id} not found.')
+                        continue
+                    
+                    if participant.role != 'participant':
+                        errors.append(f'User {participant.username} is not a participant.')
+                        continue
+                    
+                    # Check if already enrolled
+                    existing = ParticipantEnrollment.query.filter_by(
+                        participant_id=participant_id, course_id=course_id
+                    ).first()
+                    
+                    if existing:
+                        errors.append(f'Participant {participant.username} is already enrolled in this course.')
+                        continue
+                    
+                    # Create enrollment
+                    enrollment = ParticipantEnrollment()
+                    enrollment.participant_id = participant_id
+                    enrollment.course_id = course_id
+                    enrollment.enrolled_by = current_user.id
+                    
+                    db.session.add(enrollment)
+                    enrolled_count += 1
+                    
+                except ValueError:
+                    errors.append(f'Invalid participant ID: {participant_id}')
+                except Exception as e:
+                    errors.append(f'Error enrolling participant {participant_id}: {str(e)}')
+            
+            # Commit each batch to prevent timeouts
+            try:
+                db.session.commit()
+                
+                # Add small delay between batches to prevent overwhelming the database
+                if batch_end < total_participants:  # Not the last batch
+                    import time
+                    time.sleep(0.1)
+                    
+            except Exception as batch_error:
+                db.session.rollback()
+                errors.append(f'Batch {batch_start//batch_size + 1}: Database error - {str(batch_error)}')
+                
+        except Exception as batch_exception:
+            db.session.rollback()
+            errors.append(f'Batch {batch_start//batch_size + 1}: Processing error - {str(batch_exception)}')
+    
+    # Final status messages
+    if enrolled_count > 0:
+        flash(f'Successfully enrolled {enrolled_count} participants in course {course.name}.', 'success')
+    if errors:
+        flash(f'Errors encountered: {"; ".join(errors[:3])}{"..." if len(errors) > 3 else ""}', 'warning')
+    
+    return redirect(url_for('admin_course_management'))
+
 @app.route('/admin/course/<int:course_id>/remove-host/<int:host_id>', methods=['POST'])
 @login_required
 def admin_remove_host_from_course(course_id, host_id):
