@@ -4,6 +4,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 import json
+from sqlalchemy.ext.hybrid import hybrid_property
 
 # New Course Management System
 class Course(db.Model):
@@ -75,6 +76,7 @@ class User(UserMixin, db.Model):
     # Relationships
     created_quizzes = db.relationship('Quiz', backref='creator', lazy=True, cascade='all, delete-orphan')
     quiz_attempts = db.relationship('QuizAttempt', backref='participant', lazy=True, cascade='all, delete-orphan')
+    user_roles = db.relationship('UserRole', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -101,6 +103,70 @@ class User(UserMixin, db.Model):
     
     def is_participant(self):
         return self.role == 'participant'
+    
+    # New RBAC methods
+    def has_permission(self, permission_name):
+        """Check if user has a specific permission through their roles"""
+        for user_role in self.user_roles:
+            for role_permission in user_role.role.role_permissions:
+                if role_permission.permission.name == permission_name:
+                    return True
+        return False
+    
+    def has_any_permission(self, permission_names):
+        """Check if user has any of the specified permissions"""
+        return any(self.has_permission(perm) for perm in permission_names)
+    
+    def has_all_permissions(self, permission_names):
+        """Check if user has all of the specified permissions"""
+        return all(self.has_permission(perm) for perm in permission_names)
+    
+    def get_all_permissions(self):
+        """Get all permissions for this user through their roles"""
+        permissions = set()
+        for user_role in self.user_roles:
+            for role_permission in user_role.role.role_permissions:
+                permissions.add(role_permission.permission.name)
+        return list(permissions)
+    
+    def add_role(self, role_name):
+        """Add a role to this user"""
+        from models import Role, UserRole  # Import here to avoid circular imports
+        role = Role.query.filter_by(name=role_name).first()
+        if role and not self.has_role(role_name):
+            user_role = UserRole(user_id=self.id, role_id=role.id)
+            db.session.add(user_role)
+            return True
+        return False
+    
+    def remove_role(self, role_name):
+        """Remove a role from this user"""
+        from models import Role, UserRole  # Import here to avoid circular imports
+        role = Role.query.filter_by(name=role_name).first()
+        if role:
+            user_role = UserRole.query.filter_by(user_id=self.id, role_id=role.id).first()
+            if user_role:
+                db.session.delete(user_role)
+                return True
+        return False
+    
+    def has_role(self, role_name):
+        """Check if user has a specific role"""
+        return any(ur.role.name == role_name for ur in self.user_roles)
+    
+    def get_roles(self):
+        """Get all role names for this user"""
+        return [ur.role.name for ur in self.user_roles]
+    
+    # Legacy role methods for backward compatibility
+    def is_admin(self):
+        return self.has_role('admin') or self.role == 'admin'
+    
+    def is_host(self):
+        return self.has_role('host') or self.role == 'host'
+    
+    def is_participant(self):
+        return self.has_role('participant') or self.role == 'participant'
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -656,3 +722,146 @@ class PlagiarismMatch(db.Model):
     
     def __repr__(self):
         return f'<PlagiarismMatch {self.match_type}: {self.similarity_score:.2f}>'
+
+# RBAC (Role-Based Access Control) Models
+
+class Role(db.Model):
+    """Roles that can be assigned to users (admin, host, participant, etc.)"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    display_name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    is_system_role = db.Column(db.Boolean, default=False)  # System roles cannot be deleted
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    # Relationships
+    role_permissions = db.relationship('RolePermission', backref='role', lazy=True, cascade='all, delete-orphan')
+    user_roles = db.relationship('UserRole', backref='role', lazy=True, cascade='all, delete-orphan')
+    
+    @property
+    def permission_count(self):
+        return len(self.role_permissions)
+    
+    @property
+    def user_count(self):
+        return len(self.user_roles)
+    
+    def get_permissions(self):
+        """Get all permission names for this role"""
+        return [rp.permission.name for rp in self.role_permissions]
+    
+    def has_permission(self, permission_name):
+        """Check if this role has a specific permission"""
+        return any(rp.permission.name == permission_name for rp in self.role_permissions)
+    
+    def add_permission(self, permission_name):
+        """Add a permission to this role"""
+        permission = Permission.query.filter_by(name=permission_name).first()
+        if permission and not self.has_permission(permission_name):
+            role_permission = RolePermission(role_id=self.id, permission_id=permission.id)
+            db.session.add(role_permission)
+            return True
+        return False
+    
+    def remove_permission(self, permission_name):
+        """Remove a permission from this role"""
+        permission = Permission.query.filter_by(name=permission_name).first()
+        if permission:
+            role_permission = RolePermission.query.filter_by(
+                role_id=self.id, 
+                permission_id=permission.id
+            ).first()
+            if role_permission:
+                db.session.delete(role_permission)
+                return True
+        return False
+    
+    def __repr__(self):
+        return f'<Role {self.name}>'
+
+class Permission(db.Model):
+    """Individual permissions that can be granted to roles"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    display_name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    category = db.Column(db.String(50), nullable=False)  # e.g., 'quiz', 'user', 'system', 'reports'
+    is_active = db.Column(db.Boolean, default=True)
+    is_system_permission = db.Column(db.Boolean, default=False)  # System permissions cannot be deleted
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    role_permissions = db.relationship('RolePermission', backref='permission', lazy=True, cascade='all, delete-orphan')
+    
+    @property
+    def role_count(self):
+        return len(self.role_permissions)
+    
+    def get_roles(self):
+        """Get all role names that have this permission"""
+        return [rp.role.name for rp in self.role_permissions]
+    
+    def __repr__(self):
+        return f'<Permission {self.name}>'
+
+class RolePermission(db.Model):
+    """Association table for roles and permissions (many-to-many)"""
+    id = db.Column(db.Integer, primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
+    permission_id = db.Column(db.Integer, db.ForeignKey('permission.id'), nullable=False)
+    granted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    granted_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    # Ensure unique combinations
+    __table_args__ = (db.UniqueConstraint('role_id', 'permission_id', name='unique_role_permission'),)
+    
+    def __repr__(self):
+        return f'<RolePermission {self.role_id}->{self.permission_id}>'
+
+class UserRole(db.Model):
+    """Association table for users and roles (many-to-many)"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    assigned_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    is_active = db.Column(db.Boolean, default=True)
+    expires_at = db.Column(db.DateTime)  # Optional expiration date
+    
+    # Ensure unique combinations
+    __table_args__ = (db.UniqueConstraint('user_id', 'role_id', name='unique_user_role'),)
+    
+    # Relationships
+    assigned_by_user = db.relationship('User', foreign_keys=[assigned_by])
+    
+    @property
+    def is_expired(self):
+        return self.expires_at and datetime.utcnow() > self.expires_at
+    
+    def __repr__(self):
+        return f'<UserRole {self.user_id}->{self.role_id}>'
+
+class RoleAuditLog(db.Model):
+    """Audit log for role and permission changes"""
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(50), nullable=False)  # 'create', 'update', 'delete', 'assign', 'revoke'
+    entity_type = db.Column(db.String(20), nullable=False)  # 'role', 'permission', 'user_role'
+    entity_id = db.Column(db.Integer, nullable=False)
+    target_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # User affected by the change
+    performed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    old_values = db.Column(db.Text)  # JSON string of old values
+    new_values = db.Column(db.Text)  # JSON string of new values
+    reason = db.Column(db.Text)  # Optional reason for the change
+    ip_address = db.Column(db.String(45))  # IPv4 or IPv6
+    user_agent = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    target_user = db.relationship('User', foreign_keys=[target_user_id])
+    performed_by_user = db.relationship('User', foreign_keys=[performed_by])
+    
+    def __repr__(self):
+        return f'<RoleAuditLog {self.action} {self.entity_type}:{self.entity_id}>'
