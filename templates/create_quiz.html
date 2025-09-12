@@ -183,9 +183,59 @@ Q: Next question...</pre>
                         </div>
                     </div>
                     
+                    <!-- Easy Text Paste Section -->
+                    <div class="card mb-4 border-success">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-edit"></i> Quick Question Entry (Easiest Method)</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">
+                                <strong>Super Easy:</strong> Just paste your questions here! No need to upload files.
+                            </p>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold" for="quickQuestionsText">
+                                    Paste Your Questions Here
+                                </label>
+                                <textarea class="form-control" rows="10" id="quickQuestionsText" name="quick_questions_text"
+                                          placeholder="Just paste your questions in this format:
+
+Q: What is cloud computing?
+A) Internet storage only
+B) *A model for delivering computing services
+C) Hardware only
+D) Software only
+
+Q: Which is a cloud service model?
+A) *SaaS
+B) TCP
+C) HTTP
+D) DNS
+
+Use * to mark the correct answer. It's that simple!"></textarea>
+                            </div>
+                            
+                            <div class="d-flex gap-2 mb-3">
+                                <button type="button" class="btn btn-success" onclick="processQuickQuestions()">
+                                    <i class="fas fa-magic"></i> Create Quiz from Text
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearQuickText()">
+                                    <i class="fas fa-trash"></i> Clear
+                                </button>
+                            </div>
+                            
+                            <div id="quickQuestionPreview" class="alert alert-info" style="display: none;">
+                                <h6><i class="fas fa-eye"></i> Preview Questions</h6>
+                                <div id="previewContent"></div>
+                                <input type="hidden" id="useQuickQuestions" name="use_quick_questions" value="false">
+                                <small class="text-muted">Questions look good? Click "Create Quiz" below to proceed.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="alert alert-info">
                         <i class="fas fa-lightbulb"></i>
-                        <strong>Next Steps:</strong> After creating the quiz, you'll be able to add questions, set answer options, and configure additional settings. If you upload a file, questions will be automatically generated.
+                        <strong>Next Steps:</strong> After creating the quiz, you'll be able to add questions, set answer options, and configure additional settings. If you upload a file or paste questions, they will be automatically generated.
                     </div>
                     
                     <script>
@@ -231,6 +281,90 @@ Q: Next question...</pre>
                             });
                         }
                     });
+                    
+                    // Quick Questions Text Processing
+                    function processQuickQuestions() {
+                        const textArea = document.getElementById('quickQuestionsText');
+                        const previewDiv = document.getElementById('quickQuestionPreview');
+                        const previewContent = document.getElementById('previewContent');
+                        const useQuickInput = document.getElementById('useQuickQuestions');
+                        
+                        const text = textArea.value.trim();
+                        if (!text) {
+                            alert('Please paste some questions first!');
+                            return;
+                        }
+                        
+                        // Simple preview generation
+                        const lines = text.split('\n');
+                        let questions = [];
+                        let currentQ = null;
+                        let currentOptions = [];
+                        let correctIndex = -1;
+                        
+                        for (let line of lines) {
+                            line = line.trim();
+                            if (!line) continue;
+                            
+                            if (line.startsWith('Q:')) {
+                                // Save previous question
+                                if (currentQ && currentOptions.length >= 2) {
+                                    questions.push({
+                                        question: currentQ,
+                                        options: currentOptions,
+                                        correct: correctIndex
+                                    });
+                                }
+                                
+                                currentQ = line.substring(2).trim();
+                                currentOptions = [];
+                                correctIndex = -1;
+                            } else if (/^[A-D]\)/.test(line)) {
+                                const isCorrect = line.includes('*');
+                                const optionText = line.replace(/^[A-D]\)\s*\*?/, '').trim();
+                                
+                                if (isCorrect) {
+                                    correctIndex = currentOptions.length;
+                                }
+                                currentOptions.push(optionText);
+                            }
+                        }
+                        
+                        // Don't forget the last question
+                        if (currentQ && currentOptions.length >= 2) {
+                            questions.push({
+                                question: currentQ,
+                                options: currentOptions,
+                                correct: correctIndex
+                            });
+                        }
+                        
+                        if (questions.length === 0) {
+                            alert('No valid questions found. Please check your format:\\n\\nQ: Your question?\\nA) Option 1\\nB) *Correct option\\nC) Option 3');
+                            return;
+                        }
+                        
+                        // Generate preview
+                        let html = `<strong>Found ${questions.length} questions:</strong><br><br>`;
+                        questions.forEach((q, i) => {
+                            html += `<strong>${i+1}. ${q.question}</strong><br>`;
+                            q.options.forEach((opt, j) => {
+                                const correct = (j === q.correct) ? ' <span class="badge bg-success">✓</span>' : '';
+                                html += `&nbsp;&nbsp;${String.fromCharCode(65+j)}) ${opt}${correct}<br>`;
+                            });
+                            html += '<br>';
+                        });
+                        
+                        previewContent.innerHTML = html;
+                        previewDiv.style.display = 'block';
+                        useQuickInput.value = 'true';
+                    }
+                    
+                    function clearQuickText() {
+                        document.getElementById('quickQuestionsText').value = '';
+                        document.getElementById('quickQuestionPreview').style.display = 'none';
+                        document.getElementById('useQuickQuestions').value = 'false';
+                    }
                     </script>
                     
                     <div class="d-flex justify-content-between">

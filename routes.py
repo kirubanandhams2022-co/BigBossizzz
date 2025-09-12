@@ -3779,8 +3779,44 @@ def create_quiz():
             creator_id=current_user.id
         )
         
+        # Handle quick text paste if used
+        if request.form.get('use_quick_questions') == 'true':
+            quick_text = request.form.get('quick_questions_text', '').strip()
+            if quick_text:
+                try:
+                    # Use the same text parsing logic
+                    candidate_questions = extract_questions_from_text(quick_text)
+                    
+                    if not candidate_questions:
+                        flash('No questions found in the pasted text. Please check the format and try again.', 'warning')
+                        return render_template('create_quiz.html', form=form)
+                    
+                    db.session.add(quiz)
+                    db.session.commit()
+                    
+                    # Create questions from parsed data
+                    created_count = 0
+                    for q_data in candidate_questions:
+                        try:
+                            create_question_from_comprehensive_data(quiz, q_data)
+                            created_count += 1
+                        except Exception as e:
+                            logging.warning(f"Failed to create question: {e}")
+                            continue
+                    
+                    if created_count > 0:
+                        flash(f'Quiz created successfully from pasted text! {created_count} questions added.', 'success')
+                        return redirect(url_for('edit_quiz', quiz_id=quiz.id))
+                    else:
+                        flash('No valid questions could be created from the pasted text.', 'error')
+                        return render_template('create_quiz.html', form=form)
+                        
+                except Exception as e:
+                    flash(f'Error processing pasted text: {str(e)}', 'error')
+                    return render_template('create_quiz.html', form=form)
+        
         # Handle file upload if selected
-        if form.create_from_file.data and form.quiz_file.data:
+        elif form.create_from_file.data and form.quiz_file.data:
             file = form.quiz_file.data
             if file and file.filename:
                 filename = secure_filename(file.filename)
