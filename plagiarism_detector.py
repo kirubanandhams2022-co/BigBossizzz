@@ -11,6 +11,7 @@ This service uses multiple machine learning algorithms to detect plagiarism in t
 import re
 import string
 import logging
+import os
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 
@@ -39,29 +40,27 @@ class PlagiarismDetector:
             strip_accents='unicode'
         )
         
-        # Risk thresholds for different algorithms
+        # Configurable risk thresholds - Load from environment or use defaults
         self.thresholds = {
-            'cosine_high': 0.8,
-            'cosine_medium': 0.6,
-            'cosine_low': 0.4,
-            'jaccard_high': 0.7,
-            'jaccard_medium': 0.5,
-            'jaccard_low': 0.3,
-            'levenshtein_high': 0.85,
-            'levenshtein_medium': 0.7,
-            'levenshtein_low': 0.5
+            'cosine_high': float(os.environ.get('PLAGIARISM_COSINE_HIGH', '0.8')),
+            'cosine_medium': float(os.environ.get('PLAGIARISM_COSINE_MEDIUM', '0.6')),
+            'cosine_low': float(os.environ.get('PLAGIARISM_COSINE_LOW', '0.4')),
+            'jaccard_high': float(os.environ.get('PLAGIARISM_JACCARD_HIGH', '0.7')),
+            'jaccard_medium': float(os.environ.get('PLAGIARISM_JACCARD_MEDIUM', '0.5')),
+            'jaccard_low': float(os.environ.get('PLAGIARISM_JACCARD_LOW', '0.3')),
+            'levenshtein_high': float(os.environ.get('PLAGIARISM_LEVENSHTEIN_HIGH', '0.85')),
+            'levenshtein_medium': float(os.environ.get('PLAGIARISM_LEVENSHTEIN_MEDIUM', '0.7')),
+            'levenshtein_low': float(os.environ.get('PLAGIARISM_LEVENSHTEIN_LOW', '0.5')),
+            'segment_threshold': float(os.environ.get('PLAGIARISM_SEGMENT_THRESHOLD', '0.6'))
         }
         
-        # Download required NLTK data
+        # Download required NLTK data - Fail fast if resources unavailable
         try:
             nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt', quiet=True)
-            
-        try:
             nltk.data.find('corpora/stopwords')
         except LookupError:
-            nltk.download('stopwords', quiet=True)
+            logger.error("NLTK data not available. Install with: python -m nltk.downloader punkt stopwords")
+            raise RuntimeError("NLTK resources not available for plagiarism detection")
     
     def preprocess_text(self, text: str) -> str:
         """Clean and normalize text for analysis"""
@@ -185,8 +184,10 @@ class PlagiarismDetector:
         
         return risk_level, overall_score, confidence
     
-    def find_matching_segments(self, text1: str, text2: str, threshold: float = 0.8) -> List[Dict]:
+    def find_matching_segments(self, text1: str, text2: str, threshold: float = None) -> List[Dict]:
         """Find specific text segments that match between two texts"""
+        if threshold is None:
+            threshold = self.thresholds['segment_threshold']
         matches = []
         
         # Split into sentences for more granular analysis
@@ -295,8 +296,9 @@ class PlagiarismDetector:
             max_similarities['semantic'] = max(max_similarities['semantic'], semantic_sim)
             
             # Find specific matching segments if similarity is high
-            if cosine_sim >= 0.6:  # Only store matches above threshold
-                segments = self.find_matching_segments(clean_target, clean_comp, threshold=0.6)
+            segment_threshold = self.thresholds['segment_threshold']
+            if cosine_sim >= segment_threshold:  # Only store matches above threshold
+                segments = self.find_matching_segments(clean_target, clean_comp, threshold=segment_threshold)
                 
                 for segment in segments:
                     match = PlagiarismMatch()
