@@ -99,10 +99,14 @@ class User(UserMixin, db.Model):
     # New RBAC methods
     def has_permission(self, permission_name):
         """Check if user has a specific permission through their roles"""
-        for user_role in self.user_roles:
-            for role_permission in user_role.role.role_permissions:
-                if role_permission.permission.name == permission_name:
-                    return True
+        try:
+            for user_role in self.user_roles:
+                if user_role.role:
+                    for role_permission in user_role.role.role_permissions:
+                        if role_permission.permission and role_permission.permission.name == permission_name:
+                            return True
+        except Exception:
+            pass
         return False
     
     def has_any_permission(self, permission_names):
@@ -116,9 +120,14 @@ class User(UserMixin, db.Model):
     def get_all_permissions(self):
         """Get all permissions for this user through their roles"""
         permissions = set()
-        for user_role in self.user_roles:
-            for role_permission in user_role.role.role_permissions:
-                permissions.add(role_permission.permission.name)
+        try:
+            for user_role in self.user_roles:
+                if user_role.role:
+                    for role_permission in user_role.role.role_permissions:
+                        if role_permission.permission:
+                            permissions.add(role_permission.permission.name)
+        except Exception:
+            pass
         return list(permissions)
     
     def add_role(self, role_name):
@@ -126,7 +135,9 @@ class User(UserMixin, db.Model):
         from models import Role, UserRole  # Import here to avoid circular imports
         role = Role.query.filter_by(name=role_name).first()
         if role and not self.has_role(role_name):
-            user_role = UserRole(user_id=self.id, role_id=role.id)
+            user_role = UserRole()
+            user_role.user_id = self.id
+            user_role.role_id = role.id
             db.session.add(user_role)
             return True
         return False
@@ -144,11 +155,17 @@ class User(UserMixin, db.Model):
     
     def has_role(self, role_name):
         """Check if user has a specific role"""
-        return any(ur.role.name == role_name for ur in self.user_roles)
+        try:
+            return any(ur.role.name == role_name for ur in self.user_roles if ur.role)
+        except Exception:
+            return False
     
     def get_roles(self):
         """Get all role names for this user"""
-        return [ur.role.name for ur in self.user_roles]
+        try:
+            return [ur.role.name for ur in self.user_roles if ur.role]
+        except Exception:
+            return []
     
     # Legacy role methods for backward compatibility with safety checks
     def is_admin(self):
@@ -747,25 +764,39 @@ class Role(db.Model):
     
     @property
     def permission_count(self):
-        return len(self.role_permissions)
+        try:
+            return len(list(self.role_permissions))
+        except Exception:
+            return 0
     
     @property
     def user_count(self):
-        return len(self.user_roles)
+        try:
+            return len(list(self.user_roles))
+        except Exception:
+            return 0
     
     def get_permissions(self):
         """Get all permission names for this role"""
-        return [rp.permission.name for rp in self.role_permissions]
+        try:
+            return [rp.permission.name for rp in self.role_permissions if rp.permission]
+        except Exception:
+            return []
     
     def has_permission(self, permission_name):
         """Check if this role has a specific permission"""
-        return any(rp.permission.name == permission_name for rp in self.role_permissions)
+        try:
+            return any(rp.permission.name == permission_name for rp in self.role_permissions if rp.permission)
+        except Exception:
+            return False
     
     def add_permission(self, permission_name):
         """Add a permission to this role"""
         permission = Permission.query.filter_by(name=permission_name).first()
         if permission and not self.has_permission(permission_name):
-            role_permission = RolePermission(role_id=self.id, permission_id=permission.id)
+            role_permission = RolePermission()
+            role_permission.role_id = self.id
+            role_permission.permission_id = permission.id
             db.session.add(role_permission)
             return True
         return False
@@ -802,11 +833,17 @@ class Permission(db.Model):
     
     @property
     def role_count(self):
-        return len(self.role_permissions)
+        try:
+            return len(list(self.role_permissions))
+        except Exception:
+            return 0
     
     def get_roles(self):
         """Get all role names that have this permission"""
-        return [rp.role.name for rp in self.role_permissions]
+        try:
+            return [rp.role.name for rp in self.role_permissions if rp.role]
+        except Exception:
+            return []
     
     def __repr__(self):
         return f'<Permission {self.name}>'
