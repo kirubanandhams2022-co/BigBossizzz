@@ -1,30 +1,64 @@
+import os
 from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from app import app, db, mail, socketio
 from models import User, Quiz, Question, QuestionOption, QuizAttempt, Answer, ProctoringEvent, LoginEvent, UserViolation, UploadRecord, Course, HostCourseAssignment, ParticipantEnrollment, DeviceLog, SecurityAlert, CollaborationSignal, AttemptSimilarity, AlertThreshold, QuizThresholdOverride, AlertTrigger, InteractionEvent, QuestionHeatmapData, CollaborationInsight, PlagiarismAnalysis, PlagiarismMatch, Role, Permission, UserRole, RolePermission, RoleAuditLog
-# Import optional LTI integration
-try:
-    from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
-                                get_lti_provider, get_lti_grade_passback)
-except ImportError:
-    LTIProvider = LTIUser = LTIGradePassback = LTIToolConfiguration = None
-    get_lti_provider = get_lti_grade_passback = lambda *args, **kwargs: None
 
-# Import optional proctoring reports
-try:
-    from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
-except ImportError:
-    ProctoringReportGenerator = generate_scheduled_report = export_report_to_pdf = None
+# 🛡️ FEATURE FLAGS - Defined immediately after imports to prevent NameError
+ENABLE_LTI = os.environ.get('ENABLE_LTI', 'false').lower() == 'true'
+ENABLE_ANALYTICS = os.environ.get('ENABLE_ANALYTICS', 'false').lower() == 'true'
+ENABLE_REPORTS = os.environ.get('ENABLE_REPORTS', 'false').lower() == 'true'
+ENABLE_PLAGIARISM = os.environ.get('ENABLE_PLAGIARISM', 'false').lower() == 'true'
+ENABLE_COLLABORATION = os.environ.get('ENABLE_COLLABORATION', 'false').lower() == 'true'
+ENABLE_RBAC = os.environ.get('ENABLE_RBAC', 'false').lower() == 'true'
 
-# Import optional analytics engine
-try:
-    from analytics_engine import (AnalyticsEngine, PredictiveAnalytics, QuestionPerformanceAnalyzer, 
-                                  CheatingPatternDetector, InstitutionalDashboard, get_analytics_engine)
-except ImportError:
-    AnalyticsEngine = PredictiveAnalytics = QuestionPerformanceAnalyzer = None
-    CheatingPatternDetector = InstitutionalDashboard = get_analytics_engine = None
+# 🛡️ SAFE PLACEHOLDERS - Initialize all optional symbols as stubs to prevent LSP diagnostics
+LTIProvider = LTIUser = LTIGradePassback = LTIToolConfiguration = None
+get_lti_provider = get_lti_grade_passback = lambda *args, **kwargs: None
+ProctoringReportGenerator = generate_scheduled_report = export_report_to_pdf = None
+AnalyticsEngine = PredictiveAnalytics = QuestionPerformanceAnalyzer = None
+CheatingPatternDetector = InstitutionalDashboard = get_analytics_engine = None
+detector = None
+plagiarism_detector = None
+RBACService = None
+initialize_rbac_system = None
+# 🔒 SECURITY: Fail-closed RBAC decorators - deny access when RBAC disabled  
+def _rbac_fallback_decorator(f):
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            flash('Access denied. Admin privileges required.', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return wrapper
+require_permission = lambda perm: _rbac_fallback_decorator
+require_role = lambda role: _rbac_fallback_decorator
+admin_required = _rbac_fallback_decorator
+permission_context_processor = lambda: {}
+
+# Import optional LTI integration with feature flag (after placeholders)
+if ENABLE_LTI:
+    try:
+        from lti_integration import (LTIProvider, LTIUser, LTIGradePassback, LTIToolConfiguration,
+                                    get_lti_provider, get_lti_grade_passback)
+    except ImportError:
+        ENABLE_LTI = False
+
+# Import optional proctoring reports with feature flag (after placeholders)
+if ENABLE_REPORTS:
+    try:
+        from automated_proctoring_reports import ProctoringReportGenerator, generate_scheduled_report, export_report_to_pdf
+    except ImportError:
+        ENABLE_REPORTS = False
+
+# Import optional analytics engine with feature flag (after placeholders)
+if ENABLE_ANALYTICS:
+    try:
+        from analytics_engine import (AnalyticsEngine, PredictiveAnalytics, QuestionPerformanceAnalyzer, 
+                                      CheatingPatternDetector, InstitutionalDashboard, get_analytics_engine)
+    except ImportError:
+        ENABLE_ANALYTICS = False
 from forms import RegistrationForm, LoginForm, QuizForm, QuestionForm, ProfileForm
 from email_service import send_verification_email, send_credentials_email, send_login_notification, send_host_login_notification
 from flask_mail import Message
@@ -54,34 +88,37 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 from utils import get_time_greeting, get_greeting_icon
 
-# Import collaboration detection after other imports to avoid circular imports
-try:
-    from collaboration_detection import detector
-except ImportError:
-    detector = None  # Fallback if collaboration detection not available
+# Import collaboration detection with feature flag (after placeholders)
+if ENABLE_COLLABORATION:
+    try:
+        from collaboration_detection import detector
+    except ImportError:
+        ENABLE_COLLABORATION = False
 
-# Import plagiarism detection
-try:
-    from plagiarism_detector import plagiarism_detector
-except ImportError:
-    plagiarism_detector = None  # Fallback if plagiarism detection not available
+# Import plagiarism detection with feature flag (after placeholders)
+if ENABLE_PLAGIARISM:
+    try:
+        from plagiarism_detector import plagiarism_detector
+    except ImportError:
+        ENABLE_PLAGIARISM = False
 
-# Import RBAC system
-try:
-    from rbac_service import RBACService, initialize_rbac_system
-    from rbac_decorators import require_permission, require_role, admin_required, permission_context_processor
-except ImportError:
-    RBACService = None
-    initialize_rbac_system = None
-    require_permission = lambda perm: lambda f: f  # Fallback decorator
-    require_role = lambda role: lambda f: f
-    admin_required = lambda f: f
-    permission_context_processor = lambda: {}
+# Import RBAC system with feature flag (after placeholders)
+if ENABLE_RBAC:
+    try:
+        from rbac_service import RBACService, initialize_rbac_system
+        from rbac_decorators import require_permission, require_role, admin_required, permission_context_processor
+    except ImportError:
+        ENABLE_RBAC = False
 
 # Add email health check endpoint
 @app.route('/admin/email-health')
+@login_required
 def admin_email_health():
     """Email system health check for monitoring"""
+    # 🔒 SECURITY: Require admin role for health check
+    if not current_user.is_authenticated or current_user.role != 'admin':
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('login'))
     try:
         from email_service import brevo_service, test_email_service
         is_healthy = test_email_service()

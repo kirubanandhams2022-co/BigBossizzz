@@ -64,7 +64,18 @@ db.init_app(app)
 login_manager.init_app(app)
 mail.init_app(app)
 csrf.init_app(app)
-socketio.init_app(app, async_mode='eventlet', cors_allowed_origins="*", message_queue=f'redis://localhost:6379/0' if redis_client else None)
+# 🔒 SECURITY: Restrict CORS origins to known domains
+allowed_origins = [
+    "http://localhost:5000",
+    "https://localhost:5000", 
+    "http://127.0.0.1:5000",
+    "https://127.0.0.1:5000"
+]
+# Allow additional origins from environment for production
+if os.environ.get('ALLOWED_ORIGINS'):
+    allowed_origins.extend(os.environ.get('ALLOWED_ORIGINS').split(','))
+
+socketio.init_app(app, async_mode='eventlet', cors_allowed_origins=allowed_origins, message_queue=f'redis://localhost:6379/0' if redis_client else None)
 
 # Configure login manager  
 login_manager.login_view = 'login'  # type: ignore
@@ -99,35 +110,45 @@ with app.app_context():
         # Import User as fallback
         from models import User
     
-    # Default Admin Account
-    if not User.query.filter_by(email='admin@platform.com').first():
-        admin = User()
-        admin.username = 'admin'
-        admin.email = 'admin@platform.com'
-        admin.role = 'admin'
-        admin.set_password('admin123')
-        admin.is_verified = True
-        db.session.add(admin)
+    # 🔒 SECURITY: Default accounts only in development mode
+    # Production systems should use proper user management
+    is_development = os.environ.get('FLASK_ENV') == 'development' or os.environ.get('DEBUG') == 'true'
     
-    # Default Host Account
-    if not User.query.filter_by(email='host@platform.com').first():
-        host = User()
-        host.username = 'host'
-        host.email = 'host@platform.com'
-        host.role = 'host'
-        host.set_password('host123')
-        host.is_verified = True
-        db.session.add(host)
-    
-    # Default Participant Account
-    if not User.query.filter_by(email='participant@platform.com').first():
-        participant = User()
-        participant.username = 'participant'
-        participant.email = 'participant@platform.com'
-        participant.role = 'participant'
-        participant.set_password('participant123')
-        participant.is_verified = True
-        db.session.add(participant)
+    if is_development:
+        # Default Admin Account (DEV ONLY)
+        if not User.query.filter_by(email='admin@platform.com').first():
+            admin = User()
+            admin.username = 'admin'
+            admin.email = 'admin@platform.com'
+            admin.role = 'admin'
+            admin.set_password('admin123')
+            admin.is_verified = True
+            db.session.add(admin)
+            logging.info("⚠️ DEV: Created default admin account (admin@platform.com)")
+        
+        # Default Host Account (DEV ONLY)
+        if not User.query.filter_by(email='host@platform.com').first():
+            host = User()
+            host.username = 'host'
+            host.email = 'host@platform.com'
+            host.role = 'host'
+            host.set_password('host123')
+            host.is_verified = True
+            db.session.add(host)
+            logging.info("⚠️ DEV: Created default host account (host@platform.com)")
+        
+        # Default Participant Account (DEV ONLY)
+        if not User.query.filter_by(email='participant@platform.com').first():
+            participant = User()
+            participant.username = 'participant'
+            participant.email = 'participant@platform.com'
+            participant.role = 'participant'
+            participant.set_password('participant123')
+            participant.is_verified = True
+            db.session.add(participant)
+            logging.info("⚠️ DEV: Created default participant account (participant@platform.com)")
+    else:
+        logging.info("🔒 PRODUCTION: Skipping default account creation for security")
     
     db.session.commit()
     
