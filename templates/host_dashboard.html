@@ -38,12 +38,18 @@
                     <i class="fas fa-sign-in-alt me-2"></i> Login Activity
                 </a>
             </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <a class="dropdown-item" href="{{ url_for('host_heatmap_dashboard') }}">
+                    <i class="fas fa-fire me-2"></i> Heatmap Dashboard
+                </a>
+            </li>
         </ul>
     </div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg-3 col-md-6 mb-3">
         <a href="{{ url_for('host_total_quizzes') }}" class="text-decoration-none">
             <div class="card bg-primary text-white card-hover">
                 <div class="card-body">
@@ -59,7 +65,7 @@
         </a>
     </div>
     
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg-3 col-md-6 mb-3">
         <a href="{{ url_for('host_active_quizzes') }}" class="text-decoration-none">
             <div class="card bg-success text-white card-hover">
                 <div class="card-body">
@@ -75,7 +81,7 @@
         </a>
     </div>
     
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg-3 col-md-6 mb-3">
         <a href="{{ url_for('host_recent_attempts') }}" class="text-decoration-none">
             <div class="card bg-info text-white card-hover">
                 <div class="card-body">
@@ -91,16 +97,16 @@
         </a>
     </div>
     
-    <div class="col-md-3 col-sm-6 mb-3">
-        <a href="{{ url_for('host_completed_attempts') }}" class="text-decoration-none">
-            <div class="card bg-warning text-dark card-hover">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <a href="{{ url_for('host_heatmap_dashboard') }}" class="text-decoration-none">
+            <div class="card bg-info text-white card-hover">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4>{{ recent_attempts|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
-                            <p class="mb-0">Completed</p>
+                            <h4>{{ heatmap_ready_count }}</h4>
+                            <p class="mb-0">Heatmap Ready</p>
                         </div>
-                        <i class="fas fa-check-circle fa-2x"></i>
+                        <i class="fas fa-fire fa-2x"></i>
                     </div>
                 </div>
             </div>
@@ -148,6 +154,9 @@
                                         {% if quiz.proctoring_enabled %}
                                             <span class="badge bg-info">Proctored</span>
                                         {% endif %}
+                                        {% if quiz.has_heatmap_data %}
+                                            <span class="badge bg-info"><i class="fas fa-fire"></i> Heatmap</span>
+                                        {% endif %}
                                     </td>
                                     <td>{{ quiz.created_at.strftime('%Y-%m-%d') }}</td>
                                     <td>
@@ -158,6 +167,11 @@
                                             <a href="{{ url_for('view_quiz', quiz_id=quiz.id) }}" class="btn btn-outline-info">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            {% if quiz.has_heatmap_data %}
+                                                <a href="{{ url_for('host_heatmap_dashboard') }}?quiz_id={{ quiz.id }}" class="btn btn-outline-info" title="View Heatmap Analytics">
+                                                    <i class="fas fa-fire"></i>
+                                                </a>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -233,6 +247,52 @@
                     <div class="text-center">
                         <h4 class="text-success">{{ (avg_score|sum / avg_score|length)|round(1) }}%</h4>
                         <small class="text-muted">Average Score</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-fire text-info"></i> Heatmap Insights</h5>
+                <a href="{{ url_for('host_heatmap_dashboard') }}" class="btn btn-sm btn-outline-info">
+                    <i class="fas fa-external-link-alt"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                {% if heatmap_ready_count > 0 %}
+                    <div class="text-center mb-3">
+                        <h4 class="text-info">{{ heatmap_ready_count }}</h4>
+                        <small class="text-muted">Quizzes with Data</small>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="text-info">
+                                <i class="fas fa-mouse-pointer"></i>
+                                <div class="small">Click Tracking</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-warning">
+                                <i class="fas fa-brain"></i>
+                                <div class="small">AI Insights</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>Engagement Analysis</span>
+                            <span>Active</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-gradient bg-info" style="width: {{ (heatmap_ready_count / quizzes|length * 100) if quizzes|length > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-fire fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0 small">No heatmap data yet</p>
+                        <small class="text-muted">Complete quizzes to generate insights</small>
                     </div>
                 {% endif %}
             </div>
