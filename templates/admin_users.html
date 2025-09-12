@@ -275,26 +275,56 @@
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
                         <strong>Format:</strong> Enter one user per line in this format:<br>
-                        <code>username,email,password,role</code><br>
-                        <small>Password and role are optional. If not provided, auto-generated password and default role will be used.</small>
+                        <code>username,email,password,role,courses</code><br>
+                        <small><strong>Optional fields:</strong> password, role, courses (semicolon-separated course codes like DSA;MATH)<br>
+                        <strong>Course Assignment:</strong> Use course codes separated by semicolons, or leave empty to use default course below.</small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Default Role for Users</label>
+                                <select name="default_role" class="form-select">
+                                    <option value="participant">Participant</option>
+                                    <option value="host">Host</option>
+                                    <option value="admin">Administrator</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Default Course (Optional)</label>
+                                <select name="default_course" class="form-select">
+                                    <option value="">No Course Assignment</option>
+                                    {% for course in courses %}
+                                        <option value="{{ course.code }}">{{ course.code }} - {{ course.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Users will be assigned to this course unless specified per line</small>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Default Role for Users</label>
-                        <select name="default_role" class="form-select">
-                            <option value="participant">Participant</option>
-                            <option value="host">Host</option>
-                            <option value="admin">Administrator</option>
-                        </select>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="auto_create_courses" id="autoCreateCourses">
+                            <label class="form-check-label" for="autoCreateCourses">
+                                Auto-create missing courses
+                            </label>
+                            <small class="form-text text-muted d-block">If enabled, courses that don't exist will be automatically created with the course code as the name</small>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
                         <label class="form-label">User Data</label>
-                        <textarea name="users_data" class="form-control" rows="10" placeholder="student1,student1@example.com,password123,participant
-student2,student2@example.com,,participant
-teacher1,teacher1@example.com,teacherpass,host
-admin1,admin1@example.com,adminpass,admin" required></textarea>
-                        <small class="text-muted">Example: student1,student1@example.com,password123,participant</small>
+                        <textarea name="users_data" class="form-control" rows="10" placeholder="student1,student1@example.com,password123,participant,DSA;MATH
+student2,student2@example.com,,participant,DSA
+teacher1,teacher1@example.com,teacherpass,host,DSA
+admin1,admin1@example.com,adminpass,admin," required></textarea>
+                        <small class="text-muted">Examples:<br>
+                        • <code>student1,student1@example.com,password123,participant,DSA;MATH</code> (assign to DSA and MATH courses)<br>
+                        • <code>student2,student2@example.com,,participant,DSA</code> (auto-generated password, assign to DSA)<br>
+                        • <code>teacher1,teacher1@example.com,teacherpass,host,</code> (empty courses = use default course)</small>
                     </div>
                 </div>
                 <div class="modal-footer">
